@@ -5,16 +5,8 @@
 package main
 
 import (
-	"bytes"
-	"crypto/tls"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"log"
-	"math"
 	"net"
-	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -47,7 +39,7 @@ type Server struct {
 	dnsHandler   *dns.ServeMux
 
 	// DNSSEC key material
-	DnsKey  *dns.DNSKEY
+	PubKey  *dns.DNSKEY
 	KeyTag  uint16
 	PrivKey dns.PrivateKey
 
@@ -57,8 +49,8 @@ type Server struct {
 }
 
 // Newserver returns a new Server.
-func NewServer(domain, dnsAddr, string, nameservers []string, etcd string) *Server {
-	s = &Server{
+func NewServer(domain, dnsAddr string, nameservers []string, etcdAddr string) *Server {
+	s := &Server{
 		domain:       strings.ToLower(domain),
 		domainLabels: dns.CountLabel(dns.Fqdn(domain)),
 		DnsAddr:      dnsAddr,
@@ -75,11 +67,10 @@ func NewServer(domain, dnsAddr, string, nameservers []string, etcd string) *Serv
 
 // Start starts a DNS server and blocks waiting to be killed.
 func (s *Server) Start() (*sync.WaitGroup, error) {
-	var err error
-	log.Printf("initializing Server. DNS Addr: %q, Forwarders: %q", s.dnsAddr, s.ectdAddr, s.nameservers)
+	log.Printf("initializing Server. DNS Addr: %q, Forwarders: %q", s.DnsAddr, s.EtcdAddr, s.nameservers)
 
 	s.dnsTCPServer = &dns.Server{
-		Addr:         s.DNSAddr,
+		Addr:         s.DnsAddr,
 		Net:          "tcp",
 		Handler:      s.dnsHandler,
 		ReadTimeout:  s.ReadTimeout,
@@ -87,10 +78,10 @@ func (s *Server) Start() (*sync.WaitGroup, error) {
 	}
 
 	s.dnsUDPServer = &dns.Server{
-		Addr:         s.DNSAddr,
+		Addr:         s.DnsAddr,
 		Net:          "udp",
 		Handler:      s.dnsHandler,
-		UDPSize:      65535,
+		UDPSize:      65535, // TODO(miek): hmmm.
 		ReadTimeout:  s.ReadTimeout,
 		WriteTimeout: s.WriteTimeout,
 	}
@@ -108,28 +99,11 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) run() {
-	var (
-		tick = time.NewTicker(1 * time.Second)
-		sig  = make(chan os.Signal)
-	)
+	var sig = make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt)
-	defer tick.Stop()
 
 	for {
 		select {
-		case <-tick.C:
-			// We are the leader, we are responsible for managing TTLs
-			if s.IsLeader() {
-				expired := s.registry.GetExpired()
-
-				// TODO: Possible race condition? We could be demoted while iterating
-				// probably minimal chance of this happening, this will just cause commands to fail,
-				// and new leader will take over anyway
-				for _, uuid := range expired {
-					stats.ExpiredCount.Inc(1)
-					s.raftServer.Do(NewRemoveServiceCommand(uuid))
-				}
-			}
 		case <-sig:
 			s.Stop()
 			return
@@ -140,7 +114,7 @@ func (s *Server) run() {
 // ServeDNS is the handler for DNS requests, responsible for parsing DNS request, possibly forwarding
 // it to a real dns server and returning a response.
 func (s *Server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
-	stats.RequestCount.Inc(1)
+	//stats.RequestCount.Inc(1)
 
 	q := req.Question[0]
 
@@ -161,7 +135,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.Answer = make([]dns.RR, 0, 10)
 	defer func() {
 		// Check if we need to do DNSSEC and sign the reply
-		if s.PublicKey() != nil {
+		if s.PubKey != nil {
 			if opt := req.IsEdns0(); opt != nil && opt.Do() {
 				s.nsec(m)
 				s.sign(m, opt.UDPSize())
@@ -173,8 +147,8 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	if q.Name == dns.Fqdn(s.domain) {
 		switch q.Qtype {
 		case dns.TypeDNSKEY:
-			if s.PublicKey() != nil {
-				m.Answer = append(m.Answer, s.PublicKey())
+			if s.PubKey != nil {
+				m.Answer = append(m.Answer, s.PubKey)
 				return
 			}
 		case dns.TypeSOA:
@@ -189,7 +163,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			m.Ns = s.createSOA()
 			return
 		}
-		if s.roundrobin {
+		if s.RoundRobin {
 			switch l := uint16(len(records)); l {
 			case 1:
 			case 2:
@@ -272,152 +246,166 @@ Redo:
 }
 
 func (s *Server) getARecords(q dns.Question) (records []dns.RR, err error) {
-	var h string
+//	var h string
 	name := strings.TrimSuffix(q.Name, ".")
 
 	if name == s.domain {
-		for _, m := range s.Members() {
-			h, _, err = net.SplitHostPort(m)
+		// talk to etc
+		/*
+			for _, m := range s.Members() {
+				h, _, err = net.SplitHostPort(m)
 
+				if err != nil {
+					return
+				}
+				if q.Qtype == dns.TypeA {
+					records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 15}, A: net.ParseIP(h)})
+				}
+			}
+		*/
+	}
+	// Leader should always be listed
+	if name == "leader."+s.domain || name == "master."+s.domain || name == s.domain {
+		// TODO(miek): talks to etcd
+		/*
+			h, _, err = net.SplitHostPort(s.Leader())
 			if err != nil {
 				return
 			}
 			if q.Qtype == dns.TypeA {
 				records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 15}, A: net.ParseIP(h)})
 			}
-		}
-	}
-	// Leader should always be listed
-	if name == "leader."+s.domain || name == "master."+s.domain || name == s.domain {
-		h, _, err = net.SplitHostPort(s.Leader())
-		if err != nil {
-			return
-		}
-		if q.Qtype == dns.TypeA {
-			records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 15}, A: net.ParseIP(h)})
-		}
+		*/
 		return
 	}
 
-	var (
-		services []msg.Service
-		key      = strings.TrimSuffix(q.Name, s.domain+".")
-	)
+	/*
+		var (
+			services nil //[]msg.Service
+			key      = strings.TrimSuffix(q.Name, s.domain+".")
+		)
+	*/
 
-	services, err = s.registry.Get(key)
-	if len(services) == 0 && len(key) > 1 {
-		// no services found, it might be that a client is trying to get the IP
-		// for UUID.skydns.local. Try to search for those.
-		service, e := s.registry.GetUUID(key[:len(key)-1])
-		if e == nil {
-			services = append(services, service)
-			err = nil
+	/*
+		services, err = s.registry.Get(key)
+		if len(services) == 0 && len(key) > 1 {
+			// no services found, it might be that a client is trying to get the IP
+			// for UUID.skydns.local. Try to search for those.
+			service, e := s.registry.GetUUID(key[:len(key)-1])
+			if e == nil {
+				services = append(services, service)
+				err = nil
+			}
 		}
-	}
+	*/
 
-	for _, serv := range services {
-		ip := net.ParseIP(serv.Host)
-		switch {
-		case ip == nil:
-			continue
-		case ip.To4() != nil && q.Qtype == dns.TypeA:
-			records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: serv.TTL}, A: ip.To4()})
-		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
-			records = append(records, &dns.AAAA{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: serv.TTL}, AAAA: ip.To16()})
+	/*
+		for _, serv := range services {
+			ip := net.ParseIP(serv.Host)
+			switch {
+			case ip == nil:
+				continue
+			case ip.To4() != nil && q.Qtype == dns.TypeA:
+				records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: serv.TTL}, A: ip.To4()})
+			case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
+				records = append(records, &dns.AAAA{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: serv.TTL}, AAAA: ip.To16()})
+			}
 		}
-	}
+	*/
 	return
 }
 
 func (s *Server) getSRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
-	var weight uint16
-	services := make([]msg.Service, 0)
+	/*
+		var weight uint16
+		services := make([]msg.Service, 0)
 
-	key := strings.TrimSuffix(q.Name, s.domain+".")
-	services, err = s.registry.Get(key)
-
-	if err != nil {
-		return
-	}
-
-	weight = 0
-	if len(services) > 0 {
-		weight = uint16(math.Floor(float64(100 / len(services))))
-	}
-
-	for _, serv := range services {
-		// TODO: Dynamically set weight
-		// a Service may have an IP as its Host"name", in this case
-		// substitute UUID + "." + s.domain+"." an add an A record
-		// with the name and IP in the additional section.
-		// TODO(miek): check if resolvers actually grok this
-		ip := net.ParseIP(serv.Host)
-		switch {
-		case ip == nil:
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.TTL},
-				Priority: 10, Weight: weight, Port: serv.Port, Target: serv.Host + "."})
-			continue
-		case ip.To4() != nil:
-			extra = append(extra, &dns.A{Hdr: dns.RR_Header{Name: serv.UUID + "." + s.domain + ".", Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: serv.TTL}, A: ip.To4()})
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.TTL},
-				Priority: 10, Weight: weight, Port: serv.Port, Target: serv.UUID + "." + s.domain + "."})
-		case ip.To16() != nil:
-			extra = append(extra, &dns.AAAA{Hdr: dns.RR_Header{Name: serv.UUID + "." + s.domain + ".", Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: serv.TTL}, AAAA: ip.To16()})
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.TTL},
-				Priority: 10, Weight: weight, Port: serv.Port, Target: serv.UUID + "." + s.domain + "."})
-		default:
-			panic("skydns: internal error")
-		}
-	}
-
-	// Append matching entries in different region than requested with a higher priority
-	labels := dns.SplitDomainName(key)
-
-	pos := len(labels) - 4
-	if len(labels) >= 4 && labels[pos] != "*" {
-		region := labels[pos]
-		labels[pos] = "*"
-
-		// TODO: This is pretty much a copy of the above, and should be abstracted
-		additionalServices := make([]msg.Service, len(services))
-		additionalServices, err = s.registry.Get(strings.Join(labels, "."))
+		key := strings.TrimSuffix(q.Name, s.domain+".")
+		services, err = s.registry.Get(key)
 
 		if err != nil {
 			return
 		}
 
 		weight = 0
-		if len(additionalServices) <= len(services) {
-			return
+		if len(services) > 0 {
+			weight = uint16(math.Floor(float64(100 / len(services))))
 		}
 
-		weight = uint16(math.Floor(float64(100 / (len(additionalServices) - len(services)))))
-		for _, serv := range additionalServices {
-			// Exclude entries we already have
-			if strings.ToLower(serv.Region) == region {
-				continue
-			}
-			// TODO: Dynamically set priority and weight
-			// TODO(miek): same as above: abstract away
+		for _, serv := range services {
+			// TODO: Dynamically set weight
+			// a Service may have an IP as its Host"name", in this case
+			// substitute UUID + "." + s.domain+"." an add an A record
+			// with the name and IP in the additional section.
+			// TODO(miek): check if resolvers actually grok this
 			ip := net.ParseIP(serv.Host)
 			switch {
 			case ip == nil:
 				records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.TTL},
-					Priority: 20, Weight: weight, Port: serv.Port, Target: serv.Host + "."})
+					Priority: 10, Weight: weight, Port: serv.Port, Target: serv.Host + "."})
 				continue
 			case ip.To4() != nil:
 				extra = append(extra, &dns.A{Hdr: dns.RR_Header{Name: serv.UUID + "." + s.domain + ".", Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: serv.TTL}, A: ip.To4()})
 				records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.TTL},
-					Priority: 20, Weight: weight, Port: serv.Port, Target: serv.UUID + "." + s.domain + "."})
+					Priority: 10, Weight: weight, Port: serv.Port, Target: serv.UUID + "." + s.domain + "."})
 			case ip.To16() != nil:
 				extra = append(extra, &dns.AAAA{Hdr: dns.RR_Header{Name: serv.UUID + "." + s.domain + ".", Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: serv.TTL}, AAAA: ip.To16()})
 				records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.TTL},
-					Priority: 20, Weight: weight, Port: serv.Port, Target: serv.UUID + "." + s.domain + "."})
+					Priority: 10, Weight: weight, Port: serv.Port, Target: serv.UUID + "." + s.domain + "."})
 			default:
 				panic("skydns: internal error")
 			}
 		}
-	}
+
+		// Append matching entries in different region than requested with a higher priority
+		labels := dns.SplitDomainName(key)
+
+		pos := len(labels) - 4
+		if len(labels) >= 4 && labels[pos] != "*" {
+				region := labels[pos]
+				labels[pos] = "*"
+
+				// TODO: This is pretty much a copy of the above, and should be abstracted
+				additionalServices := make([]msg.Service, len(services))
+				additionalServices, err = s.registry.Get(strings.Join(labels, "."))
+
+				if err != nil {
+					return
+				}
+
+				weight = 0
+				if len(additionalServices) <= len(services) {
+					return
+				}
+
+				weight = uint16(math.Floor(float64(100 / (len(additionalServices) - len(services)))))
+				for _, serv := range additionalServices {
+					// Exclude entries we already have
+					if strings.ToLower(serv.Region) == region {
+						continue
+					}
+					// TODO: Dynamically set priority and weight
+					// TODO(miek): same as above: abstract away
+					ip := net.ParseIP(serv.Host)
+					switch {
+					case ip == nil:
+						records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.TTL},
+							Priority: 20, Weight: weight, Port: serv.Port, Target: serv.Host + "."})
+						continue
+					case ip.To4() != nil:
+						extra = append(extra, &dns.A{Hdr: dns.RR_Header{Name: serv.UUID + "." + s.domain + ".", Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: serv.TTL}, A: ip.To4()})
+						records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.TTL},
+							Priority: 20, Weight: weight, Port: serv.Port, Target: serv.UUID + "." + s.domain + "."})
+					case ip.To16() != nil:
+						extra = append(extra, &dns.AAAA{Hdr: dns.RR_Header{Name: serv.UUID + "." + s.domain + ".", Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: serv.TTL}, AAAA: ip.To16()})
+						records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.TTL},
+							Priority: 20, Weight: weight, Port: serv.Port, Target: serv.UUID + "." + s.domain + "."})
+					default:
+						panic("skydns: internal error")
+					}
+				}
+		}
+	*/
 	return
 }
 

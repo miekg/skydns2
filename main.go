@@ -19,7 +19,7 @@ var (
 	nameserver string
 	rtimeout   time.Duration
 	wtimeout   time.Duration
-	dns        string
+	ldns        string
 	etcd       string
 	domain     string
 	dnssec     string
@@ -34,14 +34,14 @@ func init() {
 			}
 			return "skydns.local"
 		}(), "domain to anchor requests to or env. var. SKYDNS_DOMAIN")
-	flag.StringVar(&lns, "dns",
+	flag.StringVar(&ldns, "dns",
 		func() string {
 			if x := os.Getenv("SKYDNS_DNS"); x != "" {
 				return x
 			}
 			return "127.0.0.1:53"
 		}(), "ip:port to bind to for DNS or env. var SKYDNS_DNS")
-	flag.StringVar(&etcd, "etcd", "url of etcd")
+	flag.StringVar(&etcd, "etcd", "", "url of etcd")
 	flag.DurationVar(&rtimeout, "rtimeout", 2*time.Second, "read timeout")
 	flag.DurationVar(&wtimeout, "wtimeout", 2*time.Second, "write timeout")
 	flag.StringVar(&nameserver, "nameserver", "", "nameserver address to forward (non-local) queries to e.g. 8.8.8.8:53,8.8.4.4:53")
@@ -63,12 +63,13 @@ func main() {
 		}
 	}
 
-	s := NewServer(domain, dns, http, nameservers, etcd)
+	s := NewServer(domain, ldns, nameservers, etcd)
 	s.ReadTimeout = rtimeout
 	s.WriteTimeout = wtimeout
+	s.RoundRobin = roundrobin
 
 	if dnssec != "" {
-		k, p, e := server.ParseKeyFile(dnssec)
+		k, p, e := ParseKeyFile(dnssec)
 		if e != nil {
 			log.Fatal(e)
 		}

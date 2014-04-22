@@ -2,14 +2,13 @@
 // Use of this source code is governed by The MIT License (MIT) that can be
 // found in the LICENSE file.
 
-package server
+package main
 
 import (
 	"crypto/sha1"
 	"github.com/miekg/dns"
 	"log"
 	"os"
-	"strings"
 	"sync"
 	"time"
 )
@@ -43,7 +42,7 @@ func ParseKeyFile(file string) (*dns.DNSKEY, dns.PrivateKey, error) {
 }
 
 func (s *Server) SetKeys(k *dns.DNSKEY, p dns.PrivateKey) {
-	s.DnsKey = k
+	s.PubKey = k
 	s.KeyTag = k.KeyTag()
 	s.PrivKey = p
 }
@@ -96,7 +95,7 @@ func (s *Server) sign(m *dns.Msg, bufsize uint16) {
 		}
 		sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
 			sig1 := s.newRRSIG(incep, expir)
-			e := sig1.Sign(s.PrivateKey(), r)
+			e := sig1.Sign(s.PrivKey, r)
 			if e != nil {
 				log.Printf("Failed to sign: %s\n", e.Error())
 			}
@@ -125,7 +124,7 @@ func (s *Server) sign(m *dns.Msg, bufsize uint16) {
 		}
 		sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
 			sig1 := s.newRRSIG(incep, expir)
-			e := sig1.Sign(s.PrivateKey(), r)
+			e := sig1.Sign(s.PrivKey, r)
 			if e != nil {
 				log.Printf("Failed to sign: %s\n", e.Error())
 			}
@@ -158,11 +157,11 @@ func (s *Server) newRRSIG(incep, expir uint32) *dns.RRSIG {
 	sig.Hdr.Rrtype = dns.TypeRRSIG
 	sig.Hdr.Ttl = origTTL
 	sig.OrigTtl = origTTL
-	sig.Algorithm = s.PublicKey().Algorithm
-	sig.KeyTag = s.KeyTag()
+	sig.Algorithm = s.PubKey.Algorithm
+	sig.KeyTag = s.KeyTag
 	sig.Inception = incep
 	sig.Expiration = expir
-	sig.SignerName = s.PublicKey().Hdr.Name
+	sig.SignerName = s.PubKey.Hdr.Name
 	return sig
 }
 
@@ -180,7 +179,10 @@ func (s *Server) newNSEC(qname string) *dns.NSEC {
 		ls4 = 0
 	}
 	key := qlabels[ls4:ls]
-	prev, next := s.registry.GetNSEC(strings.Join(key, "."))
+	key = key // TODO(miek)
+	// TODO etcd here
+//	prev, next := s.registry.GetNSEC(strings.Join(key, "."))
+	prev, next := "", ""
 	nsec := &dns.NSEC{Hdr: dns.RR_Header{Name: prev + s.domain + ".", Rrtype: dns.TypeNSEC, Class: dns.ClassINET, Ttl: 60},
 		NextDomain: next + s.domain + "."}
 	if prev == "" {
