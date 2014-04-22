@@ -17,7 +17,10 @@ import (
 
 var (
 	nameserver string
+	rtimeout   time.Duration
+	wtimeout   time.Duration
 	dns        string
+	etcd       string
 	domain     string
 	dnssec     string
 	roundrobin bool
@@ -30,23 +33,25 @@ func init() {
 				return x
 			}
 			return "skydns.local"
-		}(), "Domain to anchor requests to or env. var. SKYDNS_DOMAIN")
-	flag.StringVar(&ldns, "dns",
+		}(), "domain to anchor requests to or env. var. SKYDNS_DOMAIN")
+	flag.StringVar(&lns, "dns",
 		func() string {
 			if x := os.Getenv("SKYDNS_DNS"); x != "" {
 				return x
 			}
 			return "127.0.0.1:53"
-		}(), "IP:Port to bind to for DNS or env. var SKYDNS_DNS")
-	flag.StringVar(&nameserver, "nameserver", "", "Nameserver address to forward (non-local) queries to e.g. 8.8.8.8:53,8.8.4.4:53")
-	flag.StringVar(&dnssec, "dnssec", "", "Basename of DNSSEC key file e.q. Kskydns.local.+005+38250")
-	flag.BoolVar(&roundrobin, "roundrobin", true, "Round robin A/AAAA replies")
+		}(), "ip:port to bind to for DNS or env. var SKYDNS_DNS")
+	flag.StringVar(&etcd, "etcd", "url of etcd")
+	flag.DurationVar(&rtimeout, "rtimeout", 2*time.Second, "read timeout")
+	flag.DurationVar(&wtimeout, "wtimeout", 2*time.Second, "write timeout")
+	flag.StringVar(&nameserver, "nameserver", "", "nameserver address to forward (non-local) queries to e.g. 8.8.8.8:53,8.8.4.4:53")
+	flag.StringVar(&dnssec, "dnssec", "", "basename of DNSSEC key file e.q. Kskydns.local.+005+38250")
+	flag.BoolVar(&roundrobin, "roundrobin", true, "round robin A/AAAA replies")
 }
 
 func main() {
 	flag.Parse()
 	nameservers := strings.Split(nameserver, ",")
-	// empty argument given
 	if len(nameservers) == 1 && nameservers[0] == "" {
 		nameservers = make([]string, 0)
 		config, err := dns.ClientConfigFromFile("/etc/resolv.conf")
@@ -58,7 +63,9 @@ func main() {
 		}
 	}
 
-	s := server.NewServer(members, domain, ldns, lhttp, dataDir, rtimeout, wtimeout, secret, nameservers, !norr, tlskey, tlspem)
+	s := NewServer(domain, dns, http, nameservers, etcd)
+	s.ReadTimeout = rtimeout
+	s.WriteTimeout = wtimeout
 
 	if dnssec != "" {
 		k, p, e := server.ParseKeyFile(dnssec)
@@ -66,7 +73,7 @@ func main() {
 			log.Fatal(e)
 		}
 		if k.Header().Name != dns.Fqdn(domain) {
-			log.Fatal(errors.New("Owner name of DNSKEY must match SkyDNS domain"))
+			log.Fatal(errors.New("ownername of DNSKEY must match SkyDNS domain"))
 		}
 		s.SetKeys(k, p)
 	}

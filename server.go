@@ -1,8 +1,8 @@
-// Copyright (c) 2013 The SkyDNS Authors. All rights reserved.
+// Copyright (c) 2014 The SkyDNS Authors. All rights reserved.
 // Use of this source code is governed by The MIT License (MIT) that can be
 // found in the LICENSE file.
 
-package server
+package main
 
 import (
 	"bytes"
@@ -21,17 +21,7 @@ import (
 	"sync"
 	"time"
 
-	//non-builtin packages should go below.
-	"github.com/goraft/raft"
-	"github.com/gorilla/mux"
 	"github.com/miekg/dns"
-	"github.com/skynetservices/skydns/msg"
-	"github.com/skynetservices/skydns/registry"
-	"github.com/skynetservices/skydns/stats"
-)
-
-const (
-	raftElectionTimeout = 200 * time.Millisecond
 )
 
 /* TODO:
@@ -43,195 +33,71 @@ const (
    TTL cleanup thread should shutdown/start based on being elected master
 */
 
-func init() {
-	// Register Raft Commands
-	raft.RegisterCommand(&AddServiceCommand{})
-	raft.RegisterCommand(&UpdateTTLCommand{})
-	raft.RegisterCommand(&RemoveServiceCommand{})
-	raft.RegisterCommand(&AddCallbackCommand{})
-}
-
 type Server struct {
-	members     []string // initial members to join with
-	nameservers []string // nameservers to forward to
-
+	nameservers  []string // nameservers to forward to
 	domain       string
 	domainLabels int
-	dnsAddr      string
-	httpAddr     string
-	readTimeout  time.Duration
-	writeTimeout time.Duration
-	waiter       *sync.WaitGroup
+	DnsAddr      string
+	EtcdAddr     string
 
-	registry registry.Registry
+	waiter *sync.WaitGroup
 
 	dnsUDPServer *dns.Server
 	dnsTCPServer *dns.Server
 	dnsHandler   *dns.ServeMux
 
-	httpServer *http.Server
-	router     *mux.Router
-
-	raftServer raft.Server
-	dataDir    string
-	secret     string
-
 	// DNSSEC key material
-	dnsKey  *dns.DNSKEY
-	keyTag  uint16
-	privKey dns.PrivateKey
+	DnsKey  *dns.DNSKEY
+	KeyTag  uint16
+	PrivKey dns.PrivateKey
 
-	roundrobin bool
-
-	//private key and pem for tls
-	tlskey string
-	tlspem string
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+	RoundRobin   bool
 }
 
 // Newserver returns a new Server.
-func NewServer(members []string, domain string, dnsAddr string, httpAddr string, dataDir string, rt, wt time.Duration, secret string, nameservers []string, roundrobin bool, tlskey string, tlspem string) (s *Server) {
+func NewServer(domain, dnsAddr, string, nameservers []string, etcd string) *Server {
 	s = &Server{
-		members:      members,
 		domain:       strings.ToLower(domain),
 		domainLabels: dns.CountLabel(dns.Fqdn(domain)),
-		dnsAddr:      dnsAddr,
-		httpAddr:     httpAddr,
-		readTimeout:  rt,
-		writeTimeout: wt,
-		router:       mux.NewRouter(),
-		registry:     registry.New(),
-		dataDir:      dataDir,
+		DnsAddr:      dnsAddr,
+		EtcdAddr:     etcdAddr,
 		dnsHandler:   dns.NewServeMux(),
 		waiter:       new(sync.WaitGroup),
-		secret:       secret,
 		nameservers:  nameservers,
-		roundrobin:   roundrobin,
-		tlskey:       tlskey,
-		tlspem:       tlspem,
-	}
-
-	if _, err := os.Stat(s.dataDir); os.IsNotExist(err) {
-		log.Fatal("Data directory does not exist: ", dataDir)
-		return
 	}
 
 	// DNS
 	s.dnsHandler.Handle(".", s)
-
-	authWrapper := s.authHTTPWrapper
-
-	// API Routes
-	s.router.HandleFunc("/skydns/services/{uuid}", authWrapper(s.addServiceHTTPHandler)).Methods("PUT")
-	s.router.HandleFunc("/skydns/services/{uuid}", authWrapper(s.getServiceHTTPHandler)).Methods("GET")
-	s.router.HandleFunc("/skydns/services/{uuid}", authWrapper(s.removeServiceHTTPHandler)).Methods("DELETE")
-	s.router.HandleFunc("/skydns/services/{uuid}", authWrapper(s.updateServiceHTTPHandler)).Methods("PATCH")
-
-	s.router.HandleFunc("/skydns/callbacks/{uuid}", authWrapper(s.addCallbackHTTPHandler)).Methods("PUT")
-
-	// External API Routes
-	// /skydns/services #list all services
-	s.router.HandleFunc("/skydns/services/", authWrapper(s.getServicesHTTPHandler)).Methods("GET")
-	// /skydns/regions #list all regions
-	s.router.HandleFunc("/skydns/regions/", authWrapper(s.getRegionsHTTPHandler)).Methods("GET")
-	// /skydns/environnments #list all environments
-	s.router.HandleFunc("/skydns/environments/", authWrapper(s.getEnvironmentsHTTPHandler)).Methods("GET")
-
-	// Raft Routes
-	s.router.HandleFunc("/raft/join", s.joinHandler).Methods("POST")
-	return
+	return s
 }
-
-// DNSAddr returns IP:Port of a DNS Server.
-func (s *Server) DNSAddr() string { return s.dnsAddr }
-
-// HTTPAddr returns IP:Port of HTTP Server.
-func (s *Server) HTTPAddr() string { return s.httpAddr }
-
-// PublicKey returns the DNSKEY record of the server.
-func (s *Server) PublicKey() *dns.DNSKEY { return s.dnsKey }
-
-// KeyTag returns the keytag of the DNSKEY record of the server.
-func (s *Server) KeyTag() uint16 { return s.keyTag }
-
-// PrivateKey returns the private key of the server.
-func (s *Server) PrivateKey() dns.PrivateKey { return s.privKey }
 
 // Start starts a DNS server and blocks waiting to be killed.
 func (s *Server) Start() (*sync.WaitGroup, error) {
 	var err error
-	log.Printf("Initializing Server. DNS Addr: %q, HTTP Addr: %q, Data Dir: %q, Forwarders: %q", s.dnsAddr, s.httpAddr, s.dataDir, s.nameservers)
-
-	// Initialize and start Raft server.
-	transporter := raft.NewHTTPTransporter("/raft", raftElectionTimeout)
-	s.raftServer, err = raft.NewServer(s.HTTPAddr(), s.dataDir, transporter, nil, s.registry, "")
-	if err != nil {
-		log.Fatal(err)
-	}
-	transporter.Install(s.raftServer, s)
-	s.raftServer.Start()
-
-	// Join to leader if specified.
-	if len(s.members) > 0 {
-		log.Println("Joining cluster:", strings.Join(s.members, ","))
-
-		if !s.raftServer.IsLogEmpty() {
-			log.Fatal("Cannot join with an existing log")
-		}
-
-		if err := s.Join(s.members); err != nil {
-			return nil, err
-		}
-
-		log.Println("Joined cluster")
-
-		// Initialize the server by joining itself.
-	} else if s.raftServer.IsLogEmpty() {
-		log.Println("Initializing new cluster")
-
-		_, err := s.raftServer.Do(&raft.DefaultJoinCommand{
-			Name:             s.raftServer.Name(),
-			ConnectionString: s.connectionString(),
-		})
-
-		if err != nil {
-			log.Fatal(err)
-			return nil, err
-		}
-
-	} else {
-		log.Println("Recovered from log")
-	}
+	log.Printf("initializing Server. DNS Addr: %q, Forwarders: %q", s.dnsAddr, s.ectdAddr, s.nameservers)
 
 	s.dnsTCPServer = &dns.Server{
-		Addr:         s.DNSAddr(),
+		Addr:         s.DNSAddr,
 		Net:          "tcp",
 		Handler:      s.dnsHandler,
-		ReadTimeout:  s.readTimeout,
-		WriteTimeout: s.writeTimeout,
+		ReadTimeout:  s.ReadTimeout,
+		WriteTimeout: s.WriteTimeout,
 	}
 
 	s.dnsUDPServer = &dns.Server{
-		Addr:         s.DNSAddr(),
+		Addr:         s.DNSAddr,
 		Net:          "udp",
 		Handler:      s.dnsHandler,
 		UDPSize:      65535,
-		ReadTimeout:  s.readTimeout,
-		WriteTimeout: s.writeTimeout,
-	}
-
-	s.httpServer = &http.Server{
-		Addr:           s.HTTPAddr(),
-		Handler:        s.router,
-		ReadTimeout:    s.readTimeout,
-		WriteTimeout:   s.writeTimeout,
-		MaxHeaderBytes: 1 << 20,
+		ReadTimeout:  s.ReadTimeout,
+		WriteTimeout: s.WriteTimeout,
 	}
 
 	go s.listenAndServe()
-
 	s.waiter.Add(1)
 	go s.run()
-
 	return s.waiter, nil
 }
 
@@ -239,32 +105,6 @@ func (s *Server) Start() (*sync.WaitGroup, error) {
 func (s *Server) Stop() {
 	log.Println("Stopping server")
 	s.waiter.Done()
-}
-
-// Leader returns the current leader.
-func (s *Server) Leader() string {
-	l := s.raftServer.Leader()
-	if l == "" {
-		// We are a single node cluster, we are the leader
-		return s.raftServer.Name()
-	}
-	return l
-}
-
-// IsLeader returns true if this instance the current leader.
-func (s *Server) IsLeader() bool {
-	return s.raftServer.State() == raft.Leader
-}
-
-// Members returns the current members.
-func (s *Server) Members() (members []string) {
-	peers := s.raftServer.Peers()
-
-	for _, p := range peers {
-		members = append(members, strings.TrimPrefix(p.ConnectionString, "http://"))
-	}
-
-	return
 }
 
 func (s *Server) run() {
@@ -293,66 +133,6 @@ func (s *Server) run() {
 		case <-sig:
 			s.Stop()
 			return
-		}
-	}
-}
-
-// Join joins an existing SkyDNS cluster.
-func (s *Server) Join(members []string) error {
-	command := &raft.DefaultJoinCommand{
-		Name:             s.raftServer.Name(),
-		ConnectionString: s.connectionString(),
-	}
-
-	var b bytes.Buffer
-	json.NewEncoder(&b).Encode(command)
-
-	for _, m := range members {
-		log.Println("Attempting to connect to:", m)
-
-		resp, err := http.Post(fmt.Sprintf("http://%s/raft/join", strings.TrimSpace(m)), "application/json", &b)
-		log.Println("Post returned")
-
-		if err != nil {
-			if _, ok := err.(*url.Error); ok {
-				// If we receive a network error try the next member
-				continue
-			}
-
-			return err
-		}
-
-		resp.Body.Close()
-		return nil
-	}
-
-	return errors.New("Could not connect to any cluster members")
-}
-
-// HandleFunc proxies HTTP handlers to Gorilla's mux.Router.
-func (s *Server) HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request)) {
-	s.router.HandleFunc(pattern, handler)
-}
-
-// Handles incoming RAFT joins.
-func (s *Server) joinHandler(w http.ResponseWriter, req *http.Request) {
-	log.Println("Processing incoming join")
-	command := &raft.DefaultJoinCommand{}
-
-	if err := json.NewDecoder(req.Body).Decode(&command); err != nil {
-		log.Println("Error decoding json message:", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if _, err := s.raftServer.Do(command); err != nil {
-		switch err {
-		case raft.NotLeaderError:
-			log.Println("Redirecting to leader")
-			s.redirectToLeader(w, req)
-		default:
-			log.Println("Error processing join:", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
 }
@@ -641,11 +421,6 @@ func (s *Server) getSRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR
 	return
 }
 
-// Returns the connection string.
-func (s *Server) connectionString() string {
-	return fmt.Sprintf("http://%s", s.httpAddr)
-}
-
 // Binds to DNS and HTTP ports and starts accepting connections
 func (s *Server) listenAndServe() {
 	go func() {
@@ -661,211 +436,6 @@ func (s *Server) listenAndServe() {
 			log.Fatalf("Start %s listener on %s failed:%s", s.dnsUDPServer.Net, s.dnsUDPServer.Addr, err.Error())
 		}
 	}()
-
-	go func() {
-		if s.tlskey != "" {
-			log.Print("Starting http server with tls")
-			var err error
-			config := &tls.Config{}
-			if s.httpServer.TLSConfig != nil {
-				*config = *s.httpServer.TLSConfig
-			}
-			if config.NextProtos == nil {
-				config.NextProtos = []string{"http/1.1"}
-			}
-
-			config.Certificates = make([]tls.Certificate, 1)
-			config.Certificates[0], err = tls.LoadX509KeyPair(s.tlspem, s.tlskey)
-			if err != nil {
-				log.Fatal(err)
-			}
-			config.BuildNameToCertificate()
-			conn, err := net.Listen("tcp", s.httpAddr)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			tlsListener := tls.NewListener(conn, config)
-			s.httpServer.Serve(tlsListener)
-		} else {
-			log.Print("Starting http server without tls")
-			err := s.httpServer.ListenAndServe()
-			if err != nil {
-				log.Fatalf("Start http listener on %s failed:%s", s.httpServer.Addr, err.Error())
-			}
-		}
-	}()
-}
-
-func (s *Server) redirectToLeader(w http.ResponseWriter, req *http.Request) {
-	if s.Leader() != "" {
-		http.Redirect(w, req, "http://"+s.Leader()+req.URL.Path, http.StatusMovedPermanently)
-	} else {
-		log.Println("Error: Leader Unknown")
-		http.Error(w, "Leader unknown", http.StatusInternalServerError)
-	}
-}
-
-// shared auth method on server.
-func (s *Server) authenticate(secret string) (err error) {
-	if s.secret != "" && secret != s.secret {
-		err = errors.New("Unauthorized")
-	}
-	return
-}
-
-// Handle API add service requests
-func (s *Server) addServiceHTTPHandler(w http.ResponseWriter, req *http.Request) {
-	stats.AddServiceCount.Inc(1)
-	vars := mux.Vars(req)
-
-	var uuid string
-	var ok bool
-
-	if uuid, ok = vars["uuid"]; !ok {
-		http.Error(w, "UUID required", http.StatusBadRequest)
-		return
-	}
-
-	var serv msg.Service
-
-	if err := json.NewDecoder(req.Body).Decode(&serv); err != nil {
-		log.Println("Error: ", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if serv.Host == "" || serv.Port == 0 {
-		http.Error(w, "Host and Port required", http.StatusBadRequest)
-		return
-	}
-
-	serv.UUID = uuid
-
-	if _, err := s.raftServer.Do(NewAddServiceCommand(serv)); err != nil {
-		switch err {
-		case registry.ErrExists:
-			http.Error(w, err.Error(), http.StatusConflict)
-		case raft.NotLeaderError:
-			s.redirectToLeader(w, req)
-		default:
-			log.Println("Error: ", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
-	}
-	w.WriteHeader(http.StatusCreated)
-}
-
-// Handle API remove service requests
-func (s *Server) removeServiceHTTPHandler(w http.ResponseWriter, req *http.Request) {
-	stats.RemoveServiceCount.Inc(1)
-	vars := mux.Vars(req)
-
-	var (
-		uuid string
-		ok   bool
-	)
-
-	if uuid, ok = vars["uuid"]; !ok {
-		http.Error(w, "UUID required", http.StatusBadRequest)
-		return
-	}
-
-	if _, err := s.raftServer.Do(NewRemoveServiceCommand(uuid)); err != nil {
-		switch err {
-		case registry.ErrNotExists:
-			http.Error(w, err.Error(), http.StatusNotFound)
-		case raft.NotLeaderError:
-			s.redirectToLeader(w, req)
-		default:
-			log.Println("Error: ", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
-	}
-}
-
-// Handle API update service requests
-func (s *Server) updateServiceHTTPHandler(w http.ResponseWriter, req *http.Request) {
-	stats.UpdateTTLCount.Inc(1)
-	vars := mux.Vars(req)
-
-	var uuid string
-	var ok bool
-
-	if uuid, ok = vars["uuid"]; !ok {
-		http.Error(w, "UUID required", http.StatusBadRequest)
-		return
-	}
-
-	var serv msg.Service
-	if err := json.NewDecoder(req.Body).Decode(&serv); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if _, err := s.raftServer.Do(NewUpdateTTLCommand(uuid, serv.TTL)); err != nil {
-		switch err {
-		case registry.ErrNotExists:
-			http.Error(w, err.Error(), http.StatusNotFound)
-		case raft.NotLeaderError:
-			s.redirectToLeader(w, req)
-		default:
-			log.Println("Error: ", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
-}
-
-// getServiceHTTPHandler handles API get service requests.
-func (s *Server) getServiceHTTPHandler(w http.ResponseWriter, req *http.Request) {
-	stats.GetServiceCount.Inc(1)
-	vars := mux.Vars(req)
-
-	var uuid string
-	var ok bool
-
-	if uuid, ok = vars["uuid"]; !ok {
-		http.Error(w, "UUID required", http.StatusBadRequest)
-		return
-	}
-
-	log.Println("Retrieving Service ", uuid)
-	serv, err := s.registry.GetUUID(uuid)
-
-	if err != nil {
-		switch err {
-		case registry.ErrNotExists:
-			http.Error(w, err.Error(), http.StatusNotFound)
-		default:
-			log.Println("Error: ", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-
-		return
-	}
-
-	if err := json.NewEncoder(w).Encode(serv); err != nil {
-		log.Println("Error: ", err)
-	}
-}
-
-// authHTTPWrapper will wrap a standard handler
-// if the secret is specified for the server.
-func (s *Server) authHTTPWrapper(handler http.HandlerFunc) http.HandlerFunc {
-	if s.secret != "" {
-		return func(w http.ResponseWriter, req *http.Request) {
-			//read the authorization header to get the secret.
-			secret := req.Header.Get("Authorization")
-
-			if err := s.authenticate(secret); err != nil {
-				http.Error(w, err.Error(), http.StatusUnauthorized)
-				return
-			}
-			handler(w, req)
-		}
-	}
-	return handler
 }
 
 // Return a SOA record for this SkyDNS instance.

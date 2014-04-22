@@ -43,10 +43,9 @@ func ParseKeyFile(file string) (*dns.DNSKEY, dns.PrivateKey, error) {
 }
 
 func (s *Server) SetKeys(k *dns.DNSKEY, p dns.PrivateKey) {
-	s.dnsKey = k
-	s.keyTag = k.KeyTag()
-	s.privKey = p
-	s.registry.DNSSEC(true)
+	s.DnsKey = k
+	s.KeyTag = k.KeyTag()
+	s.PrivKey = p
 }
 
 // nsec creates (if needed) NSEC records that are included in the reply.
