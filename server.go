@@ -21,7 +21,7 @@ type Server struct {
 	nameservers  []string // nameservers to forward to
 	domain       string
 	domainLabels int
-	client         *etcd.Client
+	client       *etcd.Client
 
 	waiter *sync.WaitGroup
 
@@ -47,7 +47,7 @@ func NewServer(domain, dnsAddr string, nameservers []string, etcdAddr string) *S
 		domain:       strings.ToLower(domain),
 		domainLabels: dns.CountLabel(dns.Fqdn(domain)),
 		DnsAddr:      dnsAddr,
-		client:     etcd.NewClient([]string{etcdAddr}),
+		client:       etcd.NewClient([]string{etcdAddr}),
 		dnsHandler:   dns.NewServeMux(),
 		waiter:       new(sync.WaitGroup),
 		nameservers:  nameservers,
