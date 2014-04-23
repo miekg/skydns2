@@ -13,24 +13,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
 )
-
-/* TODO:
-   Set Priority based on Region
-   Dynamically set Weight/Priority in DNS responses
-   Handle API call for setting host statistics
-   Handle Errors in DNS
-   Master should cleanup expired services
-   TTL cleanup thread should shutdown/start based on being elected master
-*/
 
 type Server struct {
 	nameservers  []string // nameservers to forward to
 	domain       string
 	domainLabels int
-	DnsAddr      string
-	EtcdAddr     string
+	client         *etcd.Client
 
 	waiter *sync.WaitGroup
 
@@ -38,6 +29,7 @@ type Server struct {
 	dnsTCPServer *dns.Server
 	dnsHandler   *dns.ServeMux
 
+	DnsAddr string
 	// DNSSEC key material
 	PubKey  *dns.DNSKEY
 	KeyTag  uint16
@@ -49,12 +41,13 @@ type Server struct {
 }
 
 // Newserver returns a new Server.
+// TODO(miek): multiple ectdAddrs
 func NewServer(domain, dnsAddr string, nameservers []string, etcdAddr string) *Server {
 	s := &Server{
 		domain:       strings.ToLower(domain),
 		domainLabels: dns.CountLabel(dns.Fqdn(domain)),
 		DnsAddr:      dnsAddr,
-		EtcdAddr:     etcdAddr,
+		client:     etcd.NewClient([]string{etcdAddr}),
 		dnsHandler:   dns.NewServeMux(),
 		waiter:       new(sync.WaitGroup),
 		nameservers:  nameservers,
@@ -67,7 +60,7 @@ func NewServer(domain, dnsAddr string, nameservers []string, etcdAddr string) *S
 
 // Start starts a DNS server and blocks waiting to be killed.
 func (s *Server) Start() (*sync.WaitGroup, error) {
-	log.Printf("initializing Server. DNS Addr: %q, Forwarders: %q", s.DnsAddr, s.EtcdAddr, s.nameservers)
+	log.Printf("initializing Server. DNS Addr: %q, Forwarders: %q", s.DnsAddr, s.nameservers)
 
 	s.dnsTCPServer = &dns.Server{
 		Addr:         s.DnsAddr,
@@ -246,7 +239,7 @@ Redo:
 }
 
 func (s *Server) getARecords(q dns.Question) (records []dns.RR, err error) {
-//	var h string
+	//	var h string
 	name := strings.TrimSuffix(q.Name, ".")
 
 	if name == s.domain {
