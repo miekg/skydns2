@@ -1,16 +1,13 @@
 package main
 
 import (
-	"github.com/miekg/dns"
 	"net"
 	"strconv"
 	"strings"
-)
 
-// we put the names in the reverse domain
-// bla.blie.skydns.local becomes
-// local/skydns/blie/bla/srv where we put the rdata
-// last element must be A AAAA or SRV
+	"github.com/coreos/go-etcd/etcd"
+	"github.com/miekg/dns"
+)
 
 func toValue(rr dns.RR) string {
 	switch x := rr.(type) {
@@ -26,7 +23,7 @@ func toValue(rr dns.RR) string {
 	return ""
 }
 
-func toKey(s string) string {
+func toPath(s string) string {
 	l := dns.SplitDomainName(s)
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
 		l[i], l[j] = l[j], l[i]
@@ -45,9 +42,39 @@ func parseSRV(v string) (uint16, uint16, uint16, string, error) {
 	return uint16(prio), uint16(weight), uint16(port), p[3], nil
 }
 
-// Convert a DNS question to a etcd key. If the questions looks
+// questionToPath converts a DNS question to a etcd key. If the questions looks
 // like service.staging.skydns.local SRV, the resulting key
 // will by /local/skydns/staging/service/SRV .
-func QuestionToKey(q string, t uint16) string {
-	return "/" + toKey(q) + "/" + dns.TypeToString[t]
+func questionToPath(q string, t uint16) string {
+	return "/" + toPath(q) + "/" + dns.TypeToString[t]
+}
+
+// TODO(miek): TTL etc.
+func parseValue(typ, value string) dns.RR {
+	switch typ {
+	case "A":
+		a := new(dns.A)
+		a.A, _ = parseA(value)
+		return a
+	case "AAAA":
+		aaaa := new(dns.AAAA)
+		aaaa.AAAA, _ = parseAAAA(value)
+		return aaaa
+	case "SRV":
+		srv := new(dns.SRV)
+		srv.Priority, srv.Weight, srv.Port, srv.Target, _ = parseSRV(value)
+		return srv
+	}
+	return nil
+}
+
+// Create header here too.
+func get(e *etcd.Client, path string) ([]dns.RR, error) {
+	r, err := e.Get(path, false, false)
+	if err != nil {
+		return nil, err
+	}
+	// r.Response.Node.Value
+	// Look in response r and extract stuff
+	return nil, nil
 }

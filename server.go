@@ -74,7 +74,6 @@ func (s *Server) Start() (*sync.WaitGroup, error) {
 		Addr:         s.DnsAddr,
 		Net:          "udp",
 		Handler:      s.dnsHandler,
-		UDPSize:      65535, // TODO(miek): hmmm.
 		ReadTimeout:  s.ReadTimeout,
 		WriteTimeout: s.WriteTimeout,
 	}
@@ -402,7 +401,7 @@ func (s *Server) getSRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR
 	return
 }
 
-// Binds to DNS and HTTP ports and starts accepting connections
+// listenAndServe binds to DNS ports and starts accepting connections.
 func (s *Server) listenAndServe() {
 	go func() {
 		err := s.dnsTCPServer.ListenAndServe()
@@ -419,7 +418,7 @@ func (s *Server) listenAndServe() {
 	}()
 }
 
-// Return a SOA record for this SkyDNS instance.
+// createSOA return a SOA record for this SkyDNS instance.
 func (s *Server) createSOA() []dns.RR {
 	dom := dns.Fqdn(s.domain)
 	soa := &dns.SOA{Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 3600},
