@@ -63,7 +63,7 @@ func main() {
 		}
 	}
 
-	s := NewServer(domain, ldns, nameservers, etcdc)
+	s := NewServer(domain, ldns, nameservers, etcdclient)
 	s.ReadTimeout = rtimeout
 	s.WriteTimeout = wtimeout
 	s.RoundRobin = roundrobin
