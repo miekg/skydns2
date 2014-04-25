@@ -31,6 +31,7 @@ func toKey(s string) string {
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
 		l[i], l[j] = l[j], l[i]
 	}
+	// TODO(miek): escape slashes in s.
 	return strings.Join(l, "/")
 }
 
@@ -42,4 +43,11 @@ func parseSRV(v string) (uint16, uint16, uint16, string, error) {
 	weight, _ := strconv.Atoi(p[1])
 	port, _ := strconv.Atoi(p[2])
 	return uint16(prio), uint16(weight), uint16(port), p[3], nil
+}
+
+// Convert a DNS question to a etcd key. If the questions looks
+// like service.staging.skydns.local SRV, the resulting key
+// will by /local/skydns/staging/service/SRV .
+func QuestionToKey(q string, t uint16) string {
+	return "/" + toKey(q) + "/" + dns.TypeToString[t]
 }
