@@ -35,18 +35,21 @@ func parseSRV(v string) (uint16, uint16, uint16, string, error) {
 	return uint16(prio), uint16(weight), uint16(port), p[3], nil
 }
 
-func parseValue(t uint16, value string) dns.RR {
+func parseValue(t uint16, value string, h dns.RR_Header) dns.RR {
 	switch t {
 	case dns.TypeA:
 		a := new(dns.A)
+		a.Hdr = h
 		a.A, _ = parseA(value)
 		return a
 	case dns.TypeAAAA:
 		aaaa := new(dns.AAAA)
+		aaaa.Hdr = h
 		aaaa.AAAA, _ = parseAAAA(value)
 		return aaaa
 	case dns.TypeSRV:
 		srv := new(dns.SRV)
+		srv.Hdr = h
 		srv.Priority, srv.Weight, srv.Port, srv.Target, _ = parseSRV(value)
 		return srv
 	}
@@ -61,6 +64,5 @@ func get(e *etcd.Client, q string, t uint16) ([]dns.RR, error) {
 	}
 	h := dns.RR_Header{Name: q, Rrtype: t, Class: dns.ClassINET, Ttl: 60} // Ttl is overridden
 	rr := parseValue(t, r.Node.Value, h)
-	rr.Header() = h
 	return []dns.RR{rr}, nil
 }

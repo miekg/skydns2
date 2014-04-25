@@ -22,6 +22,7 @@ type Server interface {
 	Stop()
 	ServeDNS(dns.ResponseWriter, *dns.Msg)
 	ServeDNSForward(dns.ResponseWriter, *dns.Msg)
+	// GetRecords
 }
 
 type server struct {
@@ -51,7 +52,7 @@ type server struct {
 // TODO(miek): multiple ectdAddrs
 func NewServer(domain, dnsAddr string, nameservers []string, etcdAddr string) *server {
 	s := &server{
-		domain:       strings.ToLower(domain),
+		domain:       dns.Fqdn(strings.ToLower(domain)),
 		domainLabels: dns.CountLabel(dns.Fqdn(domain)),
 		DnsAddr:      dnsAddr,
 		client:       etcd.NewClient([]string{etcdAddr}),
@@ -151,18 +152,19 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				return
 			}
 		case dns.TypeSOA:
-			m.Answer = s.createSOA()
+			m.Answer = s.SOA()
 			return
 		}
 	}
 	if q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA {
-		records, err := s.getARecords(q)
+		records, err := s.AddressRecords(q)
 		if err != nil {
 			m.SetRcode(req, dns.RcodeNameError)
-			m.Ns = s.createSOA()
+			m.Ns = s.SOA()
 			return
 		}
 		if s.RoundRobin {
+			// TODO(miek): refactor this out
 			switch l := uint16(len(records)); l {
 			case 1:
 			case 2:
@@ -183,11 +185,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 		m.Answer = append(m.Answer, records...)
 	}
-	records, extra, err := s.getSRVRecords(q)
+	records, extra, err := s.SRVRecords(q)
 	if err != nil && len(m.Answer) == 0 {
 		// We are authoritative for this name, but it does not exist: NXDOMAIN
 		m.SetRcode(req, dns.RcodeNameError)
-		m.Ns = s.createSOA()
+		m.Ns = s.SOA()
 		return
 	}
 	if q.Qtype == dns.TypeANY || q.Qtype == dns.TypeSRV {
@@ -196,7 +198,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	if len(m.Answer) == 0 { // Send back a NODATA response
-		m.Ns = s.createSOA()
+		m.Ns = s.SOA()
 	}
 }
 
@@ -244,10 +246,8 @@ Redo:
 	w.WriteMsg(m)
 }
 
-func (s *server) getARecords(q dns.Question) (records []dns.RR, err error) {
-	//	var h string
-	name := strings.TrimSuffix(q.Name, ".")
-
+func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
+	name := strings.ToLower(q.Name)
 	if name == s.domain {
 		// talk to etc
 		/*
@@ -277,44 +277,10 @@ func (s *server) getARecords(q dns.Question) (records []dns.RR, err error) {
 		*/
 		return
 	}
-
-	/*
-		var (
-			services nil //[]msg.Service
-			key      = strings.TrimSuffix(q.Name, s.domain+".")
-		)
-	*/
-
-	/*
-		services, err = s.registry.Get(key)
-		if len(services) == 0 && len(key) > 1 {
-			// no services found, it might be that a client is trying to get the IP
-			// for UUID.skydns.local. Try to search for those.
-			service, e := s.registry.GetUUID(key[:len(key)-1])
-			if e == nil {
-				services = append(services, service)
-				err = nil
-			}
-		}
-	*/
-
-	/*
-		for _, serv := range services {
-			ip := net.ParseIP(serv.Host)
-			switch {
-			case ip == nil:
-				continue
-			case ip.To4() != nil && q.Qtype == dns.TypeA:
-				records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: serv.TTL}, A: ip.To4()})
-			case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
-				records = append(records, &dns.AAAA{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: serv.TTL}, AAAA: ip.To16()})
-			}
-		}
-	*/
-	return
+	return get(s.client, name, q.Qtype)
 }
 
-func (s *server) getSRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
+func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
 	/*
 		var weight uint16
 		services := make([]msg.Service, 0)
@@ -425,12 +391,11 @@ func (s *server) listenAndServe() {
 	}()
 }
 
-// createSOA return a SOA record for this SkyDNS instance.
-func (s *server) createSOA() []dns.RR {
-	dom := dns.Fqdn(s.domain)
-	soa := &dns.SOA{Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 3600},
-		Ns:      "master." + dom,
-		Mbox:    "hostmaster." + dom,
+// SOA return a SOA record for this SkyDNS instance.
+func (s *server) SOA() []dns.RR {
+	soa := &dns.SOA{Hdr: dns.RR_Header{Name: s.domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 3600},
+		Ns:      "master." + s.domain,
+		Mbox:    "hostmaster." + s.domain,
 		Serial:  uint32(time.Now().Truncate(time.Hour).Unix()),
 		Refresh: 28800,
 		Retry:   7200,
