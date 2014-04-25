@@ -163,26 +163,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			m.Ns = s.SOA()
 			return
 		}
-		if s.RoundRobin {
-			// TODO(miek): refactor this out
-			switch l := uint16(len(records)); l {
-			case 1:
-			case 2:
-				if dns.Id()%2 == 0 {
-					records[0], records[1] = records[1], records[0]
-				}
-			default:
-				// Do a minimum of l swap, maximum of 4l swaps
-				for j := 0; j < int(l*(dns.Id()%4+1)); j++ {
-					q := dns.Id() % l
-					p := dns.Id() % l
-					if q == p {
-						p = (p + 1) % l
-					}
-					records[q], records[p] = records[p], records[q]
-				}
-			}
-		}
 		m.Answer = append(m.Answer, records...)
 	}
 	records, extra, err := s.SRVRecords(q)
@@ -277,21 +257,15 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		*/
 		return
 	}
-	return get(s.client, name, q.Qtype)
+	return s.get(name, q.Qtype)
 }
 
 func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
+	name := strings.ToLower(q.Name)
+	// If we find no SRV, check for A or AAAA and substitube.
+	x, _ := s.get(name, q.Qtype)
+	return x, nil, nil
 	/*
-		var weight uint16
-		services := make([]msg.Service, 0)
-
-		key := strings.TrimSuffix(q.Name, s.domain+".")
-		services, err = s.registry.Get(key)
-
-		if err != nil {
-			return
-		}
-
 		weight = 0
 		if len(services) > 0 {
 			weight = uint16(math.Floor(float64(100 / len(services))))
@@ -403,4 +377,38 @@ func (s *server) SOA() []dns.RR {
 		Minttl:  60,
 	}
 	return []dns.RR{soa}
+}
+
+// get return resource records from the etc instance.
+func (s *server) get(q string, t uint16) ([]dns.RR, error) {
+	path := questionToPath(q, t)
+	r, err := s.client.Get(path, false, false)
+	if err != nil {
+		return nil, err
+	}
+	h := dns.RR_Header{Name: q, Rrtype: t, Class: dns.ClassINET, Ttl: 60} // Ttl is overridden
+	rr := parseValue(t, r.Node.Value, h)
+	log.Printf("%v\n", r)
+	/*
+		if s.RoundRobin && (t == dns.TypeA || t == dns.TypeAAAA) {
+			switch l := uint16(len(rr)); l {
+			case 1:
+			case 2:
+				if dns.Id()%2 == 0 {
+					rr[0], rr[1] = rr[1], rr[0]
+				}
+			default:
+				// Do a minimum of l swap, maximum of 4l swaps
+				for j := 0; j < int(l*(dns.Id()%4+1)); j++ {
+					q := dns.Id() % l
+					p := dns.Id() % l
+					if q == p {
+						p = (p + 1) % l
+					}
+					rr[q], rr[p] = rr[p], rr[q]
+				}
+			}
+		}
+	*/
+	return []dns.RR{rr}, nil
 }

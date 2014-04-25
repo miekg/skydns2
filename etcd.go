@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
 )
 
+// toPath convert a domainname to a etcd path.
 func toPath(s string) string {
 	l := dns.SplitDomainName(s)
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
@@ -54,15 +54,4 @@ func parseValue(t uint16, value string, h dns.RR_Header) dns.RR {
 		return srv
 	}
 	return nil
-}
-
-func get(e *etcd.Client, q string, t uint16) ([]dns.RR, error) {
-	path := questionToPath(q, t)
-	r, err := e.Get(path, false, false)
-	if err != nil {
-		return nil, err
-	}
-	h := dns.RR_Header{Name: q, Rrtype: t, Class: dns.ClassINET, Ttl: 60} // Ttl is overridden
-	rr := parseValue(t, r.Node.Value, h)
-	return []dns.RR{rr}, nil
 }
