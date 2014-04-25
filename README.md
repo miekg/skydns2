@@ -3,7 +3,8 @@
 
 SkyDNS bla bla bla, uses Etcd and utilizes DNS queries. Bla bla bla.
 
-[Announcement Blog Post](http://blog.gopheracademy.com/skydns)
+This is the origingal [announcement blog post](http://blog.gopheracademy.com/skydns) for version 1, since then SkyDNS
+has seen some changes.
 
 ##Setup / Install
 
@@ -16,7 +17,7 @@ Compile SkyDNS, and execute it
 Which takes the following flags
 - -domain - This is the domain requests are anchored to and should be appended to all requests (Defaults to: skydns.local)
 - -dns - This is the ip:port to listen on for DNS requests (Defaults to: 127.0.0.1:53)
-- -etcd - location of etcd.
+- -etcd - url of etcd.
 
 
 ##API
