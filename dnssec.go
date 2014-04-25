@@ -41,14 +41,14 @@ func ParseKeyFile(file string) (*dns.DNSKEY, dns.PrivateKey, error) {
 	return k.(*dns.DNSKEY), p, nil
 }
 
-func (s *Server) SetKeys(k *dns.DNSKEY, p dns.PrivateKey) {
+func (s *server) setKeys(k *dns.DNSKEY, p dns.PrivateKey) {
 	s.PubKey = k
 	s.KeyTag = k.KeyTag()
 	s.PrivKey = p
 }
 
 // nsec creates (if needed) NSEC records that are included in the reply.
-func (s *Server) nsec(m *dns.Msg) {
+func (s *server) nsec(m *dns.Msg) {
 	if m.Rcode == dns.RcodeNameError {
 		// qname nsec
 		nsec1 := s.newNSEC(m.Question[0].Name)
@@ -75,7 +75,7 @@ func (s *Server) nsec(m *dns.Msg) {
 // We also fake the origin TTL in the signature, because we don't want to
 // throw away signatures when services decide to have longer TTL. So we just
 // set the origTTL to 60.
-func (s *Server) sign(m *dns.Msg, bufsize uint16) {
+func (s *server) sign(m *dns.Msg, bufsize uint16) {
 	now := time.Now().UTC()
 	incep := uint32(now.Add(-2 * time.Hour).Unix())     // 2 hours, be sure to catch daylight saving time and such
 	expir := uint32(now.Add(7 * 24 * time.Hour).Unix()) // sign for a week
@@ -152,7 +152,7 @@ func (s *Server) sign(m *dns.Msg, bufsize uint16) {
 	return
 }
 
-func (s *Server) newRRSIG(incep, expir uint32) *dns.RRSIG {
+func (s *server) newRRSIG(incep, expir uint32) *dns.RRSIG {
 	sig := new(dns.RRSIG)
 	sig.Hdr.Rrtype = dns.TypeRRSIG
 	sig.Hdr.Ttl = origTTL
@@ -166,7 +166,7 @@ func (s *Server) newRRSIG(incep, expir uint32) *dns.RRSIG {
 }
 
 // newNSEC returns the NSEC record need to denial qname, or gives back a NODATA NSEC.
-func (s *Server) newNSEC(qname string) *dns.NSEC {
+func (s *server) newNSEC(qname string) *dns.NSEC {
 	qlabels := dns.SplitDomainName(qname)
 	if len(qlabels) < s.domainLabels {
 		// TODO(miek): can not happen...?

@@ -17,7 +17,14 @@ import (
 	"github.com/miekg/dns"
 )
 
-type Server struct {
+type Server interface {
+	Start() (*sync.WaitGroup, error)
+	Stop()
+	ServeDNS(dns.ResponseWriter, *dns.Msg)
+	ServeDNSForward(dns.ResponseWriter, *dns.Msg)
+}
+
+type server struct {
 	nameservers  []string // nameservers to forward to
 	domain       string
 	domainLabels int
@@ -40,10 +47,10 @@ type Server struct {
 	RoundRobin   bool
 }
 
-// Newserver returns a new Server.
+// Newserver returns a new server.
 // TODO(miek): multiple ectdAddrs
-func NewServer(domain, dnsAddr string, nameservers []string, etcdAddr string) *Server {
-	s := &Server{
+func NewServer(domain, dnsAddr string, nameservers []string, etcdAddr string) *server {
+	s := &server{
 		domain:       strings.ToLower(domain),
 		domainLabels: dns.CountLabel(dns.Fqdn(domain)),
 		DnsAddr:      dnsAddr,
@@ -59,8 +66,8 @@ func NewServer(domain, dnsAddr string, nameservers []string, etcdAddr string) *S
 }
 
 // Start starts a DNS server and blocks waiting to be killed.
-func (s *Server) Start() (*sync.WaitGroup, error) {
-	log.Printf("initializing Server. DNS Addr: %q, Forwarders: %q", s.DnsAddr, s.nameservers)
+func (s *server) Start() (*sync.WaitGroup, error) {
+	log.Printf("initializing server. DNS Addr: %q, Forwarders: %q", s.DnsAddr, s.nameservers)
 
 	s.dnsTCPServer = &dns.Server{
 		Addr:         s.DnsAddr,
@@ -85,12 +92,12 @@ func (s *Server) Start() (*sync.WaitGroup, error) {
 }
 
 // Stop stops a server.
-func (s *Server) Stop() {
+func (s *server) Stop() {
 	log.Println("Stopping server")
 	s.waiter.Done()
 }
 
-func (s *Server) run() {
+func (s *server) run() {
 	var sig = make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt)
 
@@ -105,7 +112,7 @@ func (s *Server) run() {
 
 // ServeDNS is the handler for DNS requests, responsible for parsing DNS request, possibly forwarding
 // it to a real dns server and returning a response.
-func (s *Server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
+func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	//stats.RequestCount.Inc(1)
 
 	q := req.Question[0]
@@ -194,7 +201,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 }
 
 // ServeDNSForward forwards a request to a nameservers and returns the response.
-func (s *Server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
+func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	if len(s.nameservers) == 0 {
 		log.Printf("Error: Failure to Forward DNS Request, no servers configured %q", dns.ErrServ)
 		m := new(dns.Msg)
@@ -237,7 +244,7 @@ Redo:
 	w.WriteMsg(m)
 }
 
-func (s *Server) getARecords(q dns.Question) (records []dns.RR, err error) {
+func (s *server) getARecords(q dns.Question) (records []dns.RR, err error) {
 	//	var h string
 	name := strings.TrimSuffix(q.Name, ".")
 
@@ -307,7 +314,7 @@ func (s *Server) getARecords(q dns.Question) (records []dns.RR, err error) {
 	return
 }
 
-func (s *Server) getSRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
+func (s *server) getSRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
 	/*
 		var weight uint16
 		services := make([]msg.Service, 0)
@@ -402,7 +409,7 @@ func (s *Server) getSRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR
 }
 
 // listenAndServe binds to DNS ports and starts accepting connections.
-func (s *Server) listenAndServe() {
+func (s *server) listenAndServe() {
 	go func() {
 		err := s.dnsTCPServer.ListenAndServe()
 		if err != nil {
@@ -419,7 +426,7 @@ func (s *Server) listenAndServe() {
 }
 
 // createSOA return a SOA record for this SkyDNS instance.
-func (s *Server) createSOA() []dns.RR {
+func (s *server) createSOA() []dns.RR {
 	dom := dns.Fqdn(s.domain)
 	soa := &dns.SOA{Hdr: dns.RR_Header{Name: dom, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 3600},
 		Ns:      "master." + dom,

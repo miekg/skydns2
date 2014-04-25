@@ -9,20 +9,6 @@ import (
 	"github.com/miekg/dns"
 )
 
-func toValue(rr dns.RR) string {
-	switch x := rr.(type) {
-	case *dns.A:
-		return x.A.String()
-	case *dns.AAAA:
-		return x.AAAA.String()
-	case *dns.SRV:
-		return strconv.Itoa(int(x.Priority)) + " " +
-			strconv.Itoa(int(x.Weight)) + " " +
-			strconv.Itoa(int(x.Port)) + " " + dns.Name(x.Target).String()
-	}
-	return ""
-}
-
 func toPath(s string) string {
 	l := dns.SplitDomainName(s)
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
@@ -32,16 +18,6 @@ func toPath(s string) string {
 	return strings.Join(l, "/")
 }
 
-func parseA(v string) (net.IP, error)    { return net.ParseIP(v).To4(), nil }
-func parseAAAA(v string) (net.IP, error) { return net.ParseIP(v).To16(), nil }
-func parseSRV(v string) (uint16, uint16, uint16, string, error) {
-	p := strings.Split(v, " ")
-	prio, _ := strconv.Atoi(p[0])
-	weight, _ := strconv.Atoi(p[1])
-	port, _ := strconv.Atoi(p[2])
-	return uint16(prio), uint16(weight), uint16(port), p[3], nil
-}
-
 // questionToPath converts a DNS question to a etcd key. If the questions looks
 // like service.staging.skydns.local SRV, the resulting key
 // will by /local/skydns/staging/service/SRV .
@@ -49,18 +25,27 @@ func questionToPath(q string, t uint16) string {
 	return "/" + toPath(q) + "/" + dns.TypeToString[t]
 }
 
-// TODO(miek): TTL etc.
-func parseValue(typ, value string) dns.RR {
-	switch typ {
-	case "A":
+func parseA(v string) (net.IP, error)    { return net.ParseIP(v).To4(), nil }
+func parseAAAA(v string) (net.IP, error) { return net.ParseIP(v).To16(), nil }
+func parseSRV(v string) (uint16, uint16, uint16, string, error) {
+	p := strings.Split(v, " ") // Stored as space separated values.
+	prio, _ := strconv.Atoi(p[0])
+	weight, _ := strconv.Atoi(p[1])
+	port, _ := strconv.Atoi(p[2])
+	return uint16(prio), uint16(weight), uint16(port), p[3], nil
+}
+
+func parseValue(t uint16, value string) dns.RR {
+	switch t {
+	case dns.TypeA:
 		a := new(dns.A)
 		a.A, _ = parseA(value)
 		return a
-	case "AAAA":
+	case dns.TypeAAAA:
 		aaaa := new(dns.AAAA)
 		aaaa.AAAA, _ = parseAAAA(value)
 		return aaaa
-	case "SRV":
+	case dns.TypeSRV:
 		srv := new(dns.SRV)
 		srv.Priority, srv.Weight, srv.Port, srv.Target, _ = parseSRV(value)
 		return srv
@@ -68,13 +53,14 @@ func parseValue(typ, value string) dns.RR {
 	return nil
 }
 
-// Create header here too.
-func get(e *etcd.Client, path string) ([]dns.RR, error) {
+func get(e *etcd.Client, q string, t uint16) ([]dns.RR, error) {
+	path := questionToPath(q, t)
 	r, err := e.Get(path, false, false)
 	if err != nil {
 		return nil, err
 	}
-	// r.Response.Node.Value
-	// Look in response r and extract stuff
-	return nil, nil
+	h := dns.RR_Header{Name: q, Rrtype: t, Class: dns.ClassINET, Ttl: 60} // Ttl is overridden
+	rr := parseValue(t, r.Node.Value, h)
+	rr.Header() = h
+	return []dns.RR{rr}, nil
 }

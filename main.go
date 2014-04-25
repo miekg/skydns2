@@ -76,7 +76,7 @@ func main() {
 		if k.Header().Name != dns.Fqdn(domain) {
 			log.Fatal(errors.New("ownername of DNSKEY must match SkyDNS domain"))
 		}
-		s.SetKeys(k, p)
+		s.setKeys(k, p)
 	}
 
 	waiter, err := s.Start()
