@@ -20,7 +20,7 @@ var (
 	rtimeout   time.Duration
 	wtimeout   time.Duration
 	ldns       string
-	etcdc      string
+	etcdclient string
 	domain     string
 	dnssec     string
 	roundrobin bool
@@ -41,7 +41,7 @@ func init() {
 			}
 			return "127.0.0.1:53"
 		}(), "ip:port to bind to for DNS or env. var SKYDNS_DNS")
-	flag.StringVar(&etcdc, "etcd", "", "url of etcd")
+	flag.StringVar(&etcdclient, "etcd", "", "url of etcd")
 	flag.DurationVar(&rtimeout, "rtimeout", 2*time.Second, "read timeout")
 	flag.DurationVar(&wtimeout, "wtimeout", 2*time.Second, "write timeout")
 	flag.StringVar(&nameserver, "nameserver", "", "nameserver address to forward (non-local) queries to e.g. 8.8.8.8:53,8.8.4.4:53")
