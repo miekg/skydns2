@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	"github.com/coreos/go-etcd/etcd" // Implement this by directly using the API of etcd
 	"github.com/miekg/dns"
 )
 
@@ -47,8 +47,8 @@ type server struct {
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 	RoundRobin   bool
-	Ttl	uint32
-	MinTtl	uint32
+	Ttl          uint32
+	MinTtl       uint32
 }
 
 // Newserver returns a new server.
@@ -62,8 +62,8 @@ func NewServer(domain, dnsAddr string, nameservers []string, etcdAddr string) *s
 		dnsHandler:   dns.NewServeMux(),
 		waiter:       new(sync.WaitGroup),
 		nameservers:  nameservers,
-		Ttl: 3600,
-		MinTtl: 60,
+		Ttl:          3600,
+		MinTtl:       60,
 	}
 
 	// DNS
@@ -123,12 +123,12 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 
 	q := req.Question[0]
 	// Ensure we lowercase question so that proper matching against anchor domain takes place
-	q.Name = strings.ToLower(q.Name)
+	name := strings.ToLower(q.Name)
 
 	log.Printf("Received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 
 	// If the query does not fall in our s.domain, forward it
-	if !strings.HasSuffix(q.Name, s.domain) {
+	if !strings.HasSuffix(name, s.domain) {
 		s.ServeDNSForward(w, req)
 		return
 	}
@@ -148,7 +148,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		w.WriteMsg(m)
 	}()
 
-	if q.Name == s.domain {
+	if name == s.domain {
 		switch q.Qtype {
 		case dns.TypeDNSKEY:
 			if s.PubKey != nil {
@@ -202,6 +202,7 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	if _, ok := w.RemoteAddr().(*net.TCPAddr); ok {
 		network = "tcp"
 	}
+	// TODO(miek): use commandline timeout stuff?
 	c := &dns.Client{Net: network, ReadTimeout: 5 * time.Second}
 
 	// Use request Id for "random" nameserver selection
@@ -255,7 +256,61 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		}
 		return
 	}
-	return s.get(name, q.Qtype)
+	path := questionToPath(name)
+	r, err := s.client.Get(path, false, true)
+	if err != nil {
+		return nil, err
+	}
+
+	// size of this, may overflow dns packet, etc... etc...
+	records = append(records, loopAddressNodes(&r.Node.Nodes, q.Name, q.Qtype)...)
+	if s.RoundRobin {
+		switch l := len(records); l {
+		case 1:
+		case 2:
+			if dns.Id()%2 == 0 {
+				records[0], records[1] = records[1], records[0]
+			}
+		default:
+			// Do a minimum of l swap, maximum of 4l swaps
+			for j := 0; j < l*(int(dns.Id())%4+1); j++ {
+				q := int(dns.Id()) % l
+				p := int(dns.Id()) % l
+				if q == p {
+					p = (p + 1) % l
+				}
+				records[q], records[p] = records[p], records[q]
+			}
+		}
+	}
+	return records, nil
+}
+
+// loopNodes recursively loops through the nodes and returns all the
+// values in a string slice.
+func loopAddressNodes(n *etcd.Nodes, q string, t uint16) (r []dns.RR) {
+	for _, n := range *n {
+		if n.Dir {
+			r = append(r, loopAddressNodes(&n.Nodes, q, t)...)
+			continue
+		}
+		if strings.HasSuffix(n.Key, "/A") && t == dns.TypeA {
+			// Error checking! + TTL is 0 etc.
+			a := new(dns.A)
+			a.Hdr = dns.RR_Header{Name: q, Rrtype: t, Class: dns.ClassINET, Ttl: uint32(n.TTL)}
+			a.A = net.ParseIP(n.Value).To4()
+			r = append(r, a)
+			continue
+		}
+		if strings.HasSuffix(n.Key, "/AAAA") && t == dns.TypeAAAA {
+			aaaa := new(dns.AAAA)
+			aaaa.Hdr = dns.RR_Header{Name: q, Rrtype: t, Class: dns.ClassINET, Ttl: uint32(n.TTL)}
+			aaaa.AAAA = net.ParseIP(n.Value).To16()
+			r = append(r, aaaa)
+			continue
+		}
+	}
+	return
 }
 
 func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
@@ -378,14 +433,20 @@ func (s *server) SOA() dns.RR {
 
 // get return resource records from the etc instance.
 func (s *server) get(q string, t uint16) ([]dns.RR, error) {
-	path := questionToPath(q, t)
-	r, err := s.client.Get(path, false, false)
+	// This is non-recursive and looks for the full path
+	// better would be a do recursive and check if a path
+	// ends in SRV, if not check for AAAA or A and create
+	// SRV from this
+	path := questionToPath(q)
+	r, err := s.client.Get(path, false, true)
 	if err != nil {
 		return nil, err
 	}
 	h := dns.RR_Header{Name: q, Rrtype: t, Class: dns.ClassINET, Ttl: 60} // Ttl is overridden
 	rr := parseValue(t, r.Node.Value, h)
-	log.Printf("%v\n", r)
+	for _, n := range r.Node.Nodes {
+		log.Printf("%q %q\n", n.Key, n.Value)
+	}
 	/*
 		if s.RoundRobin && (t == dns.TypeA || t == dns.TypeAAAA) {
 			switch l := uint16(len(rr)); l {

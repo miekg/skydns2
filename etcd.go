@@ -1,15 +1,18 @@
 package main
 
 import (
-	"net"
 	"strconv"
 	"strings"
 
 	"github.com/miekg/dns"
 )
 
-// toPath convert a domainname to a etcd path.
-func toPath(s string) string {
+// This file can be removed later I think.
+
+// questionToPath convert a domainname to a etcd path. If the question
+// looks like service.staging.skydns.local., the resulting key
+// will by /local/skydns/staging/service .
+func questionToPath(s string) string {
 	l := dns.SplitDomainName(s)
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
 		l[i], l[j] = l[j], l[i]
@@ -18,15 +21,6 @@ func toPath(s string) string {
 	return strings.Join(l, "/")
 }
 
-// questionToPath converts a DNS question to a etcd key. If the questions looks
-// like service.staging.skydns.local SRV, the resulting key
-// will by /local/skydns/staging/service/SRV .
-func questionToPath(q string, t uint16) string {
-	return "/" + toPath(q) + "/" + dns.TypeToString[t]
-}
-
-func parseA(v string) (net.IP, error)    { return net.ParseIP(v).To4(), nil }
-func parseAAAA(v string) (net.IP, error) { return net.ParseIP(v).To16(), nil }
 func parseSRV(v string) (uint16, uint16, uint16, string, error) {
 	p := strings.Split(v, " ") // Stored as space separated values.
 	prio, _ := strconv.Atoi(p[0])
@@ -37,16 +31,6 @@ func parseSRV(v string) (uint16, uint16, uint16, string, error) {
 
 func parseValue(t uint16, value string, h dns.RR_Header) dns.RR {
 	switch t {
-	case dns.TypeA:
-		a := new(dns.A)
-		a.Hdr = h
-		a.A, _ = parseA(value)
-		return a
-	case dns.TypeAAAA:
-		aaaa := new(dns.AAAA)
-		aaaa.Hdr = h
-		aaaa.AAAA, _ = parseAAAA(value)
-		return aaaa
 	case dns.TypeSRV:
 		srv := new(dns.SRV)
 		srv.Hdr = h
