@@ -7,6 +7,7 @@ package main
 import (
 	"log"
 	"net"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -22,7 +23,7 @@ type Server interface {
 	Stop()
 	ServeDNS(dns.ResponseWriter, *dns.Msg)
 	ServeDNSForward(dns.ResponseWriter, *dns.Msg)
-	// GetRecords
+	// GetRecords? GetSRVRecords
 }
 
 type server struct {
@@ -46,6 +47,8 @@ type server struct {
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 	RoundRobin   bool
+	Ttl	uint32
+	MinTtl	uint32
 }
 
 // Newserver returns a new server.
@@ -59,6 +62,8 @@ func NewServer(domain, dnsAddr string, nameservers []string, etcdAddr string) *s
 		dnsHandler:   dns.NewServeMux(),
 		waiter:       new(sync.WaitGroup),
 		nameservers:  nameservers,
+		Ttl: 3600,
+		MinTtl: 60,
 	}
 
 	// DNS
@@ -152,7 +157,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				return
 			}
 		case dns.TypeSOA:
-			m.Answer = s.SOA()
+			m.Answer = []dns.RR{s.SOA()}
 			return
 		}
 	}
@@ -160,7 +165,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		records, err := s.AddressRecords(q)
 		if err != nil {
 			m.SetRcode(req, dns.RcodeNameError)
-			m.Ns = s.SOA()
+			m.Ns = []dns.RR{s.SOA()}
 			return
 		}
 		m.Answer = append(m.Answer, records...)
@@ -169,7 +174,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	if err != nil && len(m.Answer) == 0 {
 		// We are authoritative for this name, but it does not exist: NXDOMAIN
 		m.SetRcode(req, dns.RcodeNameError)
-		m.Ns = s.SOA()
+		m.Ns = []dns.RR{s.SOA()}
 		return
 	}
 	if q.Qtype == dns.TypeANY || q.Qtype == dns.TypeSRV {
@@ -178,7 +183,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	if len(m.Answer) == 0 { // Send back a NODATA response
-		m.Ns = s.SOA()
+		m.Ns = []dns.RR{s.SOA()}
 	}
 }
 
@@ -228,33 +233,27 @@ Redo:
 
 func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
-	if name == s.domain {
-		// talk to etc
-		/*
-			for _, m := range s.Members() {
-				h, _, err = net.SplitHostPort(m)
-
-				if err != nil {
-					return
-				}
-				if q.Qtype == dns.TypeA {
-					records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 15}, A: net.ParseIP(h)})
-				}
+	if name == "master."+s.domain || name == s.domain {
+		for _, m := range s.client.GetCluster() {
+			u, e := url.Parse(m)
+			if e != nil {
+				continue
 			}
-		*/
-	}
-	// Leader should always be listed
-	if name == "leader."+s.domain || name == "master."+s.domain || name == s.domain {
-		// TODO(miek): talks to etcd
-		/*
-			h, _, err = net.SplitHostPort(s.Leader())
-			if err != nil {
-				return
+			h, _, e := net.SplitHostPort(u.Host)
+			if e != nil {
+				continue
 			}
-			if q.Qtype == dns.TypeA {
-				records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 15}, A: net.ParseIP(h)})
+			ip := net.ParseIP(h)
+			switch {
+			case ip.To4() != nil && q.Qtype == dns.TypeA:
+				records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: s.Ttl}, A: ip.To4()})
+			case ip.To16() != nil:
+				records = append(records, &dns.AAAA{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: s.Ttl}, AAAA: ip.To16()})
+			default:
+				// TODO(miek): really?
+				panic("skydns: internal error")
 			}
-		*/
+		}
 		return
 	}
 	return s.get(name, q.Qtype)
@@ -366,17 +365,16 @@ func (s *server) listenAndServe() {
 }
 
 // SOA return a SOA record for this SkyDNS instance.
-func (s *server) SOA() []dns.RR {
-	soa := &dns.SOA{Hdr: dns.RR_Header{Name: s.domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 3600},
+func (s *server) SOA() dns.RR {
+	return &dns.SOA{Hdr: dns.RR_Header{Name: s.domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: s.Ttl},
 		Ns:      "master." + s.domain,
 		Mbox:    "hostmaster." + s.domain,
 		Serial:  uint32(time.Now().Truncate(time.Hour).Unix()),
 		Refresh: 28800,
 		Retry:   7200,
 		Expire:  604800,
-		Minttl:  60,
+		Minttl:  s.MinTtl,
 	}
-	return []dns.RR{soa}
 }
 
 // get return resource records from the etc instance.
