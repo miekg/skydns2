@@ -122,14 +122,13 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	//stats.RequestCount.Inc(1)
 
 	q := req.Question[0]
-
 	// Ensure we lowercase question so that proper matching against anchor domain takes place
 	q.Name = strings.ToLower(q.Name)
 
 	log.Printf("Received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 
 	// If the query does not fall in our s.domain, forward it
-	if !strings.HasSuffix(q.Name, dns.Fqdn(s.domain)) {
+	if !strings.HasSuffix(q.Name, s.domain) {
 		s.ServeDNSForward(w, req)
 		return
 	}
@@ -149,7 +148,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		w.WriteMsg(m)
 	}()
 
-	if q.Name == dns.Fqdn(s.domain) {
+	if q.Name == s.domain {
 		switch q.Qtype {
 		case dns.TypeDNSKEY:
 			if s.PubKey != nil {
@@ -364,7 +363,7 @@ func (s *server) listenAndServe() {
 	}()
 }
 
-// SOA return a SOA record for this SkyDNS instance.
+// SOA returns a SOA record for this SkyDNS instance.
 func (s *server) SOA() dns.RR {
 	return &dns.SOA{Hdr: dns.RR_Header{Name: s.domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: s.Ttl},
 		Ns:      "master." + s.domain,
