@@ -12,50 +12,26 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd" // Implement this by directly using the API of etcd
+	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
 )
 
-type Server interface {
-	Start() (*sync.WaitGroup, error)
-	Stop()
-	ServeDNS(dns.ResponseWriter, *dns.Msg)
-	ServeDNSForward(dns.ResponseWriter, *dns.Msg)
-	// GetRecords? GetSRVRecords
-}
-
 type server struct {
-	nameservers  []string // nameservers to forward to
-	domain       string
 	domainLabels int
 	client       *etcd.Client
-
-	DnsAddr string
-	// DNSSEC key material
-	PubKey  *dns.DNSKEY
-	KeyTag  uint16
-	PrivKey dns.PrivateKey
-
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
-	RoundRobin   bool
+	config       *Config
 	Ttl          uint32
 	MinTtl       uint32
 }
 
 // Newserver returns a new server.
-// TODO(miek): multiple ectdAddrs
-func NewServer(domain, dnsAddr string, nameservers []string, etcdAddr string) *server {
+func NewServer(config *Config, client *etcd.Client) *server {
 	s := &server{
-		domain:       dns.Fqdn(strings.ToLower(domain)),
-		domainLabels: dns.CountLabel(dns.Fqdn(domain)),
-		DnsAddr:      dnsAddr,
-		client:       etcd.NewClient([]string{etcdAddr}),
-		nameservers:  nameservers,
-		Ttl:          3600,
-		MinTtl:       60,
+		client: client,
+		config: config,
+		Ttl:    3600,
+		MinTtl: 60,
 	}
-
 	return s
 }
 
@@ -68,8 +44,8 @@ func (s *server) Run() error {
 	mux.Handle(".", s)
 
 	group.Add(2)
-	go startDnsServer(group, mux, "tcp", s.DnsAddr, 0, s.WriteTimeout, s.ReadTimeout)
-	go startDnsServer(group, mux, "udp", s.DnsAddr, 65535, s.WriteTimeout, s.ReadTimeout)
+	go startDnsServer(group, mux, "tcp", s.config.DnsAddr, 0, s.config.WriteTimeout, s.config.ReadTimeout)
+	go startDnsServer(group, mux, "udp", s.config.DnsAddr, 65535, s.config.WriteTimeout, s.config.ReadTimeout)
 
 	group.Wait()
 
@@ -104,7 +80,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	log.Printf("Received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 
 	// If the query does not fall in our s.domain, forward it
-	if !strings.HasSuffix(name, s.domain) {
+	if !strings.HasSuffix(name, s.config.Domain) {
 		s.ServeDNSForward(w, req)
 		return
 	}
@@ -115,7 +91,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.Answer = make([]dns.RR, 0, 10)
 	defer func() {
 		// Check if we need to do DNSSEC and sign the reply
-		if s.PubKey != nil {
+		if s.config.PubKey != nil {
 			if opt := req.IsEdns0(); opt != nil && opt.Do() {
 				s.nsec(m)
 				s.sign(m, opt.UDPSize())
@@ -124,11 +100,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		w.WriteMsg(m)
 	}()
 
-	if name == s.domain {
+	if name == s.config.Domain {
 		switch q.Qtype {
 		case dns.TypeDNSKEY:
-			if s.PubKey != nil {
-				m.Answer = append(m.Answer, s.PubKey)
+			if s.config.PubKey != nil {
+				m.Answer = append(m.Answer, s.config.PubKey)
 				return
 			}
 		case dns.TypeSOA:
@@ -164,7 +140,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 
 // ServeDNSForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
-	if len(s.nameservers) == 0 {
+	if len(s.config.Nameservers) == 0 {
 		log.Printf("Error: Failure to Forward DNS Request, no servers configured %q", dns.ErrServ)
 		m := new(dns.Msg)
 		m.SetReply(req)
@@ -182,21 +158,21 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	c := &dns.Client{Net: network, ReadTimeout: 5 * time.Second}
 
 	// Use request Id for "random" nameserver selection
-	nsid := int(req.Id) % len(s.nameservers)
+	nsid := int(req.Id) % len(s.config.Nameservers)
 	try := 0
 Redo:
-	r, _, err := c.Exchange(req, s.nameservers[nsid])
+	r, _, err := c.Exchange(req, s.config.Nameservers[nsid])
 	if err == nil {
-		log.Printf("Forwarded DNS Request %q to %q", req.Question[0].Name, s.nameservers[nsid])
+		log.Printf("Forwarded DNS Request %q to %q", req.Question[0].Name, s.config.Nameservers[nsid])
 		w.WriteMsg(r)
 		return
 	}
 	// Seen an error, this can only mean, "server not reached", try again
 	// but only if we have not exausted our nameservers
-	if try < len(s.nameservers) {
-		log.Printf("Error: Failure to Forward DNS Request %q to %q", err, s.nameservers[nsid])
+	if try < len(s.config.Nameservers) {
+		log.Printf("Error: Failure to Forward DNS Request %q to %q", err, s.config.Nameservers[nsid])
 		try++
-		nsid = (nsid + 1) % len(s.nameservers)
+		nsid = (nsid + 1) % len(s.config.Nameservers)
 		goto Redo
 	}
 
@@ -209,7 +185,7 @@ Redo:
 
 func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
-	if name == "master."+s.domain || name == s.domain {
+	if name == "master."+s.config.Domain || name == s.config.Domain {
 		for _, m := range s.client.GetCluster() {
 			u, e := url.Parse(m)
 			if e != nil {
@@ -257,7 +233,7 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		// size of this, may overflow dns packet, etc... etc...
 		records = append(records, loopAddressNodes(&r.Node.Nodes, q.Name, q.Qtype)...)
 	}
-	if s.RoundRobin {
+	if s.config.RoundRobin {
 		switch l := len(records); l {
 		case 1:
 		case 2:
@@ -398,9 +374,9 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 
 // SOA returns a SOA record for this SkyDNS instance.
 func (s *server) SOA() dns.RR {
-	return &dns.SOA{Hdr: dns.RR_Header{Name: s.domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: s.Ttl},
-		Ns:      "master." + s.domain,
-		Mbox:    "hostmaster." + s.domain,
+	return &dns.SOA{Hdr: dns.RR_Header{Name: s.config.Domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: s.Ttl},
+		Ns:      "master." + s.config.Domain,
+		Mbox:    "hostmaster." + s.config.Domain,
 		Serial:  uint32(time.Now().Truncate(time.Hour).Unix()),
 		Refresh: 28800,
 		Retry:   7200,
