@@ -79,9 +79,7 @@ func main() {
 		s.setKeys(k, p)
 	}
 
-	waiter, err := s.Start()
-	if err != nil {
+	if err := s.Run(); err != nil {
 		log.Fatal(err)
 	}
-	waiter.Wait()
 }

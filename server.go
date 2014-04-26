@@ -8,8 +8,6 @@ import (
 	"log"
 	"net"
 	"net/url"
-	"os"
-	"os/signal"
 	"strings"
 	"sync"
 	"time"
@@ -32,12 +30,6 @@ type server struct {
 	domainLabels int
 	client       *etcd.Client
 
-	waiter *sync.WaitGroup
-
-	dnsUDPServer *dns.Server
-	dnsTCPServer *dns.Server
-	dnsHandler   *dns.ServeMux
-
 	DnsAddr string
 	// DNSSEC key material
 	PubKey  *dns.DNSKEY
@@ -59,60 +51,44 @@ func NewServer(domain, dnsAddr string, nameservers []string, etcdAddr string) *s
 		domainLabels: dns.CountLabel(dns.Fqdn(domain)),
 		DnsAddr:      dnsAddr,
 		client:       etcd.NewClient([]string{etcdAddr}),
-		dnsHandler:   dns.NewServeMux(),
-		waiter:       new(sync.WaitGroup),
 		nameservers:  nameservers,
 		Ttl:          3600,
 		MinTtl:       60,
 	}
 
-	// DNS
-	s.dnsHandler.Handle(".", s)
 	return s
 }
 
-// Start starts a DNS server and blocks waiting to be killed.
-func (s *server) Start() (*sync.WaitGroup, error) {
-	log.Printf("initializing server. DNS Addr: %q, Forwarders: %q", s.DnsAddr, s.nameservers)
+// Run is a blocking operation that starts the server listening on the DNS ports
+func (s *server) Run() error {
+	var (
+		group = &sync.WaitGroup{}
+		mux   = dns.NewServeMux()
+	)
+	mux.Handle(".", s)
 
-	s.dnsTCPServer = &dns.Server{
-		Addr:         s.DnsAddr,
-		Net:          "tcp",
-		Handler:      s.dnsHandler,
-		ReadTimeout:  s.ReadTimeout,
-		WriteTimeout: s.WriteTimeout,
-	}
+	group.Add(2)
+	go startDnsServer(group, mux, "tcp", s.DnsAddr, 0, s.WriteTimeout, s.ReadTimeout)
+	go startDnsServer(group, mux, "udp", s.DnsAddr, 65535, s.WriteTimeout, s.ReadTimeout)
 
-	s.dnsUDPServer = &dns.Server{
-		Addr:         s.DnsAddr,
-		Net:          "udp",
-		Handler:      s.dnsHandler,
-		ReadTimeout:  s.ReadTimeout,
-		WriteTimeout: s.WriteTimeout,
-	}
+	group.Wait()
 
-	go s.listenAndServe()
-	s.waiter.Add(1)
-	go s.run()
-	return s.waiter, nil
+	return nil
 }
 
-// Stop stops a server.
-func (s *server) Stop() {
-	log.Println("Stopping server")
-	s.waiter.Done()
-}
+func startDnsServer(group *sync.WaitGroup, mux *dns.ServeMux, net, addr string, udpsize int, writeTimeout, readTimeout time.Duration) {
+	defer group.Done()
 
-func (s *server) run() {
-	var sig = make(chan os.Signal)
-	signal.Notify(sig, os.Interrupt)
-
-	for {
-		select {
-		case <-sig:
-			s.Stop()
-			return
-		}
+	server := &dns.Server{
+		Addr:         addr,
+		Net:          net,
+		Handler:      mux,
+		UDPSize:      udpsize,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+	}
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -418,23 +394,6 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		}
 	*/
 	return
-}
-
-// listenAndServe binds to DNS ports and starts accepting connections.
-func (s *server) listenAndServe() {
-	go func() {
-		err := s.dnsTCPServer.ListenAndServe()
-		if err != nil {
-			log.Fatalf("Start %s listener on %s failed:%s", s.dnsTCPServer.Net, s.dnsTCPServer.Addr, err.Error())
-		}
-	}()
-
-	go func() {
-		err := s.dnsUDPServer.ListenAndServe()
-		if err != nil {
-			log.Fatalf("Start %s listener on %s failed:%s", s.dnsUDPServer.Net, s.dnsUDPServer.Addr, err.Error())
-		}
-	}()
 }
 
 // SOA returns a SOA record for this SkyDNS instance.
