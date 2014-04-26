@@ -313,11 +313,11 @@ func loopAddressNodes(n *etcd.Nodes, q string, t uint16) (r []dns.RR) {
 	return
 }
 
+// SRVRecords return SRV records from etcd.
+// If the Target is not an name but an IP address, an name is created .
 func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
-	name := strings.ToLower(q.Name)
-	// If we find no SRV, check for A or AAAA and substitube.
-	x, _ := s.get(name, q.Qtype)
-	return x, nil, nil
+//	name := strings.ToLower(q.Name)
+	return nil, nil, nil
 	/*
 		weight = 0
 		if len(services) > 0 {
@@ -431,42 +431,14 @@ func (s *server) SOA() dns.RR {
 	}
 }
 
-// get return resource records from the etc instance.
-func (s *server) get(q string, t uint16) ([]dns.RR, error) {
-	// This is non-recursive and looks for the full path
-	// better would be a do recursive and check if a path
-	// ends in SRV, if not check for AAAA or A and create
-	// SRV from this
-	path := questionToPath(q)
-	r, err := s.client.Get(path, false, true)
-	if err != nil {
-		return nil, err
+// questionToPath convert a domainname to a etcd path. If the question
+// looks like service.staging.skydns.local., the resulting key
+// will by /local/skydns/staging/service .
+func questionToPath(s string) string {
+	l := dns.SplitDomainName(s)
+	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
+		l[i], l[j] = l[j], l[i]
 	}
-	h := dns.RR_Header{Name: q, Rrtype: t, Class: dns.ClassINET, Ttl: 60} // Ttl is overridden
-	rr := parseValue(t, r.Node.Value, h)
-	for _, n := range r.Node.Nodes {
-		log.Printf("%q %q\n", n.Key, n.Value)
-	}
-	/*
-		if s.RoundRobin && (t == dns.TypeA || t == dns.TypeAAAA) {
-			switch l := uint16(len(rr)); l {
-			case 1:
-			case 2:
-				if dns.Id()%2 == 0 {
-					rr[0], rr[1] = rr[1], rr[0]
-				}
-			default:
-				// Do a minimum of l swap, maximum of 4l swaps
-				for j := 0; j < int(l*(dns.Id()%4+1)); j++ {
-					q := dns.Id() % l
-					p := dns.Id() % l
-					if q == p {
-						p = (p + 1) % l
-					}
-					rr[q], rr[p] = rr[p], rr[q]
-				}
-			}
-		}
-	*/
-	return []dns.RR{rr}, nil
+	// TODO(miek): escape slashes in s.
+	return strings.Join(l, "/")
 }
