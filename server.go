@@ -261,9 +261,26 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// size of this, may overflow dns packet, etc... etc...
-	records = append(records, loopAddressNodes(&r.Node.Nodes, q.Name, q.Qtype)...)
+	if !r.Node.Dir { // single element
+		// facter out, used twice already
+		// TODO(miek): seems not work :(
+		if strings.HasSuffix(r.Node.Key, "/A") && q.Qtype == dns.TypeA {
+			// Error checking! + TTL is 0 etc.
+			a := new(dns.A)
+			a.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: uint32(r.Node.TTL)}
+			a.A = net.ParseIP(r.Node.Value).To4()
+			records = append(records, a)
+		}
+		if strings.HasSuffix(r.Node.Key, "/AAAA") && q.Qtype == dns.TypeAAAA {
+			aaaa := new(dns.AAAA)
+			aaaa.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: uint32(r.Node.TTL)}
+			aaaa.AAAA = net.ParseIP(r.Node.Value).To16()
+			records = append(records, aaaa)
+		}
+	} else {
+		// size of this, may overflow dns packet, etc... etc...
+		records = append(records, loopAddressNodes(&r.Node.Nodes, q.Name, q.Qtype)...)
+	}
 	if s.RoundRobin {
 		switch l := len(records); l {
 		case 1:
@@ -316,8 +333,10 @@ func loopAddressNodes(n *etcd.Nodes, q string, t uint16) (r []dns.RR) {
 // SRVRecords return SRV records from etcd.
 // If the Target is not an name but an IP address, an name is created .
 func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
-//	name := strings.ToLower(q.Name)
-	return nil, nil, nil
+	name := strings.ToLower(q.Name)
+	path := questionToPath(name)
+	_, err = s.client.Get(path, false, true)
+	return nil, nil, err
 	/*
 		weight = 0
 		if len(services) > 0 {
