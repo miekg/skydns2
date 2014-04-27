@@ -77,7 +77,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
 
-	log.Printf("Received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
+	log.Printf("received request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 
 	if !strings.HasSuffix(name, s.config.Domain) {
 		s.ServeDNSForward(w, req)
@@ -147,7 +147,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 // ServeDNSForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	if len(s.config.Nameservers) == 0 {
-		log.Printf("error: Failure to Forward DNS Request, no servers configured %q", dns.ErrServ)
+		log.Printf("error: failure to forward request, no servers configured %q", dns.ErrServ)
 		m := new(dns.Msg)
 		m.SetReply(req)
 		m.SetRcode(req, dns.RcodeServerFailure)
@@ -169,20 +169,20 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 Redo:
 	r, _, err := c.Exchange(req, s.config.Nameservers[nsid])
 	if err == nil {
-		log.Printf("Forwarded DNS Request %q to %q", req.Question[0].Name, s.config.Nameservers[nsid])
+		log.Printf("forwarded request %q to %q", req.Question[0].Name, s.config.Nameservers[nsid])
 		w.WriteMsg(r)
 		return
 	}
 	// Seen an error, this can only mean, "server not reached", try again
 	// but only if we have not exausted our nameservers
 	if try < len(s.config.Nameservers) {
-		log.Printf("error: Failure to Forward DNS Request %q to %q", err, s.config.Nameservers[nsid])
+		log.Printf("error: failure to forward request %q to %q", err, s.config.Nameservers[nsid])
 		try++
 		nsid = (nsid + 1) % len(s.config.Nameservers)
 		goto Redo
 	}
 
-	log.Printf("error: Failure to Forward DNS Request %q", err)
+	log.Printf("error: failure to forward request %q", err)
 	m := new(dns.Msg)
 	m.SetReply(req)
 	m.SetRcode(req, dns.RcodeServerFailure)
@@ -218,7 +218,7 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 	var serv *Service
 	if !r.Node.Dir { // single element
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
-			log.Printf("error: Failure to parse value: %q", err)
+			log.Printf("error: failure to parse value: %q", err)
 			return nil, err
 		}
 		ip := net.ParseIP(serv.Host)
@@ -290,7 +290,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 	weight := uint16(0)
 	if !r.Node.Dir { // single element
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
-			log.Printf("error: Failure to parse value: %q", err)
+			log.Printf("error: failure to parse value: %q", err)
 			return nil, nil, err
 		}
 		ip := net.ParseIP(serv.Host)
@@ -357,7 +357,7 @@ func (s *server) loopNodes(n *etcd.Nodes) (sx []*Service) {
 			continue
 		}
 		if err := json.Unmarshal([]byte(n.Value), &serv); err != nil {
-			log.Printf("error: Failure to parse value: %q", err)
+			log.Printf("error: failure to parse value: %q", err)
 			continue
 		}
 		serv.ttl = uint32(n.TTL)

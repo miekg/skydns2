@@ -94,7 +94,7 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 			sig1 := s.newRRSIG(incep, expir)
 			e := sig1.Sign(s.config.PrivKey, r)
 			if e != nil {
-				log.Printf("Failed to sign: %s\n", e.Error())
+				log.Printf("failed to sign: %s\n", e.Error())
 			}
 			return sig1, e
 		})
@@ -123,7 +123,7 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 			sig1 := s.newRRSIG(incep, expir)
 			e := sig1.Sign(s.config.PrivKey, r)
 			if e != nil {
-				log.Printf("Failed to sign: %s\n", e.Error())
+				log.Printf("failed to sign: %s\n", e.Error())
 			}
 			return sig1, e
 		})
@@ -243,7 +243,7 @@ func (c *sigCache) search(s string) *dns.RRSIG {
 		// we want to return a copy here, because if we didn't the RRSIG
 		// could be removed by another goroutine before the packet containing
 		// this signature is send out.
-		log.Println("DNS Signature retrieved from cache")
+		log.Println("signature retrieved from cache")
 		return dns.Copy(s).(*dns.RRSIG)
 	}
 	return nil
@@ -275,7 +275,7 @@ func (c *sigCache) key(rrs []dns.RR) string {
 			i = append(i, []byte(t.NextDomain)...)
 			// bitmap does not differentiate
 		default:
-			log.Printf("DNS Signature for unhandled type %T seen", t)
+			log.Printf("signature for unhandled type %T seen", t)
 		}
 	}
 	return string(h.Sum(i))
