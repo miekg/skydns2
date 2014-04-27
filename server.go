@@ -90,6 +90,19 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.RecursionAvailable = true
 	m.Answer = make([]dns.RR, 0, 10)
 	defer func() {
+		// Set TTL to the minimum of the RRset.
+		minttl := s.Ttl
+		if len(m.Answer) > 1 {
+			for _, r := range m.Answer {
+				if r.Header().Ttl < minttl {
+					minttl = r.Header().Ttl
+				}
+			}
+			for _, r := range m.Answer {
+				r.Header().Ttl = minttl
+			}
+		}
+
 		// Check if we need to do DNSSEC and sign the reply.
 		if s.config.PubKey != nil {
 			if opt := req.IsEdns0(); opt != nil && opt.Do() {
