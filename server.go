@@ -44,15 +44,14 @@ func (s *server) Run() error {
 	mux.Handle(".", s)
 
 	group.Add(2)
-	go startDnsServer(group, mux, "tcp", s.config.DnsAddr, 0, s.config.WriteTimeout, s.config.ReadTimeout)
-	go startDnsServer(group, mux, "udp", s.config.DnsAddr, 65535, s.config.WriteTimeout, s.config.ReadTimeout)
+	go runtDNSServer(group, mux, "tcp", s.config.DnsAddr, 0, s.config.WriteTimeout, s.config.ReadTimeout)
+	go runtDNSServer(group, mux, "udp", s.config.DnsAddr, 0, s.config.WriteTimeout, s.config.ReadTimeout)
 
 	group.Wait()
-
 	return nil
 }
 
-func startDnsServer(group *sync.WaitGroup, mux *dns.ServeMux, net, addr string, udpsize int, writeTimeout, readTimeout time.Duration) {
+func runtDNSServer(group *sync.WaitGroup, mux *dns.ServeMux, net, addr string, udpsize int, writeTimeout, readTimeout time.Duration) {
 	defer group.Done()
 
 	server := &dns.Server{
