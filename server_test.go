@@ -13,8 +13,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/miekg/dns"
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/miekg/dns"
 )
 
 var Port = 9400
@@ -41,6 +41,7 @@ func newTestServer(t *testing.T) *server {
 	s.config = new(Config)
 	s.config.DnsAddr = "127.0.0.1:" + StrPort
 	s.config.Nameservers = []string{"8.8.4.4:53"}
+	s.config.Domain = "skydns.local."
 	go s.Run()
 	return s
 }
