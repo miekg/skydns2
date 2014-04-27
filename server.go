@@ -353,7 +353,6 @@ func domain(s string) string {
 	for i, j := 1, len(l)-1; i < j; i, j = i+1, j-1 {
 		l[i], l[j] = l[j], l[i]
 	}
-	println(dns.Fqdn(strings.Join(l[1:len(l)-1], ".")))
 	return dns.Fqdn(strings.Join(l[1:len(l)-1], "."))
 
 }
