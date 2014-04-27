@@ -1,111 +1,57 @@
 #SkyDNS [![Build Status](https://travis-ci.org/skynetservices/skydns.png)](https://travis-ci.org/skynetservices/skydns)
 *Version 2.0.0*
 
-SkyDNS bla bla bla, uses Etcd and utilizes DNS queries. Bla bla bla.
+SkyDNS2 is a distributed service for announcement and discovery of services build on
+top of [etcd](https://github.com/coreos/etcd). It utilizes DNS queries
+to discover available services. This is done by leveraging SRV records in DNS,
+with special meaning given to subdomains, priorities and weights.
 
-This is the origingal [announcement blog post](http://blog.gopheracademy.com/skydns) for version 1, since then SkyDNS
-has seen some changes.
+This is the origingal [announcement blog post](http://blog.gopheracademy.com/skydns) for version 1, 
+since then SkyDNS has seen some changes, most notably to ability to use etcd as a backend.
 
 ##Setup / Install
-
 Compile SkyDNS, and execute it
 
 `go get -d -v ./... && go build -v ./...`
 
-`./skydns`
+SkyDNS' configuration is stored *in* etcd, there are no flags. To start SkyDNS set the
+etcd machines in the variable ETCD_MACHINES:
 
-Which takes the following flags
-- -domain - This is the domain requests are anchored to and should be appended to all requests (Defaults to: skydns.local)
-- -dns - This is the ip:port to listen on for DNS requests (Defaults to: 127.0.0.1:53)
-- -etcd - url of etcd.
-
+    export ETCD_MACHINES='http://127.0.0.1:4001'
+    ./skydns2
 
 ##API
+
+### Configuration
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/config -d value='{"dns_addr":"127.0.0.1:5354"}'
+
 ### Service Announcements
-You announce your service by submitting JSON over HTTP to SkyDNS with information about your service.
-This information will then be available for queries either via DNS or HTTP.
+You announce your service by submitting JSON over HTTP to etcd with information about your service.
+This information will then be available for queries either via DNS.
 
 When providing information you will need to fill out the following values. Note you are free to use
 whatever you like, so take the following list as a guide only.
 
-* Name - The name of your service, e.g., "rails", "web" or anything else you like
-* Version - A version string, note the dots in this string are translated to hyphens when
-    querying via the DNS
-* Environment - Can be something as "production" or "testing"
-* Region - Where do these hosts live, e.g. "east", "west" or even "test"
-* Host, Port and TTL - Denote the actuals hosts and how long (TTL) this information is valid.
+* Host - The full name of your service, e.g., "rails.production.east.skydns.local", "web.staging.east.skydns.local", an IP address either v4 or v6.
+* Port - the port where the service can be reached.
+* Priority - the priority of the service.
 
-When queried SkyDNS will return records containing these elements in the following
-order:
-
-    <uuid>.<host>.<region>.<version>.<service>.<environment>.skydns.local
-
-Where `<uuid>` is the identifier used when registering this host and service. And also
-note the `<service>` corresponds with the Name given above.
-
-Note some of these elements may contain a wildcard or be left out completely,
+Note some of these elements may be left out completely,
 see the section named "Wildcards" below for more information.
 
 #### Without Shared Secret 
-`curl -X PUT -L http://localhost:8080/skydns/services/1001 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"Test","Host":"web1.site.com","Port":9000,"TTL":10}'`
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/b1 \
+        -d value='{"Port":80,"Priority":10,"Host": "10.0.1.3"'}
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/a1 \
+        -d value='{"Port":80,"Priority":10,"Host": "web.google.nl"'}
 
 #### With Shared Secret 
-You have the ability to use a shared secret with SkyDns. To take advantage of the shared secret you would start skydns with the -secret=<secretString> flag.
-`curl -X PUT -H "Authorization mysupersecretsharedsecret" -L http://localhost:8080/skydns/services/1001 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"Test","Host":"web1.site.com","Port":9000,"TTL":10}'`
-
-If unsuccessful you should receive an HTTP status code of: **403 Forbidden**
-
-#### Result 
-
-If successful you should receive an HTTP status code of: **201 Created**
-
-If a service with this UUID already exists you will receive back an HTTP status
-code of: **409 Conflict**
-
-SkyDNS will now have an entry for your service that will live for the number
-of seconds supplied in your TTL (10 seconds in our example), unless you send a
-heartbeat to update the TTL.
-
-Note that instead of a hostname you can also use an IP address (IPv4 or IPV6),
-in that case SkyDNS will make up an hostname that is used in the SRV record
-(defaults to UUID.skydns.local) and adds the IP adress as an A or AAAAA record
-in the additional section for this hostname.
-
-### Heartbeat / Keep alive
-SkyDNS requires that services submit an HTTP request to update their TTL within
-the TTL they last supplied. If the service fails to do so within this timeframe
-SkyDNS will expire the service automatically. This will allow for nodes to fail
-and DNS to reflect this quickly.
-
-You can update your TTL by sending an HTTP request to SkyDNS with an updated
-TTL, it can be the same as before to allow it to live for another 10s, or it can
-be adjusted to a shorter or longer duration.
-
-`curl -X PATCH -L http://localhost:8080/skydns/services/1001 -d '{"TTL":10}'`
 
 ### Service Removal
-If you wish to remove your service from SkyDNS for any reason without waiting for the TTL to expire, you simply send an HTTP DELETE.
-
-`curl -X DELETE -L http://localhost:8080/skydns/services/1001`
 
 ### Retrieve Service Info via API
-Currently you may only retrieve a service's info by UUID of the service, in the
-future we may implement querying of the services similar to the DNS interface.
-
-`curl -X GET -L http://localhost:8080/skydns/services/1001`
-
-### Call backs
-Registering a call back is similar to registering a service. A service that
-registers a call back will receive an HTTP request. Every time something changes
-in the service: the callback is executed, currently they are called when the
-service is deleted.
-
-`curl -X PUT -L http://localhost:8080/skydns/callbacks/1001 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"Test","Host":"web1.site.com",Reply:"web2.example.nl","Port":5441}'`
-
-This will result in the call back being sent to `web2.example.nl` on port 5441. The
-callback itself will be a HTTP DELETE:
-
-`curl -X DELETE -L http://web2.example.nl:5441/skydns/callbacks/1001 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"Test","Host":"web1.site.com"}'`
 
 ##Discovery (DNS)
 You can find services by querying SkyDNS via any DNS client or utility. It uses a known domain syntax with wildcards to find matching services.
@@ -113,14 +59,6 @@ You can find services by querying SkyDNS via any DNS client or utility. It uses 
 Priorities and Weights are based on the requested Region, as well as how many nodes are available matching the current request in the given region.
 
 ###Domain Format
-The domain syntax when querying follows a pattern where the right
-most positions are more generic, than the subdomains to their left:
-*\<uuid\>.\<host\>.\<region\>.\<version\>.\<service\>.\<environment\>.skydns.local*. 
-This allows for you to supply only the positions you care about:
-
-- authservice.production.skydns.local - For instance would return all services with the name AuthService in the production environment, regardless of the Version, Region, or Host
-- 1-0-0.authservice.production.skydns.local - Is the same as above but restricting it to only version 1.0.0
-- east.1-0-0.authservice.production.skydns.local - Would add the restriction that the services must be running in the East region
 
 #### Wildcards
 
@@ -145,6 +83,7 @@ Let's take a look at some results. First we need to add a few services so we hav
 	curl -X PUT -L http://localhost:8080/skydns/services/1004 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"West","Host":"web4.site.com","Port":80,"TTL":4000}'
 
 Now we can try some of our example DNS lookups:
+
 #####All services in the Production Environment
 `dig @localhost production.skydns.local SRV`
 
@@ -152,7 +91,7 @@ Now we can try some of our example DNS lookups:
 	;production.skydns.local.			IN	SRV
 
 	;; ANSWER SECTION:
-	production.skydns.local.		629		IN	SRV	10 20 80   web1.site.com.
+	production.skydns.local.		629	IN	SRV	10 20 80   web1.site.com.
 	production.skydns.local.		3979	IN	SRV	10 20 8080 web2.site.com.
 	production.skydns.local.		3629	IN	SRV	10 20 9000 server24.
 	production.skydns.local.		3985	IN	SRV	10 20 80   web3.site.com.
