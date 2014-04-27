@@ -115,28 +115,31 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	if q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA {
 		records, err := s.AddressRecords(q)
 		if err != nil {
-			m.SetRcode(req, dns.RcodeNameError)
-			m.Ns = []dns.RR{s.SOA()}
-			return
+			if e, ok := err.(*etcd.EtcdError); ok {
+				if e.ErrorCode == 100 {
+					m.SetRcode(req, dns.RcodeNameError)
+					m.Ns = []dns.RR{s.SOA()}
+					return
+				}
+			}
 		}
 		m.Answer = append(m.Answer, records...)
 	}
 	if q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY {
 		records, extra, err := s.SRVRecords(q)
 		if err != nil {
-			// NODATA
+			if e, ok := err.(*etcd.EtcdError); ok {
+				if e.ErrorCode == 100 {
+					m.SetRcode(req, dns.RcodeNameError)
+					m.Ns = []dns.RR{s.SOA()}
+					return
+				}
+			}
 		}
 		m.Answer = append(m.Answer, records...)
 		m.Extra = append(m.Extra, extra...)
 	}
-	// FIXME(miek): uh, NXDOMAIN or NODATA?
-	if len(m.Answer) == 0 {
-		// We are authoritative for this name, but it does not exist: NXDOMAIN
-		m.SetRcode(req, dns.RcodeNameError)
-		m.Ns = []dns.RR{s.SOA()}
-		return
-	}
-	if len(m.Answer) == 0 { // Send back a NODATA response
+	if len(m.Answer) == 0 { // NODATA response
 		m.Ns = []dns.RR{s.SOA()}
 	}
 }
@@ -210,7 +213,6 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 	}
 	r, err := s.client.Get(path(name), false, true)
 	if err != nil {
-		println(err.Error())
 		return nil, err
 	}
 	var serv *Service
