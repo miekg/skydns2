@@ -34,8 +34,15 @@ type Config struct {
 
 func LoadConfig(client *etcd.Client) (*Config, error) {
 	n, err := client.Get("/skydns/config", false, false)
-	config := &Config{ReadTimeout:0, WriteTimeout:0, Domain:"", DnsAddr:"", Nameservers:[]string{""},DNSSEC:""}
+	config := &Config{ReadTimeout:0, WriteTimeout:0, Domain:"", DnsAddr:"", DNSSEC:""}
 	if err != nil {
+		c, err := dns.ClientConfigFromFile("/etc/resolv.conf")
+		if err != nil {
+			return nil, err
+		}
+		for _, s := range c.Servers {
+			config.Nameservers = append(config.Nameservers, net.JoinHostPort(s, c.Port))
+		}
 		return config, nil
 	}
 	if err := json.Unmarshal([]byte(n.Node.Value), &config); err != nil {
