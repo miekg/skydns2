@@ -102,7 +102,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				r.Header().Ttl = minttl
 			}
 		}
-
 		// Check if we need to do DNSSEC and sign the reply.
 		if s.config.PubKey != nil {
 			if opt := req.IsEdns0(); opt != nil && opt.Do() {
@@ -260,12 +259,12 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		case ip == nil:
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
 			a := new(dns.A)
-			a.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: uint32(r.Node.TTL)}
+			a.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: serv.ttl}
 			a.A = ip.To4()
 			records = append(records, a)
 		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
 			aaaa := new(dns.AAAA)
-			aaaa.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: uint32(r.Node.TTL)}
+			aaaa.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: serv.ttl}
 			aaaa.AAAA = ip.To16()
 			records = append(records, aaaa)
 		}
