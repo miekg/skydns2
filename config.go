@@ -20,7 +20,7 @@ type Config struct {
 	DnsAddr      string        `json:"dns_addr,omitempty"`
 	Domain       string        `json:"domain,omitempty"`
 	DomainLabels int           `json:"-"`
-	DnsSec       string        `json:"dnssec,omitempty"`
+	DNSSEC       string        `json:"dnssec,omitempty"`
 	RoundRobin   bool          `json:"round_robin,omitempty"`
 	Nameservers  []string      `json:"nameservers,omitempty"`
 	ReadTimeout  time.Duration `json:"read_timeout,omitempty"`
@@ -34,10 +34,10 @@ type Config struct {
 
 func LoadConfig(client *etcd.Client) (*Config, error) {
 	n, err := client.Get("/skydns/config", false, false)
+	config := &Config{ReadTimeout:0, WriteTimeout:0, Domain:"", DnsAddr:"", Nameservers:[]string{""},DNSSEC:""}
 	if err != nil {
-		return nil, err
+		return config, nil
 	}
-	var config *Config
 	if err := json.Unmarshal([]byte(n.Node.Value), &config); err != nil {
 		return nil, err
 	}
@@ -70,8 +70,8 @@ func setDefaults(config *Config) error {
 			config.Nameservers = append(config.Nameservers, net.JoinHostPort(s, c.Port))
 		}
 	}
-	if config.DnsSec != "" {
-		k, p, err := ParseKeyFile(config.DnsSec)
+	if config.DNSSEC != "" {
+		k, p, err := ParseKeyFile(config.DNSSEC)
 		if err != nil {
 			return err
 		}
@@ -83,7 +83,6 @@ func setDefaults(config *Config) error {
 		config.PrivKey = p
 	}
 	config.Domain = dns.Fqdn(strings.ToLower(config.Domain))
-	config.DomainLabels = dns.CountLabel(dns.Fqdn(config.Domain))
-
+	config.DomainLabels = dns.CountLabel(config.Domain)
 	return nil
 }
