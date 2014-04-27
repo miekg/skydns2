@@ -15,7 +15,7 @@ import (
 	"github.com/miekg/dns"
 )
 
-// Config provides options to the skydns resolver
+// Config provides options to the SkyDNS resolver.
 type Config struct {
 	DnsAddr      string        `json:"dns_addr,omitempty"`
 	Domain       string        `json:"domain,omitempty"`
@@ -33,8 +33,8 @@ type Config struct {
 }
 
 func LoadConfig(client *etcd.Client) (*Config, error) {
-	n, err := client.Get("/skydns/config", false, false)
 	config := &Config{ReadTimeout:0, WriteTimeout:0, Domain:"", DnsAddr:"", DNSSEC:""}
+	n, err := client.Get("/skydns/config", false, false)
 	if err != nil {
 		c, err := dns.ClientConfigFromFile("/etc/resolv.conf")
 		if err != nil {

@@ -24,6 +24,8 @@ type server struct {
 	config       *Config
 	Ttl          uint32
 	MinTtl       uint32
+
+	group *sync.WaitGroup
 }
 
 // Newserver returns a new server.
@@ -33,24 +35,27 @@ func NewServer(config *Config, client *etcd.Client) *server {
 		config: config,
 		Ttl:    3600,
 		MinTtl: 60,
+		group:  new(sync.WaitGroup),
 	}
 	return s
 }
 
-// Run is a blocking operation that starts the server listening on the DNS ports
+// Run is a blocking operation that starts the server listening on the DNS ports.
 func (s *server) Run() error {
-	var (
-		group = &sync.WaitGroup{}
-		mux   = dns.NewServeMux()
-	)
+	mux := dns.NewServeMux()
 	mux.Handle(".", s)
 
-	group.Add(2)
-	go runDNSServer(group, mux, "tcp", s.config.DnsAddr, 0, s.config.WriteTimeout, s.config.ReadTimeout)
-	go runDNSServer(group, mux, "udp", s.config.DnsAddr, 0, s.config.WriteTimeout, s.config.ReadTimeout)
+	s.group.Add(2)
+	go runDNSServer(s.group, mux, "tcp", s.config.DnsAddr, 0, s.config.WriteTimeout, s.config.ReadTimeout)
+	go runDNSServer(s.group, mux, "udp", s.config.DnsAddr, 0, s.config.WriteTimeout, s.config.ReadTimeout)
 
-	group.Wait()
+	s.group.Wait()
 	return nil
+}
+
+// Stop stops a server.
+func (s *server) Stop() {
+	//s.group.Add(-2)
 }
 
 func runDNSServer(group *sync.WaitGroup, mux *dns.ServeMux, net, addr string, udpsize int, writeTimeout, readTimeout time.Duration) {

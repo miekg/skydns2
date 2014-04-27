@@ -7,27 +7,70 @@ package main
 // etcd needs to be running on http://127.0.0.1:4001
 
 import (
-	/*
 	"bytes"
-	"encoding/json"
-	"github.com/miekg/dns"
-	"io/ioutil"
-	"net"
 	"net/http"
-	"net/http/httptest"
-	"os"
 	"strconv"
-	"strings"
+	"sync"
 	"testing"
-	"time"
-	*/
+
+	"github.com/miekg/dns"
+	"github.com/coreos/go-etcd/etcd"
 )
 
-func newTestServer(leader, secret, machines string) *server {
-	return nil
-}
-/*
+var Port = 9400
+var StrPort = "9400" // string equivalent of Port
 
+func newTestName(t *testing.T, verb, name, value string) {
+	client := new(http.Client)
+	req, _ := http.NewRequest(verb, "http://127.0.0.1:4001/v2/keys/skydns/"+name, bytes.NewBuffer([]byte(value)))
+	_, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func newTestServer(t *testing.T) *server {
+	Port += 10
+	StrPort = strconv.Itoa(Port)
+	s := new(server)
+	client := etcd.NewClient([]string{"http//127.0.0.1:4001"})
+	client.SyncCluster()
+
+	s.group = new(sync.WaitGroup)
+	s.client = client
+	s.config = new(Config)
+	s.config.DnsAddr = "127.0.0.1:" + StrPort
+	s.config.Nameservers = []string{"8.8.4.4:53"}
+	go s.Run()
+	return s
+}
+
+func TestDNSForward(t *testing.T) {
+	s := newTestServer(t)
+	defer s.Stop()
+
+	c := new(dns.Client)
+	m := new(dns.Msg)
+	m.SetQuestion("www.example.com.", dns.TypeA)
+	resp, _, err := c.Exchange(m, "localhost:"+StrPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Answer) == 0 || resp.Rcode != dns.RcodeSuccess {
+		t.Fatal("Answer expected to have A records or rcode not equal to RcodeSuccess")
+	}
+	// TCP
+	c.Net = "tcp"
+	resp, _, err = c.Exchange(m, "localhost:"+StrPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Answer) == 0 || resp.Rcode != dns.RcodeSuccess {
+		t.Fatal("Answer expected to have A records or rcode not equal to RcodeSuccess")
+	}
+}
+
+/*
 func newTestServerDNSSEC(leader, secret, nameserver string) *Server {
 	s := newTestServer(leader, secret, nameserver)
 	key, _ := dns.NewRR("skydns.local. IN DNSKEY 256 3 5 AwEAAaXfO+DOBMJsQ5H4TfiabwSpqE4cGL0Qlvh5hrQumrjr9eNSdIOjIHJJKCe56qBU5mH+iBlXP29SVf6UiiMjIrAPDVhClLeWFe0PC+XlWseAyRgiLHdQ8r95+AfkhO5aZgnCwYf9FGGSaT0+CRYN+PyDbXBTLK5FN+j5b6bb7z+d")
@@ -516,32 +559,6 @@ func TestDNSARecords(t *testing.T) {
 	if len(resp.Answer) != 1 {
 		t.Fatal("Answer expected to have 2 A records but has", len(resp.Answer))
 	}
-}
-
-func TestDNSForward(t *testing.T) {
-	s := newTestServer("", "", "8.8.8.8:53")
-	defer s.Stop()
-
-	c := new(dns.Client)
-	m := new(dns.Msg)
-	m.SetQuestion("www.example.com.", dns.TypeA)
-	resp, _, err := c.Exchange(m, "localhost:"+StrPort)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(resp.Answer) == 0 || resp.Rcode != dns.RcodeSuccess {
-		t.Fatal("Answer expected to have A records or rcode not equal to RcodeSuccess")
-	}
-	// TCP
-	c.Net = "tcp"
-	resp, _, err = c.Exchange(m, "localhost:"+StrPort)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(resp.Answer) == 0 || resp.Rcode != dns.RcodeSuccess {
-		t.Fatal("Answer expected to have A records or rcode not equal to RcodeSuccess")
-	}
-	// TODO(miek): DNSSEC DO query
 }
 
 // DNSSEC tests
