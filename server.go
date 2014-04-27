@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"math"
 	"net"
 	"net/url"
 	"strings"
@@ -74,16 +75,15 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	//stats.RequestCount.Inc(1)
 
 	q := req.Question[0]
-	// Ensure we lowercase question so that proper matching against anchor domain takes place.
 	name := strings.ToLower(q.Name)
 
 	log.Printf("Received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 
-	// If the query does not fall in our s.domain, forward it.
 	if !strings.HasSuffix(name, s.config.Domain) {
 		s.ServeDNSForward(w, req)
 		return
 	}
+
 	m := new(dns.Msg)
 	m.SetReply(req)
 	m.Authoritative = true
@@ -202,40 +202,44 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 			switch {
 			case ip.To4() != nil && q.Qtype == dns.TypeA:
 				records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: s.Ttl}, A: ip.To4()})
-			case ip.To16() != nil:
+			case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
 				records = append(records, &dns.AAAA{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: s.Ttl}, AAAA: ip.To16()})
-			default:
-				panic("skydns: internal error")
 			}
 		}
 		return
 	}
 	r, err := s.client.Get(path(name), false, true)
 	if err != nil {
+		println(err.Error())
 		return nil, err
 	}
 	var serv *Service
 	if !r.Node.Dir { // single element
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
 			log.Printf("error: Failure to parse value: %q", err)
+			return nil, err
 		}
 		ip := net.ParseIP(serv.Host)
+		ttl := uint32(r.Node.TTL)
+		if ttl == 0 {
+			ttl = s.Ttl
+		}
 		switch {
 		case ip == nil:
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
 			a := new(dns.A)
-			a.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: uint32(r.Node.TTL)}
+			a.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: ttl}
 			a.A = ip.To4()
 			records = append(records, a)
 		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
 			aaaa := new(dns.AAAA)
-			aaaa.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: uint32(r.Node.TTL)}
+			aaaa.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: ttl}
 			aaaa.AAAA = ip.To16()
 			records = append(records, aaaa)
 		}
 		return records, nil
 	}
-	for _, serv := range loopNodes(&r.Node.Nodes) {
+	for _, serv := range s.loopNodes(&r.Node.Nodes) {
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
@@ -272,7 +276,7 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 	return records, nil
 }
 
-// SRVRecords return SRV records from etcd.
+// SRVRecords returns SRV records from etcd.
 // If the Target is not an name but an IP address, an name is created .
 func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
@@ -285,41 +289,48 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 	if !r.Node.Dir { // single element
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
 			log.Printf("error: Failure to parse value: %q", err)
+			return nil, nil, err
 		}
 		ip := net.ParseIP(serv.Host)
+		ttl := uint32(r.Node.TTL)
+		if ttl == 0 {
+			ttl = s.Ttl
+		}
 		switch {
 		case ip == nil:
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: uint32(r.Node.TTL)},
+			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: ttl},
 				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: dns.Fqdn(serv.Host)})
 		case ip.To4() != nil:
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: uint32(r.Node.TTL)},
+			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: ttl},
 				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: domain(r.Node.Key)})
-			extra = append(extra, &dns.A{Hdr: dns.RR_Header{Name: domain(r.Node.Key), Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: uint32(r.Node.TTL)}, A: ip.To4()})
+			extra = append(extra, &dns.A{Hdr: dns.RR_Header{Name: domain(r.Node.Key), Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: ip.To4()})
 		case ip.To4() == nil:
+			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: ttl},
+				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: domain(r.Node.Key)})
+			extra = append(extra, &dns.AAAA{Hdr: dns.RR_Header{Name: domain(r.Node.Key), Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: ttl}, AAAA: ip.To16()})
 		}
 		return records, extra, nil
 	}
-	// TTL in serv.
-	for _, serv := range loopNodes(&r.Node.Nodes) {
-		//		weight = uint16(math.Floor(float64(100 / (len(additionalServices) - len(services)))))
+
+	sx := s.loopNodes(&r.Node.Nodes)
+	weight = uint16(math.Floor(float64(100 / len(sx))))
+	for _, serv := range sx {
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: uint32(r.Node.TTL)},
+			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.ttl},
 				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: dns.Fqdn(serv.Host)})
 		case ip.To4() != nil:
+			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.ttl},
+				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: domain(serv.key)})
+			extra = append(extra, &dns.A{Hdr: dns.RR_Header{Name: domain(serv.key), Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: serv.ttl}, A: ip.To4()})
 		case ip.To4() == nil:
+			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.ttl},
+				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: domain(serv.key)})
+			extra = append(extra, &dns.AAAA{Hdr: dns.RR_Header{Name: domain(serv.key), Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: serv.ttl}, AAAA: ip.To16()})
 		}
 	}
-	return records, extra, err
-	/*
-		case ip.To4() != nil:
-		case ip.To16() != nil:
-			extra = append(extra, &dns.AAAA{Hdr: dns.RR_Header{Name: serv.UUID + "." + s.domain + ".", Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: serv.TTL}, AAAA: ip.To16()})
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.TTL},
-				Priority: 10, Weight: weight, Port: serv.Port, Target: serv.UUID + "." + s.domain + "."})
-	*/
-	return
+	return records, extra, nil
 }
 
 // SOA returns a SOA record for this SkyDNS instance.
@@ -335,9 +346,30 @@ func (s *server) SOA() dns.RR {
 	}
 }
 
-// path convert a domainname to a etcd path. If the question
-// looks like service.staging.skydns.local., the resulting key
-// will be /skydns/local/skydns/staging/service .
+// loopNodes recursively loops through the nodes and returns all the values.
+func (s *server) loopNodes(n *etcd.Nodes) (sx []*Service) {
+	for _, n := range *n {
+		serv := new(Service)
+		if n.Dir {
+			sx = append(sx, s.loopNodes(&n.Nodes)...)
+			continue
+		}
+		if err := json.Unmarshal([]byte(n.Value), &serv); err != nil {
+			log.Printf("error: Failure to parse value: %q", err)
+			continue
+		}
+		serv.ttl = uint32(n.TTL)
+		if serv.ttl == 0 {
+			serv.ttl = s.Ttl
+		}
+		serv.key = n.Key
+		sx = append(sx, serv)
+	}
+	return
+}
+
+// path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
+// the resulting key will be /skydns/local/skydns/staging/service .
 func path(s string) string {
 	l := dns.SplitDomainName(s)
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
@@ -347,6 +379,7 @@ func path(s string) string {
 	return "/skydns/" + strings.Join(l, "/")
 }
 
+// domain is the opposite of path.
 func domain(s string) string {
 	l := strings.Split(s, "/")
 	// start with 1, to strip /skydns
@@ -354,24 +387,4 @@ func domain(s string) string {
 		l[i], l[j] = l[j], l[i]
 	}
 	return dns.Fqdn(strings.Join(l[1:len(l)-1], "."))
-
-}
-
-// loopNodes recursively loops through the nodes and returns all the values.
-func loopNodes(n *etcd.Nodes) (sx []*Service) {
-	for _, n := range *n {
-		s := new(Service)
-		if n.Dir {
-			sx = append(sx, loopNodes(&n.Nodes)...)
-			continue
-		}
-		if err := json.Unmarshal([]byte(n.Value), &s); err != nil {
-			log.Printf("error: Failure to parse value: %q", err)
-			continue
-		}
-		s.ttl = uint32(n.TTL) // use a default if zero
-		s.key = n.Key
-		sx = append(sx, s)
-	}
-	return
 }

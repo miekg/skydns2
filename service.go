@@ -4,16 +4,6 @@
 
 package main
 
-import (
-//	"bytes"
-//	"encoding/json"
-//	"log"
-//	"net/http"
-//	"strconv"
-//	"time"
-)
-
-//
 type Service struct {
 	// This *is* the rdata from a SRV record, but with a twist.
 	// Host (Target in SRV) must be a domain name, but if it looks like an IP
