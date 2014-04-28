@@ -7,9 +7,7 @@ package main
 // etcd needs to be running on http://127.0.0.1:4001
 
 import (
-	"bytes"
 	"encoding/json"
-	"net/http"
 	"strconv"
 	"sync"
 	"testing"
@@ -24,20 +22,21 @@ import (
 var Port = 9400
 var StrPort = "9400" // string equivalent of Port
 
-func addService(t *testing.T, key string, m *Service) {
+func addService(t *testing.T, s *server, k string, ttl uint64, m *Service) {
 	b, err := json.Marshal(m)
 	if err != nil {
 		t.Fatal(err)
 	}
-	key = path(key)
-	client := new(http.Client)
-	req, _ := http.NewRequest("PUT", "http://127.0.0.1:4001/v2/keys/"+key, bytes.NewBuffer(b))
-	resp, err := client.Do(req)
+	_, err = s.client.Create(path(k), string(b), ttl)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusCreated {
-		t.Fatal("failed to add service")
+}
+
+func delService(t *testing.T, s *server, k string) {
+	_, err := s.client.Delete(path(k), false)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -45,7 +44,7 @@ func newTestServer(t *testing.T) *server {
 	Port += 10
 	StrPort = strconv.Itoa(Port)
 	s := new(server)
-	client := etcd.NewClient([]string{"http//127.0.0.1:4001"})
+	client := etcd.NewClient([]string{"http://127.0.0.1:4001"})
 	client.SyncCluster()
 
 	s.group = new(sync.WaitGroup)
@@ -53,7 +52,7 @@ func newTestServer(t *testing.T) *server {
 	s.config = new(Config)
 	s.config.DnsAddr = "127.0.0.1:" + StrPort
 	s.config.Nameservers = []string{"8.8.4.4:53"}
-	s.config.Domain = "skydns.local."
+	s.config.Domain = "skydns.test."
 	go s.Run()
 	return s
 }
@@ -83,15 +82,70 @@ func TestDNSForward(t *testing.T) {
 	}
 }
 
-func TestAddService(t *testing.T) {
+func TestDNS(t *testing.T) {
 	s := newTestServer(t)
 	defer s.Stop()
 
-	m := &Service{Host: "www.production.east.skydns.local", Port: 9000}
-	addService(t, "www.production.east.skydns.local.", m)
+	for _, serv := range services {
+		m := &Service{Host: serv.Host, Port: 9000}
+		addService(t, s, serv.key, 0, m)
+		defer delService(t, s, serv.key)
+	}
+	c := new(dns.Client)
+	for _, tc := range dnsTestCases {
+		m := new(dns.Msg)
+		m.SetQuestion(tc.Qname, tc.Qtype)
+		resp, _, err := c.Exchange(m, "localhost:"+StrPort)
+		if err != nil {
+			t.Logf("%s\n", resp)
+		}
+
+		/*
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(resp.Answer) != len(tc.Answer) {
+				t.Fatalf("Response for %q contained %d results, %d expected", tc.Question, len(resp.Answer), len(tc.Answer))
+			}
+
+			for i, a := range resp.Answer {
+				srv := a.(*dns.SRV)
+
+				// Validate Header
+				if srv.Hdr.Name != tc.Answer[i].Hdr.Name {
+					t.Errorf("Answer %d should have a Header Name of %q, but has %q", i, tc.Answer[i].Hdr.Name, srv.Hdr.Name)
+				}
+
+				if srv.Hdr.Ttl != tc.Answer[i].Hdr.Ttl {
+					t.Errorf("Answer %d should have a Header TTL of %d, but has %d", i, tc.Answer[i].Hdr.Ttl, srv.Hdr.Ttl)
+				}
+
+				if srv.Hdr.Rrtype != tc.Answer[i].Hdr.Rrtype {
+					t.Errorf("Answer %d should have a Header Response Type of %d, but has %d", i, tc.Answer[i].Hdr.Rrtype, srv.Hdr.Rrtype)
+				}
+
+				// Validate Record
+				if srv.Priority != tc.Answer[i].Priority {
+					t.Errorf("Answer %d should have a Priority of %d, but has %d", i, tc.Answer[i].Priority, srv.Priority)
+				}
+
+				if srv.Weight != tc.Answer[i].Weight {
+					t.Errorf("Answer %d should have a Weight of %d, but has %d", i, tc.Answer[i].Weight, srv.Weight)
+				}
+
+				if srv.Port != tc.Answer[i].Port {
+					t.Errorf("Answer %d should have a Port of %d, but has %d", i, tc.Answer[i].Port, srv.Port)
+				}
+
+				if srv.Target != tc.Answer[i].Target {
+					t.Errorf("Answer %d should have a Target of %q, but has %q", i, tc.Answer[i].Target, srv.Target)
+				}
+			}
+		*/
+	}
 
 }
-
 
 /*
 func newTestServerDNSSEC(leader, secret, nameserver string) *Server {
@@ -115,238 +169,51 @@ Publish: 20140126132645
 Activate: 20140126132645`), "stdin")
 	return s
 }
+*/
 
-func TestGetEnvironments(t *testing.T) {
-	s := newTestServer("", "", "")
-	defer s.Stop()
-
-	for _, m := range services {
-		s.registry.Add(m)
-	}
-
-	req, _ := http.NewRequest("GET", "/skydns/environments/", nil)
-	resp := httptest.NewRecorder()
-
-	s.router.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatal("Failed to retrieve environment list")
-	}
-
-	//server sends \n at the end, account for this
-	expected := `{"Development":2,"Production":5}`
-	expected = expected + "\n"
-
-	if !bytes.Equal(resp.Body.Bytes(), []byte(expected)) {
-		t.Fatal("Expected ", expected, " got %s", string(resp.Body.Bytes()))
-	}
-}
-
-func TestGetRegions(t *testing.T) {
-	s := newTestServer("", "", "")
-	defer s.Stop()
-
-	for _, m := range services {
-		s.registry.Add(m)
-	}
-
-	req, _ := http.NewRequest("GET", "/skydns/regions/", nil)
-	resp := httptest.NewRecorder()
-
-	s.router.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatal("Failed to retrieve region list")
-	}
-
-	//server sends \n at the end, account for this
-	expected := `{"Region1":3,"Region2":2,"Region3":2}`
-	expected = expected + "\n"
-
-	if !bytes.Equal(resp.Body.Bytes(), []byte(expected)) {
-		t.Fatal("Expected ", expected, " got %s", string(resp.Body.Bytes()))
-	}
-}
-
-func TestAuthenticationFailure(t *testing.T) {
-	s := newTestServer("", "supersecretpassword", "")
-	defer s.Stop()
-
-	m := msg.Service{
-		Name:        "TestService",
-		Version:     "1.0.0",
-		Region:      "Test",
-		Host:        "localhost",
-		Environment: "Production",
-		Port:        9000,
-		TTL:         4,
-	}
-
-	b, err := json.Marshal(m)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	req, _ := http.NewRequest("PUT", "/skydns/services/123", bytes.NewBuffer(b))
-	resp := httptest.NewRecorder()
-
-	s.router.ServeHTTP(resp, req)
-	if resp.Code != 401 {
-		t.Fatal("Authentication should have failed and it worked.")
-	}
-}
-
-func TestAuthenticationSuccess(t *testing.T) {
-	secret := "myimportantsecret"
-	s := newTestServer("", secret, "")
-	defer s.Stop()
-
-	m := msg.Service{
-		Name:        "TestService",
-		Version:     "1.0.0",
-		Region:      "Test",
-		Host:        "localhost",
-		Environment: "Production",
-		Port:        9000,
-		TTL:         4,
-	}
-
-	b, err := json.Marshal(m)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	req, _ := http.NewRequest("PUT", "/skydns/services/123", bytes.NewBuffer(b))
-	req.Header.Set("Authorization", secret)
-	resp := httptest.NewRecorder()
-
-	s.router.ServeHTTP(resp, req)
-	if resp.Code != 201 {
-		t.Fatal("Auth Should have worked and it failed")
-	}
-}
-
-func TestHostFailure(t *testing.T) {
-	s := newTestServer("", "", "")
-	defer s.Stop()
-
-	m := msg.Service{
-		Name:        "TestService",
-		Version:     "1.0.0",
-		Region:      "Test",
-		Environment: "Production",
-		Port:        9000,
-		TTL:         4,
-	}
-
-	b, err := json.Marshal(m)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req, _ := http.NewRequest("PUT", "/skydns/services/123", bytes.NewBuffer(b))
-	resp := httptest.NewRecorder()
-
-	s.router.ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatal("Failed to detect empty Host.")
-	}
-}
-
-var services = []msg.Service{
+var services = []*Service{
 	{
-		UUID:        "100",
-		Name:        "TestService",
-		Version:     "1.0.0",
-		Region:      "Region1",
-		Host:        "server1",
-		Environment: "Development",
-		Port:        9000,
-		TTL:         30,
-		Expires:     getExpirationTime(30),
+		Host: "100.server1.development.region1.skydns.test",
+		key:  path("100.server1.development.region1.skydns.test."),
 	},
 	{
-		UUID:        "101",
-		Name:        "TestService",
-		Version:     "1.0.1",
-		Region:      "Region1",
-		Host:        "server2",
-		Environment: "Production",
-		Port:        9001,
-		TTL:         31,
-		Expires:     getExpirationTime(31),
+		Host: "101.server2.production.region1.skydns.test",
+		key:  path("101.server2.production.region1.skydns.test."),
 	},
 	{
-		UUID:        "102",
-		Name:        "OtherService",
-		Version:     "1.0.0",
-		Region:      "Region2",
-		Host:        "server3",
-		Environment: "Production",
-		Port:        9002,
-		TTL:         32,
-		Expires:     getExpirationTime(32),
+		Host: "102.server3.production.region2.skydns.test",
+		key:  path("102.server3.production.region2.skydns.test."),
 	},
 	{
-		UUID:        "103",
-		Name:        "TestService",
-		Version:     "1.0.1",
-		Region:      "Region1",
-		Host:        "server4",
-		Environment: "Development",
-		Port:        9003,
-		TTL:         33,
-		Expires:     getExpirationTime(33),
+		Host: "103.server4.development.region1.skydns.test",
+		key:  path("103.server4.development.region1.skydns.test."),
 	},
 	{
-		UUID:        "104",
-		Name:        "TestService",
-		Version:     "1.0.0",
-		Region:      "Region3",
-		Host:        "server5",
-		Environment: "Production",
-		Port:        9004,
-		TTL:         34,
-		Expires:     getExpirationTime(34),
+		Host: "10.0.0.1",
+		key:  path("104.server1.development.region1.skydns.test."),
 	},
 	{
-		UUID:        "105",
-		Name:        "TestService",
-		Version:     "1.0.0",
-		Region:      "Region3",
-		Host:        "server6",
-		Environment: "Production",
-		Port:        9005,
-		TTL:         35,
-		Expires:     getExpirationTime(35),
-	},
-	{
-		UUID:        "106",
-		Name:        "OtherService",
-		Version:     "1.0.0",
-		Region:      "Region2",
-		Host:        "server7",
-		Environment: "Production",
-		Port:        9006,
-		TTL:         36,
-		Expires:     getExpirationTime(36),
+		Host: "2001::8:8:8:8",
+		key:  path("105.server3.production.region2.skydns.test."),
 	},
 }
 
 type dnsTestCase struct {
-	Question string
-	Answer   []dns.SRV
+	Qname     string
+	Qtype     uint16
+	Answer    []dns.SRV
+	ExtraA    []dns.A
+	ExtraAAAA []dns.AAAA
 }
 
 var dnsTestCases = []dnsTestCase{
-	// Generic Test
 	{
-		Question: "testservice.production.skydns.local.",
+		Qname: "testservice.production.skydns.test.",
+		Qtype: dns.TypeSRV,
 		Answer: []dns.SRV{
 			{
 				Hdr: dns.RR_Header{
-					Name:   "testservice.production.skydns.local.",
+					Name:   "testservice.production.skydns.test.",
 					Ttl:    30,
 					Rrtype: dns.TypeSRV,
 				},
@@ -357,7 +224,7 @@ var dnsTestCases = []dnsTestCase{
 			},
 			{
 				Hdr: dns.RR_Header{
-					Name:   "testservice.production.skydns.local.",
+					Name:   "testservice.production.skydns.test.",
 					Ttl:    33,
 					Rrtype: dns.TypeSRV,
 				},
@@ -368,7 +235,7 @@ var dnsTestCases = []dnsTestCase{
 			},
 			{
 				Hdr: dns.RR_Header{
-					Name:   "testservice.production.skydns.local.",
+					Name:   "testservice.production.skydns.test.",
 					Ttl:    34,
 					Rrtype: dns.TypeSRV,
 				},
@@ -382,11 +249,12 @@ var dnsTestCases = []dnsTestCase{
 
 	// Region Priority Test
 	{
-		Question: "region1.*.testservice.production.skydns.local.",
+		Qname: "region1.*.testservice.production.skydns.test.",
+		Qtype: dns.TypeSRV,
 		Answer: []dns.SRV{
 			{
 				Hdr: dns.RR_Header{
-					Name:   "region1.*.testservice.production.skydns.local.",
+					Name:   "region1.*.testservice.production.skydns.test.",
 					Ttl:    30,
 					Rrtype: dns.TypeSRV,
 				},
@@ -397,7 +265,7 @@ var dnsTestCases = []dnsTestCase{
 			},
 			{
 				Hdr: dns.RR_Header{
-					Name:   "region1.*.testservice.production.skydns.local.",
+					Name:   "region1.*.testservice.production.skydns.test.",
 					Ttl:    33,
 					Rrtype: dns.TypeSRV,
 				},
@@ -408,7 +276,7 @@ var dnsTestCases = []dnsTestCase{
 			},
 			{
 				Hdr: dns.RR_Header{
-					Name:   "region1.*.testservice.production.skydns.local.",
+					Name:   "region1.*.testservice.production.skydns.test.",
 					Ttl:    34,
 					Rrtype: dns.TypeSRV,
 				},
@@ -421,104 +289,7 @@ var dnsTestCases = []dnsTestCase{
 	},
 }
 
-type servicesTest struct {
-	query string
-	count int
-}
-
-var serviceTestArray []servicesTest = []servicesTest{
-	{"*", 7},
-	{"production", 5},
-	{"testservice.production", 3},
-	{"region1.*.*.production", 1},
-	{"region1.*.testservice.production", 1},
-	{"region1.*.TestService.production", 1},
-}
-
-func TestGetServicesWithQueries(t *testing.T) {
-	s := newTestServer("", "", "")
-	defer s.Stop()
-
-	for _, m := range services {
-		s.registry.Add(m)
-	}
-
-	for _, st := range serviceTestArray {
-		req, _ := http.NewRequest("GET", "/skydns/services/?query="+st.query, nil)
-		resp := httptest.NewRecorder()
-		s.router.ServeHTTP(resp, req)
-		if resp.Code != http.StatusOK {
-			t.Fatal("Failed To Retrieve Services")
-		}
-		var returnedServices []msg.Service
-		err := json.Unmarshal(resp.Body.Bytes(), &returnedServices)
-		if err != nil {
-			t.Fatal("Failed to unmarshal response from server")
-		}
-		if len(returnedServices) != st.count {
-			t.Fatal("Expected ", st.count, " got %d services", len(returnedServices))
-		}
-
-	}
-
-}
-
-func TestDNS(t *testing.T) {
-	s := newTestServer("", "", "")
-	defer s.Stop()
-
-	for _, m := range services {
-		s.registry.Add(m)
-	}
-	c := new(dns.Client)
-	for _, tc := range dnsTestCases {
-		m := new(dns.Msg)
-		m.SetQuestion(tc.Question, dns.TypeSRV)
-		resp, _, err := c.Exchange(m, "localhost:"+StrPort)
-
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if len(resp.Answer) != len(tc.Answer) {
-			t.Fatalf("Response for %q contained %d results, %d expected", tc.Question, len(resp.Answer), len(tc.Answer))
-		}
-
-		for i, a := range resp.Answer {
-			srv := a.(*dns.SRV)
-
-			// Validate Header
-			if srv.Hdr.Name != tc.Answer[i].Hdr.Name {
-				t.Errorf("Answer %d should have a Header Name of %q, but has %q", i, tc.Answer[i].Hdr.Name, srv.Hdr.Name)
-			}
-
-			if srv.Hdr.Ttl != tc.Answer[i].Hdr.Ttl {
-				t.Errorf("Answer %d should have a Header TTL of %d, but has %d", i, tc.Answer[i].Hdr.Ttl, srv.Hdr.Ttl)
-			}
-
-			if srv.Hdr.Rrtype != tc.Answer[i].Hdr.Rrtype {
-				t.Errorf("Answer %d should have a Header Response Type of %d, but has %d", i, tc.Answer[i].Hdr.Rrtype, srv.Hdr.Rrtype)
-			}
-
-			// Validate Record
-			if srv.Priority != tc.Answer[i].Priority {
-				t.Errorf("Answer %d should have a Priority of %d, but has %d", i, tc.Answer[i].Priority, srv.Priority)
-			}
-
-			if srv.Weight != tc.Answer[i].Weight {
-				t.Errorf("Answer %d should have a Weight of %d, but has %d", i, tc.Answer[i].Weight, srv.Weight)
-			}
-
-			if srv.Port != tc.Answer[i].Port {
-				t.Errorf("Answer %d should have a Port of %d, but has %d", i, tc.Answer[i].Port, srv.Port)
-			}
-
-			if srv.Target != tc.Answer[i].Target {
-				t.Errorf("Answer %d should have a Target of %q, but has %q", i, tc.Answer[i].Target, srv.Target)
-			}
-		}
-	}
-}
+/*
 
 func TestDNSARecords(t *testing.T) {
 	s := newTestServer("", "", "")
@@ -526,7 +297,7 @@ func TestDNSARecords(t *testing.T) {
 
 	c := new(dns.Client)
 	m := new(dns.Msg)
-	m.SetQuestion("skydns.local.", dns.TypeA)
+	m.SetQuestion("skydns.test.", dns.TypeA)
 	resp, _, err := c.Exchange(m, "localhost:"+StrPort)
 	if err != nil {
 		t.Fatal(err)
@@ -614,10 +385,10 @@ type dnssecTestCase struct {
 var dnssecTestCases = []dnssecTestCase{
 	// DNSKEY Test
 	{
-		Question: dns.Question{"skydns.local.", dns.TypeDNSKEY, dns.ClassINET},
+		Question: dns.Question{"skydns.test.", dns.TypeDNSKEY, dns.ClassINET},
 		Answer: []dns.RR{&dns.DNSKEY{
 			Hdr: dns.RR_Header{
-				Name:   "skydns.local.",
+				Name:   "skydns.test.",
 				Ttl:    origTTL,
 				Rrtype: dns.TypeDNSKEY,
 			},
@@ -628,7 +399,7 @@ var dnssecTestCases = []dnssecTestCase{
 		},
 			&dns.RRSIG{
 				Hdr: dns.RR_Header{
-					Name:   "skydns.local.",
+					Name:   "skydns.test.",
 					Ttl:    origTTL,
 					Rrtype: dns.TypeRRSIG,
 				},
@@ -639,7 +410,7 @@ var dnssecTestCases = []dnssecTestCase{
 				Expiration:  0,
 				Inception:   0,
 				KeyTag:      51945,
-				SignerName:  "skydns.local.",
+				SignerName:  "skydns.test.",
 				Signature:   "not important",
 			},
 		},
