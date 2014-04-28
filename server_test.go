@@ -8,6 +8,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"sync"
@@ -17,15 +18,26 @@ import (
 	"github.com/miekg/dns"
 )
 
+// keep global port counter that increments with 10 for each
+// new call to newTestServer. The dns server is started on port 'port'
+// the http server is started on 'port+1'.
 var Port = 9400
 var StrPort = "9400" // string equivalent of Port
 
-func newTestName(t *testing.T, verb, name, value string) {
-	client := new(http.Client)
-	req, _ := http.NewRequest(verb, "http://127.0.0.1:4001/v2/keys/skydns/"+name, bytes.NewBuffer([]byte(value)))
-	_, err := client.Do(req)
+func addService(t *testing.T, key string, m *Service) {
+	b, err := json.Marshal(m)
 	if err != nil {
 		t.Fatal(err)
+	}
+	key = path(key)
+	client := new(http.Client)
+	req, _ := http.NewRequest("PUT", "http://127.0.0.1:4001/v2/keys/"+key, bytes.NewBuffer(b))
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatal("failed to add service")
 	}
 }
 
@@ -71,6 +83,16 @@ func TestDNSForward(t *testing.T) {
 	}
 }
 
+func TestAddService(t *testing.T) {
+	s := newTestServer(t)
+	defer s.Stop()
+
+	m := &Service{Host: "www.production.east.skydns.local", Port: 9000}
+	addService(t, "www.production.east.skydns.local.", m)
+
+}
+
+
 /*
 func newTestServerDNSSEC(leader, secret, nameserver string) *Server {
 	s := newTestServer(leader, secret, nameserver)
@@ -92,54 +114,6 @@ Created: 20140126132645
 Publish: 20140126132645
 Activate: 20140126132645`), "stdin")
 	return s
-}
-
-// keep global port counter that increments with 10 for each
-// new call to newTestServer. The dns server is started on port 'port'
-// the http server is started on 'port+1'.
-var Port = 9490
-var StrPort = "9490" // string equivalent of Port
-
-func TestGetService(t *testing.T) {
-	s := newTestServer("", "", "")
-	defer s.Stop()
-
-	m := msg.Service{
-		UUID:        "123",
-		Name:        "TestService",
-		Version:     "1.0.0",
-		Region:      "Test",
-		Host:        "localhost",
-		Environment: "Production",
-		Port:        9000,
-		TTL:         4,
-		Expires:     getExpirationTime(4),
-	}
-
-	s.registry.Add(m)
-
-	req, _ := http.NewRequest("GET", "/skydns/services/"+m.UUID, nil)
-	resp := httptest.NewRecorder()
-
-	s.router.ServeHTTP(resp, req)
-
-	if resp.Code != http.StatusOK {
-		t.Fatal("Failed to retrieve service")
-	}
-
-	m.TTL = 3 // TTL will be lower as time has passed
-	expected, err := json.Marshal(m)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Newline is expected
-	expected = append(expected, []byte("\n")...)
-
-	if !bytes.Equal(resp.Body.Bytes(), expected) {
-		t.Fatalf("Returned service is invalid. Expected %q but received %q", string(expected), resp.Body.String())
-	}
 }
 
 func TestGetEnvironments(t *testing.T) {
