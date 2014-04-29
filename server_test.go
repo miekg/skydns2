@@ -16,9 +16,8 @@ import (
 	"github.com/miekg/dns"
 )
 
-// keep global port counter that increments with 10 for each
-// new call to newTestServer. The dns server is started on port 'port'
-// the http server is started on 'port+1'.
+// Keep global port counter that increments with 10 for each
+// new call to newTestServer. The dns server is started on port 'Port'.
 var Port = 9400
 var StrPort = "9400" // string equivalent of Port
 
@@ -29,6 +28,7 @@ func addService(t *testing.T, s *server, k string, ttl uint64, m *Service) {
 	}
 	_, err = s.client.Create(path(k), string(b), ttl)
 	if err != nil {
+		// TODO(miek): allow for existing keys...
 		t.Fatal(err)
 	}
 }
@@ -92,22 +92,19 @@ func TestDNS(t *testing.T) {
 		defer delService(t, s, serv.key)
 	}
 	c := new(dns.Client)
-	for _, tc := range dnsTestCases {
+	for _, tc := range dnsTestCases[:1] { // TOOD(miek): does only 1 test
 		m := new(dns.Msg)
 		m.SetQuestion(tc.Qname, tc.Qtype)
-		resp, _, err := c.Exchange(m, "localhost:"+StrPort)
+		resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
 		if err != nil {
-			t.Logf("%s\n", resp)
+			t.Fatal(err)
 		}
 
+		if len(resp.Answer) != len(tc.Answer) {
+			t.Fatalf("Response for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
+		}
 		/*
-			if err != nil {
-				t.Fatal(err)
-			}
 
-			if len(resp.Answer) != len(tc.Answer) {
-				t.Fatalf("Response for %q contained %d results, %d expected", tc.Question, len(resp.Answer), len(tc.Answer))
-			}
 
 			for i, a := range resp.Answer {
 				srv := a.(*dns.SRV)
@@ -147,54 +144,30 @@ func TestDNS(t *testing.T) {
 
 }
 
-/*
-func newTestServerDNSSEC(leader, secret, nameserver string) *Server {
-	s := newTestServer(leader, secret, nameserver)
-	key, _ := dns.NewRR("skydns.local. IN DNSKEY 256 3 5 AwEAAaXfO+DOBMJsQ5H4TfiabwSpqE4cGL0Qlvh5hrQumrjr9eNSdIOjIHJJKCe56qBU5mH+iBlXP29SVf6UiiMjIrAPDVhClLeWFe0PC+XlWseAyRgiLHdQ8r95+AfkhO5aZgnCwYf9FGGSaT0+CRYN+PyDbXBTLK5FN+j5b6bb7z+d")
-	s.dnsKey = key.(*dns.DNSKEY)
-	s.keyTag = s.dnsKey.KeyTag()
-	s.privKey, _ = s.dnsKey.ReadPrivateKey(strings.NewReader(`
-Private-key-format: v1.3
-Algorithm: 5 (RSASHA1)
-Modulus: pd874M4EwmxDkfhN+JpvBKmoThwYvRCW+HmGtC6auOv141J0g6MgckkoJ7nqoFTmYf6IGVc/b1JV/pSKIyMisA8NWEKUt5YV7Q8L5eVax4DJGCIsd1Dyv3n4B+SE7lpmCcLBh/0UYZJpPT4JFg34/INtcFMsrkU36PlvptvvP50=
-PublicExponent: AQAB
-PrivateExponent: C6e08GXphbPPx6j36ZkIZf552gs1XcuVoB4B7hU8P/Qske2QTFOhCwbC8I+qwdtVWNtmuskbpvnVGw9a6X8lh7Z09RIgzO/pI1qau7kyZcuObDOjPw42exmjqISFPIlS1wKA8tw+yVzvZ19vwRk1q6Rne+C1romaUOTkpA6UXsE=
-Prime1: 2mgJ0yr+9vz85abrWBWnB8Gfa1jOw/ccEg8ZToM9GLWI34Qoa0D8Dxm8VJjr1tixXY5zHoWEqRXciTtY3omQDQ==
-Prime2: wmxLpp9rTzU4OREEVwF43b/TxSUBlUq6W83n2XP8YrCm1nS480w4HCUuXfON1ncGYHUuq+v4rF+6UVI3PZT50Q==
-Exponent1: wkdTngUcIiau67YMmSFBoFOq9Lldy9HvpVzK/R0e5vDsnS8ZKTb4QJJ7BaG2ADpno7pISvkoJaRttaEWD3a8rQ==
-Exponent2: YrC8OglEXIGkV3tm2494vf9ozPL6+cBkFsPPg9dXbvVCyyuW0pGHDeplvfUqs4nZp87z8PsoUL+LAUqdldnwcQ==
-Coefficient: mMFr4+rDY5V24HZU3Oa5NEb55iQ56ZNa182GnNhWqX7UqWjcUUGjnkCy40BqeFAQ7lp52xKHvP5Zon56mwuQRw==
-Created: 20140126132645
-Publish: 20140126132645
-Activate: 20140126132645`), "stdin")
-	return s
-}
-*/
-
 var services = []*Service{
 	{
-		Host: "100.server1.development.region1.skydns.test",
-		key:  path("100.server1.development.region1.skydns.test."),
+		Host: "server2",
+		key:  "100.server1.development.region1.skydns.test.",
 	},
 	{
-		Host: "101.server2.production.region1.skydns.test",
-		key:  path("101.server2.production.region1.skydns.test."),
+		Host: "server2",
+		key:  "101.server2.production.region1.skydns.test.",
 	},
 	{
-		Host: "102.server3.production.region2.skydns.test",
-		key:  path("102.server3.production.region2.skydns.test."),
+		Host: "server5",
+		key:  "102.server3.production.region2.skydns.test.",
 	},
 	{
-		Host: "103.server4.development.region1.skydns.test",
-		key:  path("103.server4.development.region1.skydns.test."),
+		Host: "server6",
+		key:  "103.server4.development.region1.skydns.test.",
 	},
 	{
 		Host: "10.0.0.1",
-		key:  path("104.server1.development.region1.skydns.test."),
+		key:  "104.server1.development.region1.skydns.test.",
 	},
 	{
 		Host: "2001::8:8:8:8",
-		key:  path("105.server3.production.region2.skydns.test."),
+		key:  "105.server3.production.region2.skydns.test.",
 	},
 }
 
@@ -208,41 +181,19 @@ type dnsTestCase struct {
 
 var dnsTestCases = []dnsTestCase{
 	{
-		Qname: "testservice.production.skydns.test.",
+		Qname: "100.server1.development.region1.skydns.test.",
 		Qtype: dns.TypeSRV,
 		Answer: []dns.SRV{
 			{
 				Hdr: dns.RR_Header{
-					Name:   "testservice.production.skydns.test.",
-					Ttl:    30,
+					Name:   "100.server1.development.region1.skydns.test.",
+					Ttl:    3600,
 					Rrtype: dns.TypeSRV,
 				},
 				Priority: 10,
 				Weight:   33,
 				Target:   "server2.",
-				Port:     9001,
-			},
-			{
-				Hdr: dns.RR_Header{
-					Name:   "testservice.production.skydns.test.",
-					Ttl:    33,
-					Rrtype: dns.TypeSRV,
-				},
-				Priority: 10,
-				Weight:   33,
-				Target:   "server5.",
-				Port:     9004,
-			},
-			{
-				Hdr: dns.RR_Header{
-					Name:   "testservice.production.skydns.test.",
-					Ttl:    34,
-					Rrtype: dns.TypeSRV,
-				},
-				Priority: 10,
-				Weight:   33,
-				Target:   "server6.",
-				Port:     9005,
+				Port:     9000,
 			},
 		},
 	},
@@ -288,6 +239,31 @@ var dnsTestCases = []dnsTestCase{
 		},
 	},
 }
+
+/*
+func newTestServerDNSSEC(leader, secret, nameserver string) *Server {
+	s := newTestServer(leader, secret, nameserver)
+	key, _ := dns.NewRR("skydns.local. IN DNSKEY 256 3 5 AwEAAaXfO+DOBMJsQ5H4TfiabwSpqE4cGL0Qlvh5hrQumrjr9eNSdIOjIHJJKCe56qBU5mH+iBlXP29SVf6UiiMjIrAPDVhClLeWFe0PC+XlWseAyRgiLHdQ8r95+AfkhO5aZgnCwYf9FGGSaT0+CRYN+PyDbXBTLK5FN+j5b6bb7z+d")
+	s.dnsKey = key.(*dns.DNSKEY)
+	s.keyTag = s.dnsKey.KeyTag()
+	s.privKey, _ = s.dnsKey.ReadPrivateKey(strings.NewReader(`
+Private-key-format: v1.3
+Algorithm: 5 (RSASHA1)
+Modulus: pd874M4EwmxDkfhN+JpvBKmoThwYvRCW+HmGtC6auOv141J0g6MgckkoJ7nqoFTmYf6IGVc/b1JV/pSKIyMisA8NWEKUt5YV7Q8L5eVax4DJGCIsd1Dyv3n4B+SE7lpmCcLBh/0UYZJpPT4JFg34/INtcFMsrkU36PlvptvvP50=
+PublicExponent: AQAB
+PrivateExponent: C6e08GXphbPPx6j36ZkIZf552gs1XcuVoB4B7hU8P/Qske2QTFOhCwbC8I+qwdtVWNtmuskbpvnVGw9a6X8lh7Z09RIgzO/pI1qau7kyZcuObDOjPw42exmjqISFPIlS1wKA8tw+yVzvZ19vwRk1q6Rne+C1romaUOTkpA6UXsE=
+Prime1: 2mgJ0yr+9vz85abrWBWnB8Gfa1jOw/ccEg8ZToM9GLWI34Qoa0D8Dxm8VJjr1tixXY5zHoWEqRXciTtY3omQDQ==
+Prime2: wmxLpp9rTzU4OREEVwF43b/TxSUBlUq6W83n2XP8YrCm1nS480w4HCUuXfON1ncGYHUuq+v4rF+6UVI3PZT50Q==
+Exponent1: wkdTngUcIiau67YMmSFBoFOq9Lldy9HvpVzK/R0e5vDsnS8ZKTb4QJJ7BaG2ADpno7pISvkoJaRttaEWD3a8rQ==
+Exponent2: YrC8OglEXIGkV3tm2494vf9ozPL6+cBkFsPPg9dXbvVCyyuW0pGHDeplvfUqs4nZp87z8PsoUL+LAUqdldnwcQ==
+Coefficient: mMFr4+rDY5V24HZU3Oa5NEb55iQ56ZNa182GnNhWqX7UqWjcUUGjnkCy40BqeFAQ7lp52xKHvP5Zon56mwuQRw==
+Created: 20140126132645
+Publish: 20140126132645
+Activate: 20140126132645`), "stdin")
+	return s
+}
+*/
+
 
 /*
 
