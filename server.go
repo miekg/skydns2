@@ -10,6 +10,7 @@ import (
 	"math"
 	"net"
 	"net/url"
+	gopath "path"
 	"strings"
 	"sync"
 	"time"
@@ -397,8 +398,7 @@ func path(s string) string {
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
 		l[i], l[j] = l[j], l[i]
 	}
-	// TODO(miek): escape slashes in s.
-	return "/skydns/" + strings.Join(l, "/")
+	return gopath.Join(append([]string{"/skydns/"}, l...)...)
 }
 
 // domain is the opposite of path.
