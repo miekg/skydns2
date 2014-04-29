@@ -23,8 +23,6 @@ type server struct {
 	domainLabels int
 	client       *etcd.Client
 	config       *Config
-	Ttl          uint32
-	MinTtl       uint32
 
 	group *sync.WaitGroup
 }
@@ -34,8 +32,6 @@ func NewServer(config *Config, client *etcd.Client) *server {
 	s := &server{
 		client: client,
 		config: config,
-		Ttl:    3600,
-		MinTtl: 60,
 		group:  new(sync.WaitGroup),
 	}
 	return s
@@ -95,7 +91,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.Answer = make([]dns.RR, 0, 10)
 	defer func() {
 		// Set TTL to the minimum of the RRset.
-		minttl := s.Ttl
+		minttl := s.config.Ttl
 		if len(m.Answer) > 1 {
 			for _, r := range m.Answer {
 				if r.Header().Ttl < minttl {
@@ -217,9 +213,9 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 			ip := net.ParseIP(h)
 			switch {
 			case ip.To4() != nil && q.Qtype == dns.TypeA:
-				records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: s.Ttl}, A: ip.To4()})
+				records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: s.config.Ttl}, A: ip.To4()})
 			case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
-				records = append(records, &dns.AAAA{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: s.Ttl}, AAAA: ip.To16()})
+				records = append(records, &dns.AAAA{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: s.config.Ttl}, AAAA: ip.To16()})
 			}
 		}
 		return
@@ -236,7 +232,7 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		ip := net.ParseIP(serv.Host)
 		ttl := uint32(r.Node.TTL)
 		if ttl == 0 {
-			ttl = s.Ttl
+			ttl = s.config.Ttl
 		}
 		switch {
 		case ip == nil:
@@ -311,7 +307,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		ip := net.ParseIP(serv.Host)
 		ttl := uint32(r.Node.TTL)
 		if ttl == 0 {
-			ttl = s.Ttl
+			ttl = s.config.Ttl
 		}
 		switch {
 		case ip == nil:
@@ -355,14 +351,14 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 
 // SOA returns a SOA record for this SkyDNS instance.
 func (s *server) SOA() dns.RR {
-	return &dns.SOA{Hdr: dns.RR_Header{Name: s.config.Domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: s.Ttl},
+	return &dns.SOA{Hdr: dns.RR_Header{Name: s.config.Domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: s.config.Ttl},
 		Ns:      "master." + s.config.Domain,
 		Mbox:    "hostmaster." + s.config.Domain,
 		Serial:  uint32(time.Now().Truncate(time.Hour).Unix()),
 		Refresh: 28800,
 		Retry:   7200,
 		Expire:  604800,
-		Minttl:  s.MinTtl,
+		Minttl:  s.config.MinTtl,
 	}
 }
 
@@ -383,7 +379,7 @@ func (s *server) loopNodes(n *etcd.Nodes) (sx []*Service, err error) {
 		}
 		serv.ttl = uint32(n.TTL)
 		if serv.ttl == 0 {
-			serv.ttl = s.Ttl
+			serv.ttl = s.config.Ttl
 		}
 		serv.key = n.Key
 		sx = append(sx, serv)

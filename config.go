@@ -25,6 +25,8 @@ type Config struct {
 	Nameservers  []string      `json:"nameservers,omitempty"`
 	ReadTimeout  time.Duration `json:"read_timeout,omitempty"`
 	WriteTimeout time.Duration `json:"write_timeout,omitempty"`
+	Ttl          uint32        `json:"ttl,omitempty"`
+	MinTtl       uint32        `json:"min_ttl,omitempty"`
 
 	// DNSSEC key material
 	PubKey  *dns.DNSKEY    `json:"-"`
@@ -33,7 +35,7 @@ type Config struct {
 }
 
 func LoadConfig(client *etcd.Client) (*Config, error) {
-	config := &Config{ReadTimeout:0, WriteTimeout:0, Domain:"", DnsAddr:"", DNSSEC:""}
+	config := &Config{ReadTimeout: 0, WriteTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
 	n, err := client.Get("/skydns/config", false, false)
 	if err != nil {
 		c, err := dns.ClientConfigFromFile("/etc/resolv.conf")
@@ -66,6 +68,12 @@ func setDefaults(config *Config) error {
 	}
 	if config.Domain == "" {
 		config.Domain = "skydns.local"
+	}
+	if config.MinTtl == 0 {
+		config.MinTtl = 60
+	}
+	if config.Ttl == 0 {
+		config.Ttl = 3600
 	}
 
 	if len(config.Nameservers) == 0 {
