@@ -10,7 +10,9 @@ This is the original [announcement blog post](http://blog.gopheracademy.com/skyd
 since then SkyDNS has seen some changes, most notably to ability to use etcd as a backend.
 
 ##Setup / Install
-Compile SkyDNS, and execute it
+Compile/download and run etcd, see the documentation for etcd at <https://github.com/coreos/etcd>.
+
+Then compile SkyDNS, and execute it.
 
 `go get -d -v ./... && go build -v ./...`
 
@@ -20,11 +22,26 @@ etcd machines in the variable ETCD_MACHINES:
     export ETCD_MACHINES='http://127.0.0.1:4001'
     ./skydns2
 
-##API
 
-### Configuration
+## Configuration
+SkyDNS' configuration is stored inside `etcd`, under the key `/skydns/config`, the following paramaters
+may be set:
 
-    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/config -d value='{"dns_addr":"127.0.0.1:5354"}'
+* `dns_addr`: ip:port on which the SkyDNS should start the DNS server, defaults to `127.0.0.1:53`.
+* `domain`: domain SkyDNS is authoritative for, default to `skydns.local.`.
+* `dnssec`: enable DNSSEC.
+* `round_robin`: enable round robin sorting for A and AAAA responses, defaults to true
+* `nameservers`: forward DNS requests to these nameservers (ip:port combination), when we are not
+    authoritative for them.
+* `read_timeout`: network read timeout, for DNS and talking with etcd.
+* `write_timeout`: network write timeout.
+* `ttl`: default TTL in seconds to use on replies when none is set in etcd, defaults to 3600.
+* `min_ttl`: minimum TTL in seconds to use on NXDOMAIN, defaults to 30.
+
+Like so:
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/config \
+    -d value='{"dns_addr":"127.0.0.1:5354","ttl":3600}'
 
 ### Service Announcements
 You announce your service by submitting JSON over HTTP to etcd with information about your service.
