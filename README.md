@@ -6,7 +6,7 @@ top of [etcd](https://github.com/coreos/etcd). It utilizes DNS queries
 to discover available services. This is done by leveraging SRV records in DNS,
 with special meaning given to subdomains, priorities and weights.
 
-This is the origingal [announcement blog post](http://blog.gopheracademy.com/skydns) for version 1, 
+This is the original [announcement blog post](http://blog.gopheracademy.com/skydns) for version 1, 
 since then SkyDNS has seen some changes, most notably to ability to use etcd as a backend.
 
 ##Setup / Install
