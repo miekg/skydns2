@@ -82,8 +82,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
 
-	log.Printf("received request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
-
 	if !strings.HasSuffix(name, s.config.Domain) {
 		s.ServeDNSForward(w, req)
 		return
@@ -164,7 +162,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 // ServeDNSForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	if len(s.config.Nameservers) == 0 {
-		log.Printf("error: failure to forward request, no servers configured %q", dns.ErrServ)
 		m := new(dns.Msg)
 		m.SetReply(req)
 		m.SetRcode(req, dns.RcodeServerFailure)
@@ -186,14 +183,12 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 Redo:
 	r, _, err := c.Exchange(req, s.config.Nameservers[nsid])
 	if err == nil {
-		log.Printf("forwarded request %q to %q", req.Question[0].Name, s.config.Nameservers[nsid])
 		w.WriteMsg(r)
 		return
 	}
 	// Seen an error, this can only mean, "server not reached", try again
 	// but only if we have not exausted our nameservers
 	if try < len(s.config.Nameservers) {
-		log.Printf("error: failure to forward request %q to %q", err, s.config.Nameservers[nsid])
 		try++
 		nsid = (nsid + 1) % len(s.config.Nameservers)
 		goto Redo
@@ -235,7 +230,6 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 	var serv *Service
 	if !r.Node.Dir { // single element
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
-			log.Printf("error: failure to parse value: %q", err)
 			return nil, err
 		}
 		ip := net.ParseIP(serv.Host)
@@ -258,7 +252,11 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		}
 		return records, nil
 	}
-	for _, serv := range s.loopNodes(&r.Node.Nodes) {
+	nodes, err := s.loopNodes(&r.Node.Nodes)
+	if err != nil {
+		return nil, err
+	}
+	for _, serv := range nodes {
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
@@ -307,7 +305,6 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 	weight := uint16(0)
 	if !r.Node.Dir { // single element
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
-			log.Printf("error: failure to parse value: %q", err)
 			return nil, nil, err
 		}
 		ip := net.ParseIP(serv.Host)
@@ -331,7 +328,10 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		return records, extra, nil
 	}
 
-	sx := s.loopNodes(&r.Node.Nodes)
+	sx, err := s.loopNodes(&r.Node.Nodes)
+	if err != nil {
+		return nil, nil, err
+	}
 	weight = uint16(math.Floor(float64(100 / len(sx))))
 	for _, serv := range sx {
 		ip := net.ParseIP(serv.Host)
@@ -366,16 +366,19 @@ func (s *server) SOA() dns.RR {
 }
 
 // loopNodes recursively loops through the nodes and returns all the values.
-func (s *server) loopNodes(n *etcd.Nodes) (sx []*Service) {
+func (s *server) loopNodes(n *etcd.Nodes) (sx []*Service, err error) {
 	for _, n := range *n {
 		serv := new(Service)
 		if n.Dir {
-			sx = append(sx, s.loopNodes(&n.Nodes)...)
+			nodes, err := s.loopNodes(&n.Nodes)
+			if err != nil {
+				return nil, err
+			}
+			sx = append(sx, nodes...)
 			continue
 		}
 		if err := json.Unmarshal([]byte(n.Value), &serv); err != nil {
-			log.Printf("error: failure to parse value: %q", err)
-			continue
+			return nil, err
 		}
 		serv.ttl = uint32(n.TTL)
 		if serv.ttl == 0 {
@@ -384,7 +387,7 @@ func (s *server) loopNodes(n *etcd.Nodes) (sx []*Service) {
 		serv.key = n.Key
 		sx = append(sx, serv)
 	}
-	return
+	return sx, nil
 }
 
 // path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
