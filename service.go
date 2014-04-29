@@ -4,15 +4,13 @@
 
 package main
 
+// This *is* the rdata from a SRV record, but with a twist.
+// Host (Target in SRV) must be a domain name, but if it looks like an IP
+// address (4/6), we will treat it like an IP address.
 type Service struct {
-	// This *is* the rdata from a SRV record, but with a twist.
-	// Host (Target in SRV) must be a domain name, but if it looks like an IP
-	// address (4/6), we will treat it like an IP address.
-
-	Priority int
-	//	Weight   int // Don't let the API set weights, we will do this automatically.
-	Port int
-	Host string
+	Host     string `json:"host,omitempty"`
+	Port     int    `json:"port,omitempty"`
+	Priority int    `json:"priority,omitempty"`
 
 	ttl uint32
 	key string

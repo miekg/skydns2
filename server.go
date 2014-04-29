@@ -10,6 +10,7 @@ import (
 	"math"
 	"net"
 	"net/url"
+	gopath "path"
 	"strings"
 	"sync"
 	"time"
@@ -22,8 +23,6 @@ type server struct {
 	domainLabels int
 	client       *etcd.Client
 	config       *Config
-	Ttl          uint32
-	MinTtl       uint32
 
 	group *sync.WaitGroup
 }
@@ -33,8 +32,6 @@ func NewServer(config *Config, client *etcd.Client) *server {
 	s := &server{
 		client: client,
 		config: config,
-		Ttl:    3600,
-		MinTtl: 60,
 		group:  new(sync.WaitGroup),
 	}
 	return s
@@ -82,8 +79,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
 
-	log.Printf("received request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
-
 	if !strings.HasSuffix(name, s.config.Domain) {
 		s.ServeDNSForward(w, req)
 		return
@@ -96,7 +91,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.Answer = make([]dns.RR, 0, 10)
 	defer func() {
 		// Set TTL to the minimum of the RRset.
-		minttl := s.Ttl
+		minttl := s.config.Ttl
 		if len(m.Answer) > 1 {
 			for _, r := range m.Answer {
 				if r.Header().Ttl < minttl {
@@ -164,7 +159,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 // ServeDNSForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	if len(s.config.Nameservers) == 0 {
-		log.Printf("error: failure to forward request, no servers configured %q", dns.ErrServ)
 		m := new(dns.Msg)
 		m.SetReply(req)
 		m.SetRcode(req, dns.RcodeServerFailure)
@@ -186,14 +180,12 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 Redo:
 	r, _, err := c.Exchange(req, s.config.Nameservers[nsid])
 	if err == nil {
-		log.Printf("forwarded request %q to %q", req.Question[0].Name, s.config.Nameservers[nsid])
 		w.WriteMsg(r)
 		return
 	}
 	// Seen an error, this can only mean, "server not reached", try again
 	// but only if we have not exausted our nameservers
 	if try < len(s.config.Nameservers) {
-		log.Printf("error: failure to forward request %q to %q", err, s.config.Nameservers[nsid])
 		try++
 		nsid = (nsid + 1) % len(s.config.Nameservers)
 		goto Redo
@@ -221,9 +213,9 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 			ip := net.ParseIP(h)
 			switch {
 			case ip.To4() != nil && q.Qtype == dns.TypeA:
-				records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: s.Ttl}, A: ip.To4()})
+				records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: s.config.Ttl}, A: ip.To4()})
 			case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
-				records = append(records, &dns.AAAA{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: s.Ttl}, AAAA: ip.To16()})
+				records = append(records, &dns.AAAA{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: s.config.Ttl}, AAAA: ip.To16()})
 			}
 		}
 		return
@@ -235,13 +227,12 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 	var serv *Service
 	if !r.Node.Dir { // single element
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
-			log.Printf("error: failure to parse value: %q", err)
 			return nil, err
 		}
 		ip := net.ParseIP(serv.Host)
 		ttl := uint32(r.Node.TTL)
 		if ttl == 0 {
-			ttl = s.Ttl
+			ttl = s.config.Ttl
 		}
 		switch {
 		case ip == nil:
@@ -258,7 +249,11 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		}
 		return records, nil
 	}
-	for _, serv := range s.loopNodes(&r.Node.Nodes) {
+	nodes, err := s.loopNodes(&r.Node.Nodes)
+	if err != nil {
+		return nil, err
+	}
+	for _, serv := range nodes {
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
@@ -307,13 +302,12 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 	weight := uint16(0)
 	if !r.Node.Dir { // single element
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
-			log.Printf("error: failure to parse value: %q", err)
 			return nil, nil, err
 		}
 		ip := net.ParseIP(serv.Host)
 		ttl := uint32(r.Node.TTL)
 		if ttl == 0 {
-			ttl = s.Ttl
+			ttl = s.config.Ttl
 		}
 		switch {
 		case ip == nil:
@@ -331,7 +325,10 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		return records, extra, nil
 	}
 
-	sx := s.loopNodes(&r.Node.Nodes)
+	sx, err := s.loopNodes(&r.Node.Nodes)
+	if err != nil {
+		return nil, nil, err
+	}
 	weight = uint16(math.Floor(float64(100 / len(sx))))
 	for _, serv := range sx {
 		ip := net.ParseIP(serv.Host)
@@ -354,37 +351,40 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 
 // SOA returns a SOA record for this SkyDNS instance.
 func (s *server) SOA() dns.RR {
-	return &dns.SOA{Hdr: dns.RR_Header{Name: s.config.Domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: s.Ttl},
+	return &dns.SOA{Hdr: dns.RR_Header{Name: s.config.Domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: s.config.Ttl},
 		Ns:      "master." + s.config.Domain,
 		Mbox:    "hostmaster." + s.config.Domain,
 		Serial:  uint32(time.Now().Truncate(time.Hour).Unix()),
 		Refresh: 28800,
 		Retry:   7200,
 		Expire:  604800,
-		Minttl:  s.MinTtl,
+		Minttl:  s.config.MinTtl,
 	}
 }
 
 // loopNodes recursively loops through the nodes and returns all the values.
-func (s *server) loopNodes(n *etcd.Nodes) (sx []*Service) {
+func (s *server) loopNodes(n *etcd.Nodes) (sx []*Service, err error) {
 	for _, n := range *n {
 		serv := new(Service)
 		if n.Dir {
-			sx = append(sx, s.loopNodes(&n.Nodes)...)
+			nodes, err := s.loopNodes(&n.Nodes)
+			if err != nil {
+				return nil, err
+			}
+			sx = append(sx, nodes...)
 			continue
 		}
 		if err := json.Unmarshal([]byte(n.Value), &serv); err != nil {
-			log.Printf("error: failure to parse value: %q", err)
-			continue
+			return nil, err
 		}
 		serv.ttl = uint32(n.TTL)
 		if serv.ttl == 0 {
-			serv.ttl = s.Ttl
+			serv.ttl = s.config.Ttl
 		}
 		serv.key = n.Key
 		sx = append(sx, serv)
 	}
-	return
+	return sx, nil
 }
 
 // path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
@@ -394,8 +394,7 @@ func path(s string) string {
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
 		l[i], l[j] = l[j], l[i]
 	}
-	// TODO(miek): escape slashes in s.
-	return "/skydns/" + strings.Join(l, "/")
+	return gopath.Join(append([]string{"/skydns/"}, l...)...)
 }
 
 // domain is the opposite of path.
