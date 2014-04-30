@@ -44,8 +44,8 @@ func ParseKeyFile(file string) (*dns.DNSKEY, dns.PrivateKey, error) {
 	return k.(*dns.DNSKEY), p, nil
 }
 
-// nsec creates (if needed) NSEC records that are included in the reply.
-func (s *server) nsec(m *dns.Msg) {
+// NewNSEC creates (if needed) NSEC records that are included in the reply.
+func (s *server) NewNSEC(m *dns.Msg) {
 	if m.Rcode == dns.RcodeNameError {
 		// qname nsec
 		nsec1 := s.newNSEC(m.Question[0].Name)
@@ -91,7 +91,7 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 			cache.remove(key)
 		}
 		sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
-			sig1 := s.newRRSIG(incep, expir)
+			sig1 := s.NewRRSIG(incep, expir)
 			e := sig1.Sign(s.config.PrivKey, r)
 			if e != nil {
 				log.Printf("failed to sign: %s\n", e.Error())
@@ -120,7 +120,7 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 			cache.remove(key)
 		}
 		sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
-			sig1 := s.newRRSIG(incep, expir)
+			sig1 := s.NewRRSIG(incep, expir)
 			e := sig1.Sign(s.config.PrivKey, r)
 			if e != nil {
 				log.Printf("failed to sign: %s\n", e.Error())
@@ -149,7 +149,7 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 	return
 }
 
-func (s *server) newRRSIG(incep, expir uint32) *dns.RRSIG {
+func (s *server) NewRRSIG(incep, expir uint32) *dns.RRSIG {
 	sig := new(dns.RRSIG)
 	sig.Hdr.Rrtype = dns.TypeRRSIG
 	sig.Hdr.Ttl = origTTL

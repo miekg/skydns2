@@ -97,7 +97,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		// Check if we need to do DNSSEC and sign the reply.
 		if s.config.PubKey != nil {
 			if opt := req.IsEdns0(); opt != nil && opt.Do() {
-				s.nsec(m)
+				s.NewNSEC(m)
 				s.sign(m, opt.UDPSize())
 			}
 		}
