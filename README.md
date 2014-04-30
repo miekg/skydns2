@@ -95,7 +95,7 @@ Testing one of the names with `dig`
     ;1.rails.production.east.skydns.local.	IN	SRV
 
     ;; ANSWER SECTION:
-    1.rails.production.east.skydns.local.   3600	IN	SRV	10 0 9000   service1.example.com.
+    1.rails.production.east.skydns.local. 3600 IN SRV 10 0 8080 service1.example.com.
 
 #### Subdomains
 
@@ -108,10 +108,22 @@ If we are interesting in all the servers in the east-region, we can just leave o
     ;; QUESTION SECTION
     ; east.skydns.local.    IN      SRV
 
-    ;; ANSWER SECTION
-    east.skydns.local.
+    ;; ANSWER SECTION:
+    east.skydns.local.      3600    IN      SRV     10 20 8080 service1.example.com.
+    east.skydns.local.      3600    IN      SRV     10 20 8080 4.rails.staging.east.skydns.local.
+    east.skydns.local.      3600    IN      SRV     10 20 8080 6.rails.staging.east.skydns.local.
 
-This returns all services which has their suffix matching `east.skydns.local`, the more labels you add the more specific your search becomes.
+    ;; ADDITIONAL SECTION:
+    4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
+    6.rails.staging.east.skydns.local. 3600 IN AAAA 2003::8:1
+
+Here all three entries of the 'east' are returned. There is one another feature in play. The second and third
+names, {4,6}.rails.staging.east.skydns.local, only had an ip record configured. Here SkyDNS used the ectd
+path to construct a target name and then puts the actual ip address in the additional section. Directly querying
+for the A records of 4.rails.staging.east.skydns.local. of course also works:
+
+    % dig @localhost -p 5354 +noall +answer A 4.rails.staging.east.skydns.local.
+    4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
 
 Using wildcards `*` in the middle of the query (as could be done in SkyDNS version 1), is not supported anymore.
 
@@ -120,51 +132,49 @@ Using wildcards `*` in the middle of the query (as could be done in SkyDNS versi
 Now we can try some of our example DNS lookups:
 
 #####All Services in Production 
-`dig @localhost production.skydns.local SRV`
 
-	;; QUESTION SECTION:
-	;production.skydns.local.			IN	SRV
+     dig @localhost staging.east.skydns.local. SRV
 
-	;; ANSWER SECTION:
-	production.skydns.local.		629	IN	SRV	10 20 80   web1.site.com.
-	production.skydns.local.		3979	IN	SRV	10 20 8080 web2.site.com.
-	production.skydns.local.		3629	IN	SRV	10 20 9000 server24.
-	production.skydns.local.		3985	IN	SRV	10 20 80   web3.site.com.
-	production.skydns.local.		3990	IN	SRV	10 20 80   web4.site.com.
+    ;; QUESTION SECTION:
+    ;staging.east.skydns.local. IN  SRV
+
+    ;; ANSWER SECTION:
+    staging.east.skydns.local. 3600 IN  SRV 10 50 8080 4.rails.staging.east.skydns.local.
+    staging.east.skydns.local. 3600 IN  SRV 10 50 8080 6.rails.staging.east.skydns.local.
+
+    ;; ADDITIONAL SECTION:
+    4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
+    6.rails.staging.east.skydns.local. 3600 IN AAAA 2003::8:1
 
 ####A/AAAA Records
 To return A records, simply run a normal DNS query for a service matching the above patterns.
 
 Now do a normal DNS query:
-`dig rails.production.skydns.local`
 
-	;; QUESTION SECTION:
-	;rails.production.skydns.local.	IN	A
+    dig @localhost staging.east.skydns.local. A
 
-	;; ANSWER SECTION:
-	rails.production.skydns.local. 399918 IN A	127.0.0.10
-	rails.production.skydns.local. 399918 IN A	127.0.0.11
-	rails.production.skydns.local. 399918 IN A	127.0.0.12
-	rails.production.skydns.local. 399919 IN A	127.0.0.13
+    ;; QUESTION SECTION:
+    ;staging.east.skydns.local. IN  A
 
-Now you have a list of all known IP Addresses registered running the `rails`
-service name. Because we're returning A records and not SRV records, there
+    ;; ANSWER SECTION:
+    staging.east.skydns.local. 3600 IN  A   10.0.1.125
+
+Now you have a list of all known IP Addresses registered running in staging in
+the east area.
+Because we're returning A records and not SRV records, there
 are no ports listed, so this is only useful when you're querying for services
-running on ports known to you in advance. Notice, we didn't specify version or
-region, but we could have.
+running on ports known to you in advance.
 
 ####DNS Forwarding
 
-By specifying `-nameserver="8.8.8.8:53,8.8.4.4:53` on the `skydns` command line,
+By specifying nameservers in SkyDNS's config, for instance `8.8.8.8:53,8.8.4.4:53`,
 you create a DNS forwarding proxy. In this case it round robins between the two
-nameserver IPs mentioned on the command line.
+nameserver IPs mentioned.
 
 Requests for which SkyDNS isn't authoritative
 will be forwarded and proxied back to the client. This means that you can set
 SkyDNS as the primary DNS server in `/etc/resolv.conf` and use it for both service
 discovery and normal DNS operations.
-
-*Please test this before relying on it in production, as there may be edge cases that don't work as planned.*
 
 ####DNSSEC
 
@@ -178,8 +188,8 @@ SkyDNS is `skydns.local`:
 
 This creates two files both with the basename `Kskydns.local.+005.49860`, one of the
 extension `.key` (this holds the public key) and one with the extension `.private` which
-hold the private key. The basename of this file should be given to SkyDNS's -dnssec
-option: `-dnssec=Kskydns.local.+005+49860`
+hold the private key. The basename of this file should be given to SkyDNS's DNSSEC configuration
+option: `Kskydns.local.+005+49860`
 
 If you then query with `dig +dnssec` you will get signatures, keys and NSEC3 records returned.
 

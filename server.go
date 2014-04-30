@@ -301,6 +301,9 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		if ttl == 0 {
 			ttl = s.config.Ttl
 		}
+		if serv.Priority == 0 {
+			serv.Priority = int(s.config.Priority)
+		}
 		switch {
 		case ip == nil:
 			records = append(records, serv.NewSRV(q.Name, ttl, weight))
