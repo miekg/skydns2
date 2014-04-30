@@ -136,7 +136,6 @@ func TestDNS(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 var services = []*Service{
