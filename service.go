@@ -25,21 +25,21 @@ type Service struct {
 
 // NewSRV returns a new SRV record based on the Service.
 func (s *Service) NewSRV(name string, ttl uint32, weight uint16) *dns.SRV {
-	srv := &dns.SRV{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: ttl},
+	return &dns.SRV{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: ttl},
 		Priority: uint16(s.Priority), Weight: weight, Port: uint16(s.Port), Target: dns.Fqdn(s.Host)}
-	return srv
 }
 
+// NewA returns a new A record based on the Service.
 func (s *Service) NewA(name string, ttl uint32, ip net.IP) *dns.A {
-	a := &dns.A{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: ip}
-	return a
+	return &dns.A{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: ip}
 }
 
-func (s *Service) NewAAAA() *dns.AAAA {
-	return nil
+// NewAAAA returns a new AAAA record based on the Service.
+func (s *Service) NewAAAA(name string, ttl uint32, ip net.IP) *dns.AAAA {
+	return &dns.AAAA{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: ttl}, AAAA: ip}
 }
 
-// path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
+// Path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
 // the resulting key will be /skydns/local/skydns/staging/service .
 func Path(s string) string {
 	l := dns.SplitDomainName(s)
@@ -49,7 +49,7 @@ func Path(s string) string {
 	return path.Join(append([]string{"/skydns/"}, l...)...)
 }
 
-// domain is the opposite of path.
+// Domain is the opposite of Path.
 func Domain(s string) string {
 	l := strings.Split(s, "/")
 	// start with 1, to strip /skydns

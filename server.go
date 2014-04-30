@@ -112,7 +112,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				return
 			}
 		case dns.TypeSOA:
-			m.Answer = []dns.RR{s.SOA()}
+			m.Answer = []dns.RR{s.NewSOA()}
 			return
 		}
 	}
@@ -122,7 +122,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
 					m.SetRcode(req, dns.RcodeNameError)
-					m.Ns = []dns.RR{s.SOA()}
+					m.Ns = []dns.RR{s.NewSOA()}
 					return
 				}
 			}
@@ -135,7 +135,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
 					m.SetRcode(req, dns.RcodeNameError)
-					m.Ns = []dns.RR{s.SOA()}
+					m.Ns = []dns.RR{s.NewSOA()}
 					return
 				}
 			}
@@ -144,7 +144,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.Extra = append(m.Extra, extra...)
 	}
 	if len(m.Answer) == 0 { // NODATA response
-		m.Ns = []dns.RR{s.SOA()}
+		m.Ns = []dns.RR{s.NewSOA()}
 	}
 }
 
@@ -203,11 +203,12 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 				continue
 			}
 			ip := net.ParseIP(h)
+			serv := new(Service) // noop for now, but will be actually do something when create A/AAAA
 			switch {
 			case ip.To4() != nil && q.Qtype == dns.TypeA:
-				records = append(records, &dns.A{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: s.config.Ttl}, A: ip.To4()})
+				records = append(records, serv.NewA(q.Name, s.config.Ttl, ip.To4()))
 			case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
-				records = append(records, &dns.AAAA{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: s.config.Ttl}, AAAA: ip.To16()})
+				records = append(records, serv.NewAAAA(q.Name, s.config.Ttl, ip.To16()))
 			}
 		}
 		return
@@ -229,15 +230,9 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		switch {
 		case ip == nil:
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
-			a := new(dns.A)
-			a.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: ttl}
-			a.A = ip.To4()
-			records = append(records, a)
+			records = append(records, serv.NewA(q.Name, ttl, ip.To4()))
 		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
-			aaaa := new(dns.AAAA)
-			aaaa.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: ttl}
-			aaaa.AAAA = ip.To16()
-			records = append(records, aaaa)
+			records = append(records, serv.NewAAAA(q.Name, ttl, ip.To16()))
 		}
 		return records, nil
 	}
@@ -250,15 +245,9 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		switch {
 		case ip == nil:
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
-			a := new(dns.A)
-			a.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: serv.ttl}
-			a.A = ip.To4()
-			records = append(records, a)
+			records = append(records, serv.NewA(q.Name, serv.ttl, ip.To4()))
 		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
-			aaaa := new(dns.AAAA)
-			aaaa.Hdr = dns.RR_Header{Name: q.Name, Rrtype: q.Qtype, Class: dns.ClassINET, Ttl: serv.ttl}
-			aaaa.AAAA = ip.To16()
-			records = append(records, aaaa)
+			records = append(records, serv.NewAAAA(q.Name, serv.ttl, ip.To16()))
 		}
 	}
 	if s.config.RoundRobin {
@@ -308,13 +297,11 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		case ip == nil:
 			records = append(records, serv.NewSRV(q.Name, ttl, weight))
 		case ip.To4() != nil:
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: ttl},
-				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(r.Node.Key)})
-			extra = append(extra, &dns.A{Hdr: dns.RR_Header{Name: Domain(r.Node.Key), Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: ip.To4()})
+			records = append(records, serv.NewSRV(q.Name, ttl, weight))
+			extra = append(extra, serv.NewA(Domain(r.Node.Key), ttl, ip.To4()))
 		case ip.To4() == nil:
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: ttl},
-				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(r.Node.Key)})
-			extra = append(extra, &dns.AAAA{Hdr: dns.RR_Header{Name: Domain(r.Node.Key), Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: ttl}, AAAA: ip.To16()})
+			records = append(records, serv.NewSRV(q.Name, ttl, weight))
+			extra = append(extra, serv.NewAAAA(Domain(r.Node.Key), ttl, ip.To16()))
 		}
 		return records, extra, nil
 	}
@@ -330,20 +317,18 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		case ip == nil:
 			records = append(records, serv.NewSRV(q.Name, serv.ttl, weight))
 		case ip.To4() != nil:
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.ttl},
-				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(serv.key)})
+			records = append(records, serv.NewSRV(q.Name, serv.ttl, weight))
 			extra = append(extra, serv.NewA(Domain(serv.key), serv.ttl, ip.To4()))
 		case ip.To4() == nil:
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.ttl},
-				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(serv.key)})
-			extra = append(extra, &dns.AAAA{Hdr: dns.RR_Header{Name: Domain(serv.key), Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: serv.ttl}, AAAA: ip.To16()})
+			records = append(records, serv.NewSRV(q.Name, serv.ttl, weight))
+			extra = append(extra, serv.NewAAAA(Domain(serv.key), serv.ttl, ip.To16()))
 		}
 	}
 	return records, extra, nil
 }
 
 // SOA returns a SOA record for this SkyDNS instance.
-func (s *server) SOA() dns.RR {
+func (s *server) NewSOA() dns.RR {
 	return &dns.SOA{Hdr: dns.RR_Header{Name: s.config.Domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: s.config.Ttl},
 		Ns:      "master." + s.config.Domain,
 		Mbox:    "hostmaster." + s.config.Domain,
