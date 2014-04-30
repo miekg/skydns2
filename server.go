@@ -332,7 +332,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
-			records = append(records, serv.NewSRV(q.Name,  serv.ttl, weight))
+			records = append(records, serv.NewSRV(q.Name, serv.ttl, weight))
 		case ip.To4() != nil:
 			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.ttl},
 				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(serv.key)})
@@ -377,6 +377,9 @@ func (s *server) loopNodes(n *etcd.Nodes) (sx []*Service, err error) {
 		serv.ttl = uint32(n.TTL)
 		if serv.ttl == 0 {
 			serv.ttl = s.config.Ttl
+		}
+		if serv.Priority == 0 {
+			serv.Priority = int(s.config.Priority)
 		}
 		serv.key = n.Key
 		sx = append(sx, serv)

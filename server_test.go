@@ -96,9 +96,11 @@ func TestDNS(t *testing.T) {
 		m := new(dns.Msg)
 		m.SetQuestion(tc.Qname, tc.Qtype)
 		resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
+		t.Logf("%s\n", resp.String())
 		if err != nil {
 			t.Fatal(err)
 		}
+		t.Fail()
 
 		if len(resp.Answer) != len(tc.Answer) {
 			t.Fatalf("Response for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
