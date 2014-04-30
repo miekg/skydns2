@@ -58,8 +58,10 @@ When providing information you will need to fill out the following values.
 
 Adding the service can thus be done with:
 
-    curl -XPUT http://127.0.0.1:4001/v2/keys/local/skydns/east/production/rails \
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/production/rails \
     -d value='{"host":"service5.example.com","priority":20}'
+
+Note we use the directory `/skydns` to anchor all names.
 
 When querying the DNS for services you can use subdomains. see the section named "Subdomains" below for more information.
 
@@ -77,14 +79,14 @@ For the purpose of this document, lets suppose we have added to following servic
 
 These names can be added with:
 
-    curl -XPUT http://127.0.0.1:4001/v2/keys/local/skydns/east/production/rails/1 \
-    -d value='{"host":"service1.example.com"}'
-    curl -XPUT http://127.0.0.1:4001/v2/keys/local/skydns/west/production/rails/2 \
-    -d value='{"host":"service2.example.com"}'
-    curl -XPUT http://127.0.0.1:4001/v2/keys/local/skydns/east/staging/rails/4 \
-    -d value='{"host":"10.0.1.125"}'
-    curl -XPUT http://127.0.0.1:4001/v2/keys/local/skydns/east/staging/rails/6 \
-    -d value='{"host":"2003::8:1"}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/production/rails/1 \
+    -d value='{"host":"service1.example.com","port":8080}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/west/production/rails/2 \
+    -d value='{"host":"service2.example.com","port":8080}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/staging/rails/4 \
+    -d value='{"host":"10.0.1.125","port":8080}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/staging/rails/6 \
+    -d value='{"host":"2003::8:1","port":8080}'
 
 Testing one of the names with `dig`
 
