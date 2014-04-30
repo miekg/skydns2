@@ -26,7 +26,7 @@ func addService(t *testing.T, s *server, k string, ttl uint64, m *Service) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = s.client.Create(path(k), string(b), ttl)
+	_, err = s.client.Create(Path(k), string(b), ttl)
 	if err != nil {
 		// TODO(miek): allow for existing keys...
 		t.Fatal(err)
@@ -34,7 +34,7 @@ func addService(t *testing.T, s *server, k string, ttl uint64, m *Service) {
 }
 
 func delService(t *testing.T, s *server, k string) {
-	_, err := s.client.Delete(path(k), false)
+	_, err := s.client.Delete(Path(k), false)
 	if err != nil {
 		t.Fatal(err)
 	}

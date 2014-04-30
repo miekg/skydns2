@@ -310,8 +310,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		}
 		switch {
 		case ip == nil:
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: ttl},
-				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: dns.Fqdn(serv.Host)})
+			records = append(records, serv.NewSRV(q.Name, ttl, weight))
 		case ip.To4() != nil:
 			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: ttl},
 				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(r.Node.Key)})
@@ -333,8 +332,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
-			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.ttl},
-				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: dns.Fqdn(serv.Host)})
+			records = append(records, serv.NewSRV(q.Name,  serv.ttl, weight))
 		case ip.To4() != nil:
 			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.ttl},
 				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(serv.key)})
