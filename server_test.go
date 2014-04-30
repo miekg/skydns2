@@ -53,6 +53,9 @@ func newTestServer(t *testing.T) *server {
 	s.config.DnsAddr = "127.0.0.1:" + StrPort
 	s.config.Nameservers = []string{"8.8.4.4:53"}
 	s.config.Domain = "skydns.test."
+	// some defaults copied over from config.go
+	s.config.Priority = 10
+	s.config.Ttl = 3600
 	go s.Run()
 	return s
 }
@@ -87,7 +90,7 @@ func TestDNS(t *testing.T) {
 	defer s.Stop()
 
 	for _, serv := range services {
-		m := &Service{Host: serv.Host, Port: 9000}
+		m := &Service{Host: serv.Host, Port: serv.Port}
 		addService(t, s, serv.key, 0, m)
 		defer delService(t, s, serv.key)
 	}
@@ -96,51 +99,42 @@ func TestDNS(t *testing.T) {
 		m := new(dns.Msg)
 		m.SetQuestion(tc.Qname, tc.Qtype)
 		resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
-		t.Logf("%s\n", resp.String())
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Fail()
-
+		t.Logf("%s\n", resp.String())
 		if len(resp.Answer) != len(tc.Answer) {
 			t.Fatalf("Response for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
 		}
-		/*
+		for i, a := range resp.Answer {
+			if a.Header().Name != tc.Answer[i].Header().Name {
+				t.Errorf("Answer %d should have a Header Name of %q, but has %q", i, tc.Answer[i].Header().Name, a.Header().Name)
+			}
 
-			for i, a := range resp.Answer {
-				srv := a.(*dns.SRV)
+			if a.Header().Ttl != tc.Answer[i].Header().Ttl {
+				t.Errorf("Answer %d should have a Header TTL of %d, but has %d", i, tc.Answer[i].Header().Ttl, a.Header().Ttl)
+			}
 
-				// Validate Header
-				if srv.Hdr.Name != tc.Answer[i].Hdr.Name {
-					t.Errorf("Answer %d should have a Header Name of %q, but has %q", i, tc.Answer[i].Hdr.Name, srv.Hdr.Name)
+			if a.Header().Rrtype != tc.Answer[i].Header().Rrtype {
+				t.Errorf("Answer %d should have a Header Response Type of %d, but has %d", i, tc.Answer[i].Header().Rrtype, a.Header().Rrtype)
+			}
+
+			switch x := a.(type) {
+			case *dns.SRV:
+				if x.Priority != tc.Answer[i].Priority {
+					t.Errorf("Answer %d should have a Priority of %d, but has %d", i, tc.Answer[i].Priority, x.Priority)
 				}
-
-				if srv.Hdr.Ttl != tc.Answer[i].Hdr.Ttl {
-					t.Errorf("Answer %d should have a Header TTL of %d, but has %d", i, tc.Answer[i].Hdr.Ttl, srv.Hdr.Ttl)
+				if x.Weight != tc.Answer[i].Weight {
+					t.Errorf("Answer %d should have a Weight of %d, but has %d", i, tc.Answer[i].Weight, x.Weight)
 				}
-
-				if srv.Hdr.Rrtype != tc.Answer[i].Hdr.Rrtype {
-					t.Errorf("Answer %d should have a Header Response Type of %d, but has %d", i, tc.Answer[i].Hdr.Rrtype, srv.Hdr.Rrtype)
+				if x.Port != tc.Answer[i].Port {
+					t.Errorf("Answer %d should have a Port of %d, but has %d", i, tc.Answer[i].Port, x.Port)
 				}
-
-				// Validate Record
-				if srv.Priority != tc.Answer[i].Priority {
-					t.Errorf("Answer %d should have a Priority of %d, but has %d", i, tc.Answer[i].Priority, srv.Priority)
-				}
-
-				if srv.Weight != tc.Answer[i].Weight {
-					t.Errorf("Answer %d should have a Weight of %d, but has %d", i, tc.Answer[i].Weight, srv.Weight)
-				}
-
-				if srv.Port != tc.Answer[i].Port {
-					t.Errorf("Answer %d should have a Port of %d, but has %d", i, tc.Answer[i].Port, srv.Port)
-				}
-
-				if srv.Target != tc.Answer[i].Target {
-					t.Errorf("Answer %d should have a Target of %q, but has %q", i, tc.Answer[i].Target, srv.Target)
+				if x.Target != tc.Answer[i].Target {
+					t.Errorf("Answer %d should have a Target of %q, but has %q", i, tc.Answer[i].Target, x.Target)
 				}
 			}
-		*/
+		}
 	}
 
 }
@@ -148,10 +142,12 @@ func TestDNS(t *testing.T) {
 var services = []*Service{
 	{
 		Host: "server2",
+		Port: 8080,
 		key:  "100.server1.development.region1.skydns.test.",
 	},
 	{
 		Host: "server2",
+		Port: 80,
 		key:  "101.server2.production.region1.skydns.test.",
 	},
 	{
@@ -194,7 +190,7 @@ var dnsTestCases = []dnsTestCase{
 				Priority: 10,
 				Weight:   0,
 				Target:   "server2.",
-				Port:     9000,
+				Port:     8080,
 			},
 		},
 	},
@@ -264,7 +260,6 @@ Activate: 20140126132645`), "stdin")
 	return s
 }
 */
-
 
 /*
 
