@@ -43,7 +43,7 @@ To set the configuration so something like:
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/config \
     -d value='{"dns_addr":"127.0.0.1:5354","ttl":3600}'
 
-### Service Announcements
+## Service Announcements
 You announce your service by submitting JSON over HTTP to etcd with information about your service.
 This information will then be available for queries via DNS.
 
@@ -65,9 +65,8 @@ Note we use the directory `/skydns` to anchor all names.
 
 When querying the DNS for services you can use subdomains. see the section named "Subdomains" below for more information.
 
-### Service Discovery via the DNS
+## Service Discovery via the DNS
 
-##Discovery (DNS)
 You can find services by querying SkyDNS via any DNS client or utility. It uses a known domain syntax with subdomains to find matching services.
 
 For the purpose of this document, lets suppose we have added to following services to etcd:
@@ -97,7 +96,7 @@ Testing one of the names with `dig`
     ;; ANSWER SECTION:
     1.rails.production.east.skydns.local. 3600 IN SRV 10 0 8080 service1.example.com.
 
-#### Subdomains
+### Subdomains
 
 Of course using the full names isn't *that* useful, so SkyDNS lets you query for subdomains, and returns responses based upon the amount of services matched
 by the subdomain.
@@ -131,7 +130,7 @@ Using wildcards `*` in the middle of the query (as could be done in SkyDNS versi
 
 Now we can try some of our example DNS lookups:
 
-#####All Services in Production 
+####All Services in staging.east 
 
      dig @localhost staging.east.skydns.local. SRV
 
