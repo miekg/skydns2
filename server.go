@@ -28,12 +28,7 @@ type server struct {
 
 // Newserver returns a new server.
 func NewServer(config *Config, client *etcd.Client) *server {
-	s := &server{
-		client: client,
-		config: config,
-		group:  new(sync.WaitGroup),
-	}
-	return s
+	return &server{client: client, config: config, group: new(sync.WaitGroup)}
 }
 
 // Run is a blocking operation that starts the server listening on the DNS ports.
@@ -73,8 +68,6 @@ func runDNSServer(group *sync.WaitGroup, mux *dns.ServeMux, net, addr string, ud
 // ServeDNS is the handler for DNS requests, responsible for parsing DNS request, possibly forwarding
 // it to a real dns server and returning a response.
 func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
-	//stats.RequestCount.Inc(1)
-
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
 
@@ -336,7 +329,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		case ip.To4() != nil:
 			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.ttl},
 				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(serv.key)})
-			extra = append(extra, &dns.A{Hdr: dns.RR_Header{Name: Domain(serv.key), Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: serv.ttl}, A: ip.To4()})
+			extra = append(extra, serv.NewA(Domain(serv.key), serv.ttl, ip.To4())
 		case ip.To4() == nil:
 			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.ttl},
 				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(serv.key)})

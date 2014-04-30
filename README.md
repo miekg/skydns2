@@ -38,70 +38,86 @@ may be set:
 * `ttl`: default TTL in seconds to use on replies when none is set in etcd, defaults to 3600.
 * `min_ttl`: minimum TTL in seconds to use on NXDOMAIN, defaults to 30.
 
-Like so:
+To set the configuration so something like:
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/config \
     -d value='{"dns_addr":"127.0.0.1:5354","ttl":3600}'
 
 ### Service Announcements
 You announce your service by submitting JSON over HTTP to etcd with information about your service.
-This information will then be available for queries either via DNS.
+This information will then be available for queries via DNS.
 
-When providing information you will need to fill out the following values. Note you are free to use
-whatever you like, so take the following list as a guide only.
+When providing information you will need to fill out the following values.
 
-* Host - The full name of your service, e.g., "rails.production.east.skydns.local", "web.staging.east.skydns.local", an IP address either v4 or v6.
+* Path - The path of the key in etcd, e.g. if the domain you want to register is "rails.production.east.skydns.local", you need to reverse
+    it and replace the dots with slashes. So the name here becomes: local/skydns/east/production/rails. Then prefix the `/skydns/` string to,
+    so the final path becomes `/v2/keys/skdydns/local/skydns/east/production/rails`
+* Host - The name of your service, e.g., "service5.mydomain.com" or and ip address (either v4 or v6)
 * Port - the port where the service can be reached.
 * Priority - the priority of the service.
 
-Note some of these elements may be left out completely,
-see the section named "Wildcards" below for more information.
+Adding the service can thus be done with:
 
-#### Without Shared Secret 
+    curl -XPUT http://127.0.0.1:4001/v2/keys/local/skydns/east/production/rails \
+    -d value='{"host":"service5.example.com","priority":20}'
 
-    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/b1 \
-        -d value='{"Port":80,"Priority":10,"Host": "10.0.1.3"'}
-    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/a1 \
-        -d value='{"Port":80,"Priority":10,"Host": "web.google.nl"'}
+When querying the DNS for services you can use subdomains. see the section named "Subdomains" below for more information.
 
-#### With Shared Secret 
-
-### Service Removal
-
-### Retrieve Service Info via API
+### Service Discovery via the DNS
 
 ##Discovery (DNS)
-You can find services by querying SkyDNS via any DNS client or utility. It uses a known domain syntax with wildcards to find matching services.
+You can find services by querying SkyDNS via any DNS client or utility. It uses a known domain syntax with subdomains to find matching services.
 
-Priorities and Weights are based on the requested Region, as well as how many nodes are available matching the current request in the given region.
+For the purpose of this document, lets suppose we have added to following services to etcd:
 
-###Domain Format
+* 1.rails.production.east.skydns.local, mapping to service1.example.com
+* 2.rails.production.west.skydns.local, mapping to service2.example.com
+* 4.rails.staging.east.skydns.local, mapping to 10.0.1.125
+* 6.rails.staging.east.skydns.local, mapping to 2003::8:1
 
-#### Wildcards
+These names can be added with:
 
-In addition to only needing to specify as much of the domain as required for the granularity level you're looking for, you may also supply the wildcard `*` in any of the positions.
+    curl -XPUT http://127.0.0.1:4001/v2/keys/local/skydns/east/production/rails/1 \
+    -d value='{"host":"service1.example.com"}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/local/skydns/west/production/rails/2 \
+    -d value='{"host":"service2.example.com"}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/local/skydns/east/staging/rails/4 \
+    -d value='{"host":"10.0.1.125"}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/local/skydns/east/staging/rails/6 \
+    -d value='{"host":"2003::8:1"}'
 
-- east.*.*.production.skydns.local - Would return all services in the East region, that are a part of the production environment.
+Testing one of the names with `dig`
+
+    % dig @localhost SRV 1.rails.production.east.skydns.local
+    ;; QUESTION SECTION:
+    ;1.rails.production.east.skydns.local.	IN	SRV
+
+    ;; ANSWER SECTION:
+    1.rails.production.east.skydns.local.   3600	IN	SRV	10 0 9000   service1.example.com.
+
+#### Subdomains
+
+Of course using the full names isn't *that* useful, so SkyDNS lets you query for subdomains, and returns responses based upon the amount of services matched
+by the subdomain.
+
+If we are interesting in all the servers in the east-region, we can just leave of the right most labels from our query:
+
+    % dig @localhost SRV east.skydns.local
+    ;; QUESTION SECTION
+    ; east.skydns.local.    IN      SRV
+
+    ;; ANSWER SECTION
+    east.skydns.local.
+
+This returns all services which has their suffix matching `east.skydns.local`, the more labels you add the more specific your search becomes.
+
+Using wildcards `*` in the middle of the query (as could be done in SkyDNS version 1), is not supported anymore.
 
 ###Examples
 
-Let's take a look at some results. First we need to add a few services so we have services to query against.
-
-	// Service 1001 (East Region)
-	curl -X PUT -L http://localhost:8080/skydns/services/1001 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"East","Host":"web1.site.com","Port":80,"TTL":4000}'
-	
-	// Service 1002 (East Region)
-	curl -X PUT -L http://localhost:8080/skydns/services/1002 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"East","Host":"web2.site.com","Port":8080,"TTL":4000}'
-	
-	// Service 1003 (West Region)
-	curl -X PUT -L http://localhost:8080/skydns/services/1003 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"West","Host":"web3.site.com","Port":80,"TTL":4000}'
-	
-	// Service 1004 (West Region)
-	curl -X PUT -L http://localhost:8080/skydns/services/1004 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"West","Host":"web4.site.com","Port":80,"TTL":4000}'
-
 Now we can try some of our example DNS lookups:
 
-#####All services in the Production Environment
+#####All Services in Production 
 `dig @localhost production.skydns.local SRV`
 
 	;; QUESTION SECTION:
@@ -114,61 +130,8 @@ Now we can try some of our example DNS lookups:
 	production.skydns.local.		3985	IN	SRV	10 20 80   web3.site.com.
 	production.skydns.local.		3990	IN	SRV	10 20 80   web4.site.com.
 
-#####All TestService instances in Production Environment
-`dig @localhost testservice.production.skydns.local SRV`
-
-	;; QUESTION SECTION:
-	;testservice.production.skydns.local.		IN	SRV
-
-	;; ANSWER SECTION:
-	testservice.production.skydns.local.	615		IN	SRV	10 20 80   web1.site.com.
-	testservice.production.skydns.local.	3966	IN	SRV	10 20 8080 web2.site.com.
-	testservice.production.skydns.local.	3615	IN	SRV	10 20 9000 server24.
-	testservice.production.skydns.local.	3972	IN	SRV	10 20 80   web3.site.com.
-	testservice.production.skydns.local.	3976	IN	SRV	10 20 80   web4.site.com.
-
-#####All TestService v1.0.0 Instances in Production Environment
-`dig @localhost 1-0-0.testservice.production.skydns.local SRV`
-
-	;; QUESTION SECTION:
-	;1-0-0.testservice.production.skydns.local.	IN	SRV
-
-	;; ANSWER SECTION:
-	1-0-0.testservice.production.skydns.local. 600  IN	SRV	10 20 80   web1.site.com.
-	1-0-0.testservice.production.skydns.local. 3950 IN	SRV	10 20 8080 web2.site.com.
-	1-0-0.testservice.production.skydns.local. 3600 IN	SRV	10 20 9000 server24.
-	1-0-0.testservice.production.skydns.local. 3956 IN	SRV	10 20 80   web3.site.com.
-	1-0-0.testservice.production.skydns.local. 3961 IN	SRV	10 20 80   web4.site.com.
-
-#####All TestService Instances at any version, within the East region
-`dig @localhost east.*.testservice.production.skydns.local SRV`
-
-This is where we've changed things up a bit, notice we used the "*" wildcard for
-version so we get any version, and because we've supplied an explicit region
-that we're looking for we get that as the highest DNS priority, with the weight
-being distributed evenly, then all of our West instances still show up for
-fail-over, but with a higher Priority.
-
-	;; QUESTION SECTION:
-	;east.*.testservice.production.skydns.local. IN	SRV
-
-	;; ANSWER SECTION:
-	east.*.testservice.production.skydns.local. 531  IN SRV	10 50 80   web1.site.com.
-	east.*.testservice.production.skydns.local. 3881 IN SRV	10 50 8080 web2.site.com.
-	east.*.testservice.production.skydns.local. 3531 IN SRV	20 33 9000 server24.
-	east.*.testservice.production.skydns.local. 3887 IN SRV	20 33 80   web3.site.com.
-	east.*.testservice.production.skydns.local. 3892 IN SRV	20 33 80   web4.site.com.
-
-
-####A Records
+####A/AAAA Records
 To return A records, simply run a normal DNS query for a service matching the above patterns.
-
-Let's add some web servers to SkyDNS:
-
-	curl -X PUT -L http://localhost:8080/skydns/services/1011 -d '{"Name":"rails","Version":"1.0.0","Environment":"Production","Region":"East","Host":"127.0.0.10","Port":80,"TTL":400000}'
-	curl -X PUT -L http://localhost:8080/skydns/services/1012 -d '{"Name":"rails","Version":"1.0.0","Environment":"Production","Region":"East","Host":"127.0.0.11","Port":80,"TTL":400000}'
-	curl -X PUT -L http://localhost:8080/skydns/services/1013 -d '{"Name":"rails","Version":"1.0.0","Environment":"Production","Region":"West","Host":"127.0.0.12","Port":80,"TTL":400000}'
-	curl -X PUT -L http://localhost:8080/skydns/services/1014 -d '{"Name":"rails","Version":"1.0.0","Environment":"Production","Region":"West","Host":"127.0.0.13","Port":80,"TTL":400000}'
 
 Now do a normal DNS query:
 `dig rails.production.skydns.local`
@@ -216,7 +179,7 @@ extension `.key` (this holds the public key) and one with the extension `.privat
 hold the private key. The basename of this file should be given to SkyDNS's -dnssec
 option: `-dnssec=Kskydns.local.+005+49860`
 
-If you then query with `dig +dnssec` you will get signatures, keys and nsec records returned.
+If you then query with `dig +dnssec` you will get signatures, keys and NSEC3 records returned.
 
 ## License
 The MIT License (MIT)

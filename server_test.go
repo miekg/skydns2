@@ -107,7 +107,6 @@ func TestDNS(t *testing.T) {
 		}
 		/*
 
-
 			for i, a := range resp.Answer {
 				srv := a.(*dns.SRV)
 
@@ -193,7 +192,7 @@ var dnsTestCases = []dnsTestCase{
 					Rrtype: dns.TypeSRV,
 				},
 				Priority: 10,
-				Weight:   33,
+				Weight:   0,
 				Target:   "server2.",
 				Port:     9000,
 			},

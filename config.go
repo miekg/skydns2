@@ -17,16 +17,24 @@ import (
 
 // Config provides options to the SkyDNS resolver.
 type Config struct {
+	// The ip:port SkyDNS should be listening on for incoming DNS requests.
 	DnsAddr      string        `json:"dns_addr,omitempty"`
+	// The domain SkyDNS is authoritative for, defaults to skydns.local.
 	Domain       string        `json:"domain,omitempty"`
 	DomainLabels int           `json:"-"`
 	DNSSEC       string        `json:"dnssec,omitempty"`
+	// Round robin A/AAAA replies. Default is true.
 	RoundRobin   bool          `json:"round_robin,omitempty"`
+	// List of ip:port, seperated by commas of recursive nameservers to
+	// forward queries to.
 	Nameservers  []string      `json:"nameservers,omitempty"`
 	ReadTimeout  time.Duration `json:"read_timeout,omitempty"`
 	WriteTimeout time.Duration `json:"write_timeout,omitempty"`
+	// Default priority on SRV records when none is given. Defaults to 10.
 	Priority     uint16	   `json:"priority"`
+	// Default TTL, in seconds, when none is given in etcd. Defaults to 3600.
 	Ttl          uint32        `json:"ttl,omitempty"`
+	// Minimum TTL, in seconds, for NXDOMAIN responses. Defaults to 300.
 	MinTtl       uint32        `json:"min_ttl,omitempty"`
 
 	// DNSSEC key material

@@ -6,6 +6,7 @@ package main
 
 import (
 	"github.com/miekg/dns"
+	"net"
 	"path"
 	"strings"
 )
@@ -29,9 +30,9 @@ func (s *Service) NewSRV(name string, ttl uint32, weight uint16) *dns.SRV {
 	return srv
 }
 
-// TODO:miek
-func (s *Service) NewA() *dns.A {
-	return nil
+func (s *Service) NewA(name string, ttl uint32, ip net.IP) *dns.A {
+	a := &dns.A{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: ip}
+	return a
 }
 
 func (s *Service) NewAAAA() *dns.AAAA {
