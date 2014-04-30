@@ -10,7 +10,6 @@ import (
 	"math"
 	"net"
 	"net/url"
-	gopath "path"
 	"strings"
 	"sync"
 	"time"
@@ -220,7 +219,7 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		}
 		return
 	}
-	r, err := s.client.Get(path(name), false, true)
+	r, err := s.client.Get(Path(name), false, true)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +293,7 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 // If the Target is not an name but an IP address, an name is created .
 func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
-	r, err := s.client.Get(path(name), false, true)
+	r, err := s.client.Get(Path(name), false, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -315,12 +314,12 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: dns.Fqdn(serv.Host)})
 		case ip.To4() != nil:
 			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: ttl},
-				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: domain(r.Node.Key)})
-			extra = append(extra, &dns.A{Hdr: dns.RR_Header{Name: domain(r.Node.Key), Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: ip.To4()})
+				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(r.Node.Key)})
+			extra = append(extra, &dns.A{Hdr: dns.RR_Header{Name: Domain(r.Node.Key), Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: ip.To4()})
 		case ip.To4() == nil:
 			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: ttl},
-				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: domain(r.Node.Key)})
-			extra = append(extra, &dns.AAAA{Hdr: dns.RR_Header{Name: domain(r.Node.Key), Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: ttl}, AAAA: ip.To16()})
+				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(r.Node.Key)})
+			extra = append(extra, &dns.AAAA{Hdr: dns.RR_Header{Name: Domain(r.Node.Key), Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: ttl}, AAAA: ip.To16()})
 		}
 		return records, extra, nil
 	}
@@ -338,12 +337,12 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: dns.Fqdn(serv.Host)})
 		case ip.To4() != nil:
 			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.ttl},
-				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: domain(serv.key)})
-			extra = append(extra, &dns.A{Hdr: dns.RR_Header{Name: domain(serv.key), Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: serv.ttl}, A: ip.To4()})
+				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(serv.key)})
+			extra = append(extra, &dns.A{Hdr: dns.RR_Header{Name: Domain(serv.key), Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: serv.ttl}, A: ip.To4()})
 		case ip.To4() == nil:
 			records = append(records, &dns.SRV{Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: serv.ttl},
-				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: domain(serv.key)})
-			extra = append(extra, &dns.AAAA{Hdr: dns.RR_Header{Name: domain(serv.key), Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: serv.ttl}, AAAA: ip.To16()})
+				Priority: uint16(serv.Priority), Weight: weight, Port: uint16(serv.Port), Target: Domain(serv.key)})
+			extra = append(extra, &dns.AAAA{Hdr: dns.RR_Header{Name: Domain(serv.key), Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: serv.ttl}, AAAA: ip.To16()})
 		}
 	}
 	return records, extra, nil
@@ -385,24 +384,4 @@ func (s *server) loopNodes(n *etcd.Nodes) (sx []*Service, err error) {
 		sx = append(sx, serv)
 	}
 	return sx, nil
-}
-
-// path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
-// the resulting key will be /skydns/local/skydns/staging/service .
-func path(s string) string {
-	l := dns.SplitDomainName(s)
-	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
-		l[i], l[j] = l[j], l[i]
-	}
-	return gopath.Join(append([]string{"/skydns/"}, l...)...)
-}
-
-// domain is the opposite of path.
-func domain(s string) string {
-	l := strings.Split(s, "/")
-	// start with 1, to strip /skydns
-	for i, j := 1, len(l)-1; i < j; i, j = i+1, j-1 {
-		l[i], l[j] = l[j], l[i]
-	}
-	return dns.Fqdn(strings.Join(l[1:len(l)-1], "."))
 }
