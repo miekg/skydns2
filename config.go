@@ -25,6 +25,7 @@ type Config struct {
 	Nameservers  []string      `json:"nameservers,omitempty"`
 	ReadTimeout  time.Duration `json:"read_timeout,omitempty"`
 	WriteTimeout time.Duration `json:"write_timeout,omitempty"`
+	Priority     uint16	   `json:"priority"`
 	Ttl          uint32        `json:"ttl,omitempty"`
 	MinTtl       uint32        `json:"min_ttl,omitempty"`
 
@@ -74,6 +75,9 @@ func setDefaults(config *Config) error {
 	}
 	if config.Ttl == 0 {
 		config.Ttl = 3600
+	}
+	if config.Priority == 0 {
+		config.Priority = 10
 	}
 
 	if len(config.Nameservers) == 0 {
