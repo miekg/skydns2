@@ -63,7 +63,7 @@ Adding the service can thus be done with:
 
 Note we use the directory `/skydns` to anchor all names.
 
-When querying the DNS for services you can use subdomains. see the section named "Subdomains" below for more information.
+When querying the DNS for services you can use wildcards or query for subdomains. see the section named "Wildcards" below for more information.
 
 ## Service Discovery via the DNS
 
@@ -96,10 +96,9 @@ Testing one of the names with `dig`
     ;; ANSWER SECTION:
     1.rails.production.east.skydns.local. 3600 IN SRV 10 0 8080 service1.example.com.
 
-### Subdomains
+### Wildcards
 
-Of course using the full names isn't *that* useful, so SkyDNS lets you query for subdomains, and returns responses based upon the amount of services matched
-by the subdomain.
+Of course using the full names isn't *that* useful, so SkyDNS lets you query for subdomains, and returns responses based upon the amount of services matched by the subdomain or from the the wildcard query.
 
 If we are interesting in all the servers in the east-region, we can just leave of the right most labels from our query:
 

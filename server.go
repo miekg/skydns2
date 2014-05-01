@@ -218,8 +218,8 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 	if err != nil {
 		return nil, err
 	}
-	var serv *Service
 	if !r.Node.Dir { // single element
+		var serv *Service
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
 			return nil, err
 		}
@@ -237,7 +237,6 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		}
 		return records, nil
 	}
-	println("NNN", name)
 	nodes, err := s.loopNodes(&r.Node.Nodes, strings.Split(PathNoWildcard(name), "/"), star)
 	if err != nil {
 		return nil, err
@@ -282,9 +281,9 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 	if err != nil {
 		return nil, nil, err
 	}
-	var serv *Service
 	weight := uint16(0)
 	if !r.Node.Dir { // single element
+		var serv *Service
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
 			return nil, nil, err
 		}
@@ -300,9 +299,11 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		case ip == nil:
 			records = append(records, serv.NewSRV(q.Name, ttl, weight))
 		case ip.To4() != nil:
+			serv.Host = Domain(serv.key) // TODO(miek): ugly
 			records = append(records, serv.NewSRV(q.Name, ttl, weight))
 			extra = append(extra, serv.NewA(Domain(r.Node.Key), ttl, ip.To4()))
 		case ip.To4() == nil:
+			serv.Host = Domain(serv.key) // TODO(miek): ugly
 			records = append(records, serv.NewSRV(q.Name, ttl, weight))
 			extra = append(extra, serv.NewAAAA(Domain(r.Node.Key), ttl, ip.To16()))
 		}
@@ -320,9 +321,11 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		case ip == nil:
 			records = append(records, serv.NewSRV(q.Name, serv.ttl, weight))
 		case ip.To4() != nil:
+			serv.Host = Domain(serv.key) // TODO(miek): ugly
 			records = append(records, serv.NewSRV(q.Name, serv.ttl, weight))
 			extra = append(extra, serv.NewA(Domain(serv.key), serv.ttl, ip.To4()))
 		case ip.To4() == nil:
+			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewSRV(q.Name, serv.ttl, weight))
 			extra = append(extra, serv.NewAAAA(Domain(serv.key), serv.ttl, ip.To16()))
 		}
@@ -352,7 +355,7 @@ func (s *server) NewSOA() dns.RR {
 // loopNodes recursively loops through the nodes and returns all the values. The nodes' keyname
 // will be match against any wildcards when star is true.
 func (s *server) loopNodes(n *etcd.Nodes, nameParts []string, star bool) (sx []*Service, err error) {
-	Nodes:
+Nodes:
 	for _, n := range *n {
 		if n.Dir {
 			nodes, err := s.loopNodes(&n.Nodes, nameParts, star)
@@ -365,7 +368,7 @@ func (s *server) loopNodes(n *etcd.Nodes, nameParts []string, star bool) (sx []*
 		if star {
 			keyParts := strings.Split(n.Key, "/")
 			for i, n := range nameParts {
-				if i > len(keyParts) - 1 {
+				if i > len(keyParts)-1 {
 					// name is longer than key
 					continue Nodes
 				}
