@@ -213,7 +213,8 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		}
 		return
 	}
-	r, err := s.client.Get(Path(name), false, true)
+	path, star := Path(name)
+	r, err := s.client.Get(path, false, true)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +237,8 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		}
 		return records, nil
 	}
-	nodes, err := s.loopNodes(&r.Node.Nodes)
+	println("NNN", name)
+	nodes, err := s.loopNodes(&r.Node.Nodes, strings.Split(PathNoWildcard(name), "/"), star)
 	if err != nil {
 		return nil, err
 	}
@@ -275,9 +277,8 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 // If the Target is not an name but an IP address, an name is created .
 func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
-	// if there is a wildcard in the name, a lone '*' label, look for the highest available
-	// key and loop through all the nodes to see if they match the wildcard request.
-	r, err := s.client.Get(Path(name), false, true)
+	path, star := Path(name)
+	r, err := s.client.Get(path, false, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -308,7 +309,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		return records, extra, nil
 	}
 
-	sx, err := s.loopNodes(&r.Node.Nodes)
+	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(PathNoWildcard(name), "/"), star)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -342,18 +343,41 @@ func (s *server) NewSOA() dns.RR {
 	}
 }
 
-// loopNodes recursively loops through the nodes and returns all the values.
-func (s *server) loopNodes(n *etcd.Nodes) (sx []*Service, err error) {
+// skydns/local/skydns/east/staging/web
+// skydns/local/skydns/west/production/web
+//
+// skydns/local/skydns/*/*/web
+// skydns/local/skydns/*/web
+
+// loopNodes recursively loops through the nodes and returns all the values. The nodes' keyname
+// will be match against any wildcards when star is true.
+func (s *server) loopNodes(n *etcd.Nodes, nameParts []string, star bool) (sx []*Service, err error) {
+	Nodes:
 	for _, n := range *n {
-		serv := new(Service)
 		if n.Dir {
-			nodes, err := s.loopNodes(&n.Nodes)
+			nodes, err := s.loopNodes(&n.Nodes, nameParts, star)
 			if err != nil {
 				return nil, err
 			}
 			sx = append(sx, nodes...)
 			continue
 		}
+		if star {
+			keyParts := strings.Split(n.Key, "/")
+			for i, n := range nameParts {
+				if i > len(keyParts) - 1 {
+					// name is longer than key
+					continue Nodes
+				}
+				if n == "*" {
+					continue
+				}
+				if keyParts[i] != n {
+					continue Nodes
+				}
+			}
+		}
+		serv := new(Service)
 		if err := json.Unmarshal([]byte(n.Value), &serv); err != nil {
 			return nil, err
 		}
