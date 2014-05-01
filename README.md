@@ -124,7 +124,7 @@ for the A records of 4.rails.staging.east.skydns.local. of course also works:
     % dig @localhost -p 5354 +noall +answer A 4.rails.staging.east.skydns.local.
     4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
 
-Using wildcards `*` in the middle of the query (as could be done in SkyDNS version 1), is not supported anymore.
+Using wildcards `*` in the middle of the query (as could be done in SkyDNS version 1), is not supported as of yet.
 
 ###Examples
 
