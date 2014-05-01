@@ -275,6 +275,8 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 // If the Target is not an name but an IP address, an name is created .
 func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
+	// if there is a wildcard in the name, a lone '*' label, look for the highest available
+	// key and loop through all the nodes to see if they match the wildcard request.
 	r, err := s.client.Get(Path(name), false, true)
 	if err != nil {
 		return nil, nil, err
