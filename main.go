@@ -13,6 +13,9 @@ import (
 )
 
 var machines = strings.Split(os.Getenv("ETCD_MACHINES"), ",")
+// ETCD_TLS
+// ETCD_SOMESOMESOMETHING
+// if etcd machines starts with https:// use the cert
 
 func newClient() *etcd.Client {
 	client := etcd.NewClient(machines)

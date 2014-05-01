@@ -251,7 +251,6 @@ func (c *sigCache) search(s string) *dns.RRSIG {
 		// we want to return a copy here, because if we didn't the RRSIG
 		// could be removed by another goroutine before the packet containing
 		// this signature is send out.
-		log.Println("signature retrieved from cache")
 		return dns.Copy(s).(*dns.RRSIG)
 	}
 	return nil

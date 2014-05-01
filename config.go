@@ -97,7 +97,11 @@ func setDefaults(config *Config) error {
 			config.Nameservers = append(config.Nameservers, net.JoinHostPort(s, c.Port))
 		}
 	}
+	config.Domain = dns.Fqdn(strings.ToLower(config.Domain))
+	config.DomainLabels = dns.CountLabel(config.Domain)
 	if config.DNSSEC != "" {
+		println("DNSSEC support is being reworked, disabling for now")
+		return nil
 		k, p, err := ParseKeyFile(config.DNSSEC)
 		if err != nil {
 			return err
@@ -109,7 +113,5 @@ func setDefaults(config *Config) error {
 		config.KeyTag = k.KeyTag()
 		config.PrivKey = p
 	}
-	config.Domain = dns.Fqdn(strings.ToLower(config.Domain))
-	config.DomainLabels = dns.CountLabel(config.Domain)
 	return nil
 }
