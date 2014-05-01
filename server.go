@@ -314,6 +314,9 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 	if err != nil {
 		return nil, nil, err
 	}
+	if len(sx) == 0 {
+		return nil, nil, nil
+	}
 	weight = uint16(math.Floor(float64(100 / len(sx))))
 	for _, serv := range sx {
 		ip := net.ParseIP(serv.Host)
