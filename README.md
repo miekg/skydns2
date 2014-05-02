@@ -22,7 +22,7 @@ etcd machines in the variable ETCD_MACHINES:
     export ETCD_MACHINES='http://127.0.0.1:4001'
     ./skydns2
 
-If ETCD_MACHINES it not found, SKyDNS wil default to `http://127..0.0.1:4001`.
+If ETCD_MACHINES it not found, SKyDNS will default to `http://127.0.0.1:4001`.
 
 ## Configuration
 SkyDNS' configuration is stored inside `etcd`, under the key `/skydns/config`, the following paramaters
