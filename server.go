@@ -61,10 +61,10 @@ func runDNSServer(group *sync.WaitGroup, mux *dns.ServeMux, net, addr string, re
 	defer group.Done()
 
 	server := &dns.Server{
-		Addr:         addr,
-		Net:          net,
-		Handler:      mux,
-		ReadTimeout:  readTimeout,
+		Addr:        addr,
+		Net:         net,
+		Handler:     mux,
+		ReadTimeout: readTimeout,
 	}
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatal(err)
