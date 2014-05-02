@@ -190,9 +190,19 @@ var dnsTestCases = []dnsTestCase{
 		Qname: "105.server1.development.region1.skydns.test.", Qtype: dns.TypeAAAA,
 		Answer: []dns.RR{newAAAA("105.server1.development.region1.skydns.test. 3600 AAAA 2001::8:8:8:8")},
 	},
-	// Region Priority Test
+	// Subdomain Test
 	{
-		Qname: "region1.*.testservice.production.skydns.test.", Qtype: dns.TypeSRV,
+		Qname: "production.region1.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{newSRV("region1.*.testservice.production.skydns.test. 30 SRV 10 100 9001 server2")},
+	},
+	// Wildcard Test
+	{
+		Qname: "production.*.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{newSRV("region1.*.testservice.production.skydns.test. 30 SRV 10 100 9001 server2")},
+	},
+	// Wildcard Test
+	{
+		Qname: "*.region1.skydns.test.", Qtype: dns.TypeSRV,
 		Answer: []dns.RR{newSRV("region1.*.testservice.production.skydns.test. 30 SRV 10 100 9001 server2")},
 	},
 }
