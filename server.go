@@ -234,6 +234,7 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		if ttl == 0 {
 			ttl = s.config.Ttl
 		}
+		serv.key = r.Node.Key
 		switch {
 		case ip == nil:
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
@@ -287,7 +288,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 	if err != nil {
 		return nil, nil, err
 	}
-	weight := uint16(0)
+	weight := uint16(100)
 	if !r.Node.Dir { // single element
 		var serv *Service
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
@@ -301,6 +302,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		if serv.Priority == 0 {
 			serv.Priority = int(s.config.Priority)
 		}
+		serv.key = r.Node.Key
 		switch {
 		case ip == nil:
 			records = append(records, serv.NewSRV(q.Name, ttl, weight))
