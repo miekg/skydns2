@@ -97,14 +97,13 @@ func TestDNS(t *testing.T) {
 		defer delService(t, s, serv.key)
 	}
 	c := new(dns.Client)
-	for _, tc := range dnsTestCases[:1] { // TOOD(miek): does only 1 test
+	for _, tc := range dnsTestCases {
 		m := new(dns.Msg)
 		m.SetQuestion(tc.Qname, tc.Qtype)
 		resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Logf("%s\n", resp.String())
 		if len(resp.Answer) != len(tc.Answer) {
 			t.Fatalf("Response for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
 		}
@@ -112,129 +111,89 @@ func TestDNS(t *testing.T) {
 			if a.Header().Name != tc.Answer[i].Header().Name {
 				t.Errorf("Answer %d should have a Header Name of %q, but has %q", i, tc.Answer[i].Header().Name, a.Header().Name)
 			}
-
 			if a.Header().Ttl != tc.Answer[i].Header().Ttl {
 				t.Errorf("Answer %d should have a Header TTL of %d, but has %d", i, tc.Answer[i].Header().Ttl, a.Header().Ttl)
 			}
-
 			if a.Header().Rrtype != tc.Answer[i].Header().Rrtype {
 				t.Errorf("Answer %d should have a Header Response Type of %d, but has %d", i, tc.Answer[i].Header().Rrtype, a.Header().Rrtype)
 			}
 
 			switch x := a.(type) {
 			case *dns.SRV:
-				if x.Priority != tc.Answer[i].Priority {
-					t.Errorf("Answer %d should have a Priority of %d, but has %d", i, tc.Answer[i].Priority, x.Priority)
+				if x.Priority != tc.Answer[i].(*dns.SRV).Priority {
+					t.Errorf("Answer %d should have a Priority of %d, but has %d", i, tc.Answer[i].(*dns.SRV).Priority, x.Priority)
 				}
-				if x.Weight != tc.Answer[i].Weight {
-					t.Errorf("Answer %d should have a Weight of %d, but has %d", i, tc.Answer[i].Weight, x.Weight)
+				if x.Weight != tc.Answer[i].(*dns.SRV).Weight {
+					t.Errorf("Answer %d should have a Weight of %d, but has %d", i, tc.Answer[i].(*dns.SRV).Weight, x.Weight)
 				}
-				if x.Port != tc.Answer[i].Port {
-					t.Errorf("Answer %d should have a Port of %d, but has %d", i, tc.Answer[i].Port, x.Port)
+				if x.Port != tc.Answer[i].(*dns.SRV).Port {
+					t.Errorf("Answer %d should have a Port of %d, but has %d", i, tc.Answer[i].(*dns.SRV).Port, x.Port)
 				}
-				if x.Target != tc.Answer[i].Target {
-					t.Errorf("Answer %d should have a Target of %q, but has %q", i, tc.Answer[i].Target, x.Target)
+				if x.Target != tc.Answer[i].(*dns.SRV).Target {
+					t.Errorf("Answer %d should have a Target of %q, but has %q", i, tc.Answer[i].(*dns.SRV).Target, x.Target)
+				}
+			case *dns.A:
+				if x.A.String() != tc.Answer[i].(*dns.A).A.String() {
+					t.Errorf("Answer %d should have a Address of %q, but has %q", i, tc.Answer[i].(*dns.A).A.String(), x.A.String())
+				}
+			case *dns.AAAA:
+				if x.AAAA.String() != tc.Answer[i].(*dns.AAAA).AAAA.String() {
+					t.Errorf("Answer %d should have a Address of %q, but has %q", i, tc.Answer[i].(*dns.AAAA).AAAA.String(), x.AAAA.String())
 				}
 			}
+		}
+		for i, e := range resp.Extra {
+			switch x := e.(type) {
+			case *dns.A:
+				if x.A.String() != tc.Extra[i].(*dns.A).A.String() {
+					t.Errorf("Extra %d should have a Address of %q, but has %q", i, tc.Extra[i].(*dns.A).A.String(), x.A.String())
+				}
+			case *dns.AAAA:
+				if x.AAAA.String() != tc.Extra[i].(*dns.AAAA).AAAA.String() {
+					t.Errorf("Extra %d should have a Address of %q, but has %q", i, tc.Extra[i].(*dns.AAAA).AAAA.String(), x.AAAA.String())
+				}
+			}
+
 		}
 	}
 }
 
 var services = []*Service{
-	{
-		Host: "server2",
-		Port: 8080,
-		key:  "100.server1.development.region1.skydns.test.",
-	},
-	{
-		Host: "server2",
-		Port: 80,
-		key:  "101.server2.production.region1.skydns.test.",
-	},
-	{
-		Host: "server5",
-		key:  "102.server3.production.region2.skydns.test.",
-	},
-	{
-		Host: "server6",
-		key:  "103.server4.development.region1.skydns.test.",
-	},
-	{
-		Host: "10.0.0.1",
-		key:  "104.server1.development.region1.skydns.test.",
-	},
-	{
-		Host: "2001::8:8:8:8",
-		key:  "105.server3.production.region2.skydns.test.",
-	},
+	{Host: "server2", Port: 8080, key: "100.server1.development.region1.skydns.test."},
+	{Host: "server2", Port: 80, key: "101.server2.production.region1.skydns.test."},
+	{Host: "server5", key: "102.server3.production.region2.skydns.test."},
+	{Host: "server6", key: "103.server4.development.region1.skydns.test."},
+	{Host: "10.0.0.1", key: "104.server1.development.region1.skydns.test."},
+	{Host: "2001::8:8:8:8", key: "105.server3.production.region2.skydns.test."},
 }
 
 type dnsTestCase struct {
-	Qname     string
-	Qtype     uint16
-	Answer    []dns.SRV
-	ExtraA    []dns.A
-	ExtraAAAA []dns.AAAA
+	Qname  string
+	Qtype  uint16
+	Answer []dns.RR
+	Extra  []dns.RR
 }
 
 var dnsTestCases = []dnsTestCase{
+	// Full Name Test
 	{
-		Qname: "100.server1.development.region1.skydns.test.",
-		Qtype: dns.TypeSRV,
-		Answer: []dns.SRV{
-			{
-				Hdr: dns.RR_Header{
-					Name:   "100.server1.development.region1.skydns.test.",
-					Ttl:    3600,
-					Rrtype: dns.TypeSRV,
-				},
-				Priority: 10,
-				Weight:   0,
-				Target:   "server2.",
-				Port:     8080,
-			},
-		},
+		Qname: "100.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{newSRV("100.server1.development.region1.skydns.test. 3600 SRV 10 0 8080 server.")},
 	},
-
+	// A Record Test
+	{
+		Qname: "104.server1.development.region1.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
+	},
+	// AAAAA Record Test
+	{
+		Qname: "105.server1.development.region1.skydns.test.", Qtype: dns.TypeAAAA,
+		Answer: []dns.RR{newAAAA("105.server1.development.region1.skydns.test. 3600 AAAA 2001::8:8:8:8")},
+	},
 	// Region Priority Test
 	{
-		Qname: "region1.*.testservice.production.skydns.test.",
-		Qtype: dns.TypeSRV,
-		Answer: []dns.SRV{
-			{
-				Hdr: dns.RR_Header{
-					Name:   "region1.*.testservice.production.skydns.test.",
-					Ttl:    30,
-					Rrtype: dns.TypeSRV,
-				},
-				Priority: 10,
-				Weight:   100,
-				Target:   "server2.",
-				Port:     9001,
-			},
-			{
-				Hdr: dns.RR_Header{
-					Name:   "region1.*.testservice.production.skydns.test.",
-					Ttl:    33,
-					Rrtype: dns.TypeSRV,
-				},
-				Priority: 20,
-				Weight:   50,
-				Target:   "server5.",
-				Port:     9004,
-			},
-			{
-				Hdr: dns.RR_Header{
-					Name:   "region1.*.testservice.production.skydns.test.",
-					Ttl:    34,
-					Rrtype: dns.TypeSRV,
-				},
-				Priority: 20,
-				Weight:   50,
-				Target:   "server6.",
-				Port:     9005,
-			},
-		},
+		Qname: "region1.*.testservice.production.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{newSRV("region1.*.testservice.production.skydns.test. 30 SRV 10 100 9001 server2")},
 	},
 }
 
@@ -398,3 +357,7 @@ func newMsg(tc dnssecTestCase) *dns.Msg {
 	return m
 }
 */
+
+func newA(rr string) *dns.A       { r, _ := dns.NewRR(rr); return r.(*dns.A) }
+func newAAAA(rr string) *dns.AAAA { r, _ := dns.NewRR(rr); return r.(*dns.AAAA) }
+func newSRV(rr string) *dns.SRV   { r, _ := dns.NewRR(rr); return r.(*dns.SRV) }
