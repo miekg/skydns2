@@ -19,8 +19,8 @@ import (
 // will deny the wildcard for *.server.config.Domain. This allows
 // use to pre-compute those records. We then only need to compute
 // the NSEC3 that covers the qname.
+// Ofcourse sometimes we need a wildcard bla bla
 
-const origTTL uint32 = 60
 
 var (
 	cache    *sigCache = newCache()
@@ -48,34 +48,33 @@ func ParseKeyFile(file string) (*dns.DNSKEY, dns.PrivateKey, error) {
 	if e != nil {
 		return nil, nil, e
 	}
-	k.Header().Ttl = origTTL
 	return k.(*dns.DNSKEY), p, nil
 }
 
-// NewNSEC creates (if needed) NSEC records that are included in the reply.
-func (s *server) NewNSEC(m *dns.Msg) {
+// Denial creates (if needed) NSEC3 records that are included in the reply.
+func (s *server) Denial(m *dns.Msg) {
 	if m.Rcode == dns.RcodeNameError {
 		// qname nsec
-		nsec1 := s.newNSEC(m.Question[0].Name)
+		nsec1 := s.NewNSEC3(m.Question[0].Name)
 		m.Ns = append(m.Ns, nsec1)
 		// wildcard nsec
 		idx := dns.Split(m.Question[0].Name)
 		wildcard := "*." + m.Question[0].Name[idx[0]:]
-		nsec2 := s.newNSEC(wildcard)
+		nsec2 := s.NewNSEC3(wildcard)
 		if nsec1.Hdr.Name != nsec2.Hdr.Name || nsec1.NextDomain != nsec2.NextDomain {
-			// different NSEC, add it
+			// different NSEC3, add it
 			m.Ns = append(m.Ns, nsec2)
 		}
 	}
 	if m.Rcode == dns.RcodeSuccess && len(m.Ns) == 1 {
 		if _, ok := m.Ns[0].(*dns.SOA); ok {
-			m.Ns = append(m.Ns, s.newNSEC(m.Question[0].Name))
+			m.Ns = append(m.Ns, s.NewNSEC3(m.Question[0].Name))
 		}
 	}
 }
 
 // sign signs a message m, it takes care of negative or nodata responses as
-// well by synthesising NSEC records. It will also cache the signatures, using
+// well by synthesising NSEC3 records. It will also cache the signatures, using
 // a hash of the signed data as a key.
 // We also fake the origin TTL in the signature, because we don't want to
 // throw away signatures when services decide to have longer TTL. So we just
@@ -100,6 +99,10 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 		}
 		sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
 			sig1 := s.NewRRSIG(incep, expir)
+			if r[0].Header().Rrtype == dns.TypeNSEC3 {
+				sig1.OrigTtl = s.config.MinTtl
+				sig1.Header().Ttl = s.config.MinTtl
+			}
 			e := sig1.Sign(s.config.PrivKey, r)
 			if e != nil {
 				log.Printf("failed to sign: %s\n", e.Error())
@@ -129,6 +132,10 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 		}
 		sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
 			sig1 := s.NewRRSIG(incep, expir)
+			if r[0].Header().Rrtype == dns.TypeNSEC3 {
+				sig1.OrigTtl = s.config.MinTtl
+				sig1.Header().Ttl = s.config.MinTtl
+			}
 			e := sig1.Sign(s.config.PrivKey, r)
 			if e != nil {
 				log.Printf("failed to sign: %s\n", e.Error())
@@ -160,8 +167,8 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 func (s *server) NewRRSIG(incep, expir uint32) *dns.RRSIG {
 	sig := new(dns.RRSIG)
 	sig.Hdr.Rrtype = dns.TypeRRSIG
-	sig.Hdr.Ttl = origTTL
-	sig.OrigTtl = origTTL
+	sig.Hdr.Ttl = s.config.Ttl
+	sig.OrigTtl = s.config.Ttl
 	sig.Algorithm = s.config.PubKey.Algorithm
 	sig.KeyTag = s.config.KeyTag
 	sig.Inception = incep
@@ -170,8 +177,8 @@ func (s *server) NewRRSIG(incep, expir uint32) *dns.RRSIG {
 	return sig
 }
 
-// newNSEC returns the NSEC record need to denial qname, or gives back a NODATA NSEC.
-func (s *server) newNSEC(qname string) *dns.NSEC {
+// NewNSEC3 returns the NSEC3 record need to denial qname, or gives back a NODATA NSEC3.
+func (s *server) NewNSEC3(qname string) *dns.NSEC {
 	qlabels := dns.SplitDomainName(qname)
 	if len(qlabels) < s.domainLabels {
 		// TODO(miek): can not happen...?

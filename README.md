@@ -188,7 +188,10 @@ SkyDNS is `skydns.local`:
 This creates two files both with the basename `Kskydns.local.+005.49860`, one of the
 extension `.key` (this holds the public key) and one with the extension `.private` which
 hold the private key. The basename of this file should be given to SkyDNS's DNSSEC configuration
-option: `Kskydns.local.+005+49860`
+option: `Kskydns.local.+005+49860`, like so (together with some other options):
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/config -d \
+        value='{"dns_addr":"127.0.0.1:5354","dnssec":"Kskydns.local.+005+55656"}'
 
 If you then query with `dig +dnssec` you will get signatures, keys and NSEC3 records returned.
 

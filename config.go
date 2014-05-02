@@ -95,15 +95,16 @@ func setDefaults(config *Config) error {
 	config.Domain = dns.Fqdn(strings.ToLower(config.Domain))
 	config.DomainLabels = dns.CountLabel(config.Domain)
 	if config.DNSSEC != "" {
-		println("DNSSEC support is being reworked, disabling for now")
-		return nil
-		k, p, err := ParseKeyFile(config.DNSSEC)
+		// For some reason the + are replaces by spaces in etcd. Re-replace them
+		keyfile := strings.Replace(config.DNSSEC, " ",  "+", -1)
+		k, p, err := ParseKeyFile(keyfile)
 		if err != nil {
 			return err
 		}
 		if k.Header().Name != dns.Fqdn(config.Domain) {
 			return fmt.Errorf("ownername of DNSKEY must match SkyDNS domain")
 		}
+		k.Header().Ttl = config.Ttl
 		config.PubKey = k
 		config.KeyTag = k.KeyTag()
 		config.PrivKey = p
