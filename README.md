@@ -22,19 +22,19 @@ etcd machines in the variable ETCD_MACHINES:
     export ETCD_MACHINES='http://127.0.0.1:4001'
     ./skydns2
 
+If ETCD_MACHINES it not found, SKyDNS wil default to `http://127..0.0.1:4001`.
 
 ## Configuration
 SkyDNS' configuration is stored inside `etcd`, under the key `/skydns/config`, the following paramaters
 may be set:
 
 * `dns_addr`: ip:port on which the SkyDNS should start the DNS server, defaults to `127.0.0.1:53`.
-* `domain`: domain SkyDNS is authoritative for, default to `skydns.local.`.
-* `dnssec`: enable DNSSEC.
-* `round_robin`: enable round robin sorting for A and AAAA responses, defaults to true
+* `domain`: domain SkyDNS is authoritative for, defaults to `skydns.local.`.
+* `dnssec`: enable DNSSEC (broken at the moment).
+* `round_robin`: enable round robin sorting for A and AAAA responses, defaults to true.
 * `nameservers`: forward DNS requests to these nameservers (ip:port combination), when we are not
-    authoritative for them.
+    authoritative for a domain.
 * `read_timeout`: network read timeout, for DNS and talking with etcd.
-* `write_timeout`: network write timeout.
 * `ttl`: default TTL in seconds to use on replies when none is set in etcd, defaults to 3600.
 * `min_ttl`: minimum TTL in seconds to use on NXDOMAIN, defaults to 30.
 
