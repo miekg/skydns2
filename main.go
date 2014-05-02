@@ -12,14 +12,24 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
-var machines = strings.Split(os.Getenv("ETCD_MACHINES"), ",")
+var (
+	machines = strings.Split(os.Getenv("ETCD_MACHINES"), ",") // URL to ectd
+	tlskey   = os.Getenv("ETCD_TLSKEY")                       // TLS private key path
+	tlspem   = os.Getenv("ETCD_TLSPEM")                       // X509 certificate
+)
 
-// ETCD_TLS
-// ETCD_SOMESOMESOMETHING
-// if etcd machines starts with https:// use the cert
-
-func newClient() *etcd.Client {
-	client := etcd.NewClient(machines)
+func newClient() (client *etcd.Client) {
+	if len(machines) == 0 {
+		machines = append(machines, "http://127.0.0.1:4001")
+	}
+	if strings.HasPrefix(machines[0], "https://") {
+		var err error
+		if client, err = etcd.NewTLSClient(machines, tlspem, tlskey, ""); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		client = etcd.NewClient(machines)
+	}
 	client.SyncCluster()
 	return client
 }

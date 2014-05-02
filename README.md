@@ -1,5 +1,3 @@
-WORK IN PROGRESS
-
 #SkyDNS [![Build Status](https://travis-ci.org/skynetservices/skydns.png)](https://travis-ci.org/skynetservices/skydns2)
 *Version 2.0.0*
 

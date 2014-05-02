@@ -18,6 +18,13 @@ import (
 	"github.com/miekg/dns"
 )
 
+// TODO
+// * Priority is fixed to 20
+// * Fix DNSSEC
+// * SSL
+// * Tests
+// * Re-introduce notion of region, i.e. a format for a domain name
+
 type server struct {
 	domainLabels int
 	client       *etcd.Client

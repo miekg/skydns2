@@ -20,13 +20,11 @@ type Config struct {
 	// The ip:port SkyDNS should be listening on for incoming DNS requests.
 	DnsAddr string `json:"dns_addr,omitempty"`
 	// The domain SkyDNS is authoritative for, defaults to skydns.local.
-	Domain       string `json:"domain,omitempty"`
-	DomainLabels int    `json:"-"`
-	DNSSEC       string `json:"dnssec,omitempty"`
+	Domain string `json:"domain,omitempty"`
+	DNSSEC string `json:"dnssec,omitempty"`
 	// Round robin A/AAAA replies. Default is true.
 	RoundRobin bool `json:"round_robin,omitempty"`
-	// List of ip:port, seperated by commas of recursive nameservers to
-	// forward queries to.
+	// List of ip:port, seperated by commas of recursive nameservers to forward queries to.
 	Nameservers  []string      `json:"nameservers,omitempty"`
 	ReadTimeout  time.Duration `json:"read_timeout,omitempty"`
 	WriteTimeout time.Duration `json:"write_timeout,omitempty"`
@@ -38,9 +36,10 @@ type Config struct {
 	MinTtl uint32 `json:"min_ttl,omitempty"`
 
 	// DNSSEC key material
-	PubKey  *dns.DNSKEY    `json:"-"`
-	KeyTag  uint16         `json:"-"`
-	PrivKey dns.PrivateKey `json:"-"`
+	PubKey       *dns.DNSKEY    `json:"-"`
+	KeyTag       uint16         `json:"-"`
+	PrivKey      dns.PrivateKey `json:"-"`
+	DomainLabels int            `json:"-"`
 }
 
 func LoadConfig(client *etcd.Client) (*Config, error) {
