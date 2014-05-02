@@ -41,11 +41,12 @@ may be set:
 To set the configuration so something like:
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/config \
-    -d value='{"dns_addr":"127.0.0.1:5354","ttl":3600}'
+        -d value='{"dns_addr":"127.0.0.1:5354","ttl":3600}'
 
 ## Service Announcements
 You announce your service by submitting JSON over HTTP to etcd with information about your service.
 This information will then be available for queries via DNS.
+We use the directory `/skydns` to anchor all names.
 
 When providing information you will need to fill out the following values.
 
@@ -59,9 +60,9 @@ When providing information you will need to fill out the following values.
 Adding the service can thus be done with:
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/production/rails \
-    -d value='{"host":"service5.example.com","priority":20}'
+        -d value='{"host":"service5.example.com","priority":20}'
 
-Note we use the directory `/skydns` to anchor all names.
+Or use `etcdctl` like so: ....
 
 When querying the DNS for services you can use wildcards or query for subdomains. see the section named "Wildcards" below for more information.
 
@@ -79,13 +80,13 @@ For the purpose of this document, lets suppose we have added to following servic
 These names can be added with:
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/production/rails/1 \
-    -d value='{"host":"service1.example.com","port":8080}'
+        -d value='{"host":"service1.example.com","port":8080}'
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/west/production/rails/2 \
-    -d value='{"host":"service2.example.com","port":8080}'
+        -d value='{"host":"service2.example.com","port":8080}'
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/staging/rails/4 \
-    -d value='{"host":"10.0.1.125","port":8080}'
+        -d value='{"host":"10.0.1.125","port":8080}'
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/staging/rails/6 \
-    -d value='{"host":"2003::8:1","port":8080}'
+        -d value='{"host":"2003::8:1","port":8080}'
 
 Testing one of the names with `dig`
 
@@ -123,7 +124,7 @@ for the A records of 4.rails.staging.east.skydns.local. of course also works:
     % dig @localhost -p 5354 +noall +answer A 4.rails.staging.east.skydns.local.
     4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
 
-Using wildcards `*` in the middle of the query (as could be done in SkyDNS version 1), is not supported as of yet.
+TODO(miek): wildcard queries
 
 ###Examples
 
