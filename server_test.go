@@ -9,6 +9,7 @@ package main
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
@@ -55,10 +56,32 @@ func newTestServer(t *testing.T) *server {
 	s.config.DnsAddr = "127.0.0.1:" + StrPort
 	s.config.Nameservers = []string{"8.8.4.4:53"}
 	s.config.Domain = "skydns.test."
+	s.config.DomainLabels = 2
 	// some defaults copied over from config.go
 	s.config.Priority = 10
 	s.config.Ttl = 3600
 	go s.Run()
+	return s
+}
+
+func newTestServerDNSSEC(t *testing.T) *server {
+	s := newTestServer(t)
+	s.config.PubKey = newDNSKEY("skydns.test. IN DNSKEY 256 3 5 AwEAAaXfO+DOBMJsQ5H4TfiabwSpqE4cGL0Qlvh5hrQumrjr9eNSdIOjIHJJKCe56qBU5mH+iBlXP29SVf6UiiMjIrAPDVhClLeWFe0PC+XlWseAyRgiLHdQ8r95+AfkhO5aZgnCwYf9FGGSaT0+CRYN+PyDbXBTLK5FN+j5b6bb7z+d")
+	s.config.KeyTag = s.config.PubKey.KeyTag()
+	s.config.PrivKey, _ = s.config.PubKey.ReadPrivateKey(strings.NewReader(`
+Private-key-format: v1.3
+Algorithm: 5 (RSASHA1)
+Modulus: pd874M4EwmxDkfhN+JpvBKmoThwYvRCW+HmGtC6auOv141J0g6MgckkoJ7nqoFTmYf6IGVc/b1JV/pSKIyMisA8NWEKUt5YV7Q8L5eVax4DJGCIsd1Dyv3n4B+SE7lpmCcLBh/0UYZJpPT4JFg34/INtcFMsrkU36PlvptvvP50=
+PublicExponent: AQAB
+PrivateExponent: C6e08GXphbPPx6j36ZkIZf552gs1XcuVoB4B7hU8P/Qske2QTFOhCwbC8I+qwdtVWNtmuskbpvnVGw9a6X8lh7Z09RIgzO/pI1qau7kyZcuObDOjPw42exmjqISFPIlS1wKA8tw+yVzvZ19vwRk1q6Rne+C1romaUOTkpA6UXsE=
+Prime1: 2mgJ0yr+9vz85abrWBWnB8Gfa1jOw/ccEg8ZToM9GLWI34Qoa0D8Dxm8VJjr1tixXY5zHoWEqRXciTtY3omQDQ==
+Prime2: wmxLpp9rTzU4OREEVwF43b/TxSUBlUq6W83n2XP8YrCm1nS480w4HCUuXfON1ncGYHUuq+v4rF+6UVI3PZT50Q==
+Exponent1: wkdTngUcIiau67YMmSFBoFOq9Lldy9HvpVzK/R0e5vDsnS8ZKTb4QJJ7BaG2ADpno7pISvkoJaRttaEWD3a8rQ==
+Exponent2: YrC8OglEXIGkV3tm2494vf9ozPL6+cBkFsPPg9dXbvVCyyuW0pGHDeplvfUqs4nZp87z8PsoUL+LAUqdldnwcQ==
+Coefficient: mMFr4+rDY5V24HZU3Oa5NEb55iQ56ZNa182GnNhWqX7UqWjcUUGjnkCy40BqeFAQ7lp52xKHvP5Zon56mwuQRw==
+Created: 20140126132645
+Publish: 20140126132645
+Activate: 20140126132645`), "stdin")
 	return s
 }
 
@@ -142,6 +165,10 @@ func TestDNS(t *testing.T) {
 				}
 			}
 		}
+		for i, n := range resp.Ns {
+			i = i
+			n = n
+		}
 		for i, e := range resp.Extra {
 			switch x := e.(type) {
 			case *dns.A:
@@ -158,6 +185,26 @@ func TestDNS(t *testing.T) {
 	}
 }
 
+/*
+func TestDNSSEC(t *testing.T) {
+	s := newTestServer("", "", "")
+	defer s.Stop()
+
+	for _, m := range services {
+		s.registry.Add(m)
+	}
+	c := new(dns.Client)
+	for _, tc := range dnssecTestCases {
+		m := newMsg(tc)
+		resp, _, err := c.Exchange(m, "localhost:"+StrPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sectionCheck(t, resp.Answer, tc.Answer)
+	}
+}
+*/
+
 var services = []*Service{
 	{Host: "server2", Port: 8080, key: "100.server1.development.region1.skydns.test."},
 	{Host: "server2", Port: 80, key: "101.server2.production.region1.skydns.test."},
@@ -171,6 +218,7 @@ type dnsTestCase struct {
 	Qname  string
 	Qtype  uint16
 	Answer []dns.RR
+	Ns     []dns.RR
 	Extra  []dns.RR
 }
 
@@ -205,50 +253,28 @@ var dnsTestCases = []dnsTestCase{
 		Qname: "*.region1.skydns.test.", Qtype: dns.TypeSRV,
 		Answer: []dns.RR{newSRV("region1.*.testservice.production.skydns.test. 30 SRV 10 100 9001 server2")},
 	},
+	// NXDOMAIN Test
+	// NODATA Test
 }
+
+var dnssecTestCases = []dnsTestCase{
+	// DNSKEY Test
+	{
+		Qname: "skydns.test.", Qtype: dns.TypeDNSKEY,
+		Answer: []dns.RR{newDNSKEY("skydns.test. 3600 DNSKEY 256 3 5 deadbeaf"),
+			newRRSIG("skydns.test. 3600 RRSIG DNSKEY 5 2 3600 0 0 51945 skydns.test. deadbeaf"),
+		},
+	},
+	// NXDOMAIN Test
+
+
+	// NODATA Test
+
+	// Wildcard Test
+}
+
 
 /*
-func newTestServerDNSSEC(leader, secret, nameserver string) *Server {
-	s := newTestServer(leader, secret, nameserver)
-	key, _ := dns.NewRR("skydns.local. IN DNSKEY 256 3 5 AwEAAaXfO+DOBMJsQ5H4TfiabwSpqE4cGL0Qlvh5hrQumrjr9eNSdIOjIHJJKCe56qBU5mH+iBlXP29SVf6UiiMjIrAPDVhClLeWFe0PC+XlWseAyRgiLHdQ8r95+AfkhO5aZgnCwYf9FGGSaT0+CRYN+PyDbXBTLK5FN+j5b6bb7z+d")
-	s.dnsKey = key.(*dns.DNSKEY)
-	s.keyTag = s.dnsKey.KeyTag()
-	s.privKey, _ = s.dnsKey.ReadPrivateKey(strings.NewReader(`
-Private-key-format: v1.3
-Algorithm: 5 (RSASHA1)
-Modulus: pd874M4EwmxDkfhN+JpvBKmoThwYvRCW+HmGtC6auOv141J0g6MgckkoJ7nqoFTmYf6IGVc/b1JV/pSKIyMisA8NWEKUt5YV7Q8L5eVax4DJGCIsd1Dyv3n4B+SE7lpmCcLBh/0UYZJpPT4JFg34/INtcFMsrkU36PlvptvvP50=
-PublicExponent: AQAB
-PrivateExponent: C6e08GXphbPPx6j36ZkIZf552gs1XcuVoB4B7hU8P/Qske2QTFOhCwbC8I+qwdtVWNtmuskbpvnVGw9a6X8lh7Z09RIgzO/pI1qau7kyZcuObDOjPw42exmjqISFPIlS1wKA8tw+yVzvZ19vwRk1q6Rne+C1romaUOTkpA6UXsE=
-Prime1: 2mgJ0yr+9vz85abrWBWnB8Gfa1jOw/ccEg8ZToM9GLWI34Qoa0D8Dxm8VJjr1tixXY5zHoWEqRXciTtY3omQDQ==
-Prime2: wmxLpp9rTzU4OREEVwF43b/TxSUBlUq6W83n2XP8YrCm1nS480w4HCUuXfON1ncGYHUuq+v4rF+6UVI3PZT50Q==
-Exponent1: wkdTngUcIiau67YMmSFBoFOq9Lldy9HvpVzK/R0e5vDsnS8ZKTb4QJJ7BaG2ADpno7pISvkoJaRttaEWD3a8rQ==
-Exponent2: YrC8OglEXIGkV3tm2494vf9ozPL6+cBkFsPPg9dXbvVCyyuW0pGHDeplvfUqs4nZp87z8PsoUL+LAUqdldnwcQ==
-Coefficient: mMFr4+rDY5V24HZU3Oa5NEb55iQ56ZNa182GnNhWqX7UqWjcUUGjnkCy40BqeFAQ7lp52xKHvP5Zon56mwuQRw==
-Created: 20140126132645
-Publish: 20140126132645
-Activate: 20140126132645`), "stdin")
-	return s
-}
-*/
-
-/*
-
-func TestDNSARecords(t *testing.T) {
-	s := newTestServer("", "", "")
-	defer s.Stop()
-
-	c := new(dns.Client)
-	m := new(dns.Msg)
-	m.SetQuestion("skydns.test.", dns.TypeA)
-	resp, _, err := c.Exchange(m, "localhost:"+StrPort)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(resp.Answer) != 1 {
-		t.Fatal("Answer expected to have 2 A records but has", len(resp.Answer))
-	}
-}
-
 // DNSSEC tests
 
 func sectionCheck(t *testing.T, resp []dns.RR, tc []dns.RR) {
@@ -298,76 +324,10 @@ func sectionCheck(t *testing.T, resp []dns.RR, tc []dns.RR) {
 		}
 	}
 }
-
-func TestDNSSEC(t *testing.T) {
-	s := newTestServer("", "", "")
-	defer s.Stop()
-
-	for _, m := range services {
-		s.registry.Add(m)
-	}
-	c := new(dns.Client)
-	for _, tc := range dnssecTestCases {
-		m := newMsg(tc)
-		resp, _, err := c.Exchange(m, "localhost:"+StrPort)
-		if err != nil {
-			t.Fatal(err)
-		}
-		sectionCheck(t, resp.Answer, tc.Answer)
-	}
-}
-
-type dnssecTestCase struct {
-	Question dns.Question
-	Answer   []dns.RR
-	Ns       []dns.RR
-	Extra    []dns.RR
-}
-
-var dnssecTestCases = []dnssecTestCase{
-	// DNSKEY Test
-	{
-		Question: dns.Question{"skydns.test.", dns.TypeDNSKEY, dns.ClassINET},
-		Answer: []dns.RR{&dns.DNSKEY{
-			Hdr: dns.RR_Header{
-				Name:   "skydns.test.",
-				Ttl:    origTTL,
-				Rrtype: dns.TypeDNSKEY,
-			},
-			Flags:     256,
-			Protocol:  3,
-			Algorithm: 5,
-			PublicKey: "not important",
-		},
-			&dns.RRSIG{
-				Hdr: dns.RR_Header{
-					Name:   "skydns.test.",
-					Ttl:    origTTL,
-					Rrtype: dns.TypeRRSIG,
-				},
-				TypeCovered: dns.TypeDNSKEY,
-				Algorithm:   5,
-				Labels:      2,
-				OrigTtl:     origTTL,
-				Expiration:  0,
-				Inception:   0,
-				KeyTag:      51945,
-				SignerName:  "skydns.test.",
-				Signature:   "not important",
-			},
-		},
-	},
-}
-
-// newMsg return a new dns.Msg set with DNSSEC and with the question from the tc.
-func newMsg(tc dnssecTestCase) *dns.Msg {
-	m := new(dns.Msg)
-	m.SetQuestion(tc.Question.Name, tc.Question.Qtype)
-	m.SetEdns0(4096, true)
-	return m
-}
 */
 
-func newA(rr string) *dns.A       { r, _ := dns.NewRR(rr); return r.(*dns.A) }
-func newAAAA(rr string) *dns.AAAA { r, _ := dns.NewRR(rr); return r.(*dns.AAAA) }
-func newSRV(rr string) *dns.SRV   { r, _ := dns.NewRR(rr); return r.(*dns.SRV) }
+func newA(rr string) *dns.A           { r, _ := dns.NewRR(rr); return r.(*dns.A) }
+func newAAAA(rr string) *dns.AAAA     { r, _ := dns.NewRR(rr); return r.(*dns.AAAA) }
+func newSRV(rr string) *dns.SRV       { r, _ := dns.NewRR(rr); return r.(*dns.SRV) }
+func newDNSKEY(rr string) *dns.DNSKEY { r, _ := dns.NewRR(rr); return r.(*dns.DNSKEY) }
+func newRRSIG(rr string) *dns.RRSIG   { r, _ := dns.NewRR(rr); return r.(*dns.RRSIG) }
