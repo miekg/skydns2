@@ -124,6 +124,7 @@ func TestDNS(t *testing.T) {
 		m := new(dns.Msg)
 		m.SetQuestion(tc.Qname, tc.Qtype)
 		resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
+		t.Logf("%s\n", resp)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -226,7 +227,7 @@ var dnsTestCases = []dnsTestCase{
 	// Full Name Test
 	{
 		Qname: "100.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
-		Answer: []dns.RR{newSRV("100.server1.development.region1.skydns.test. 3600 SRV 10 0 8080 server.")},
+		Answer: []dns.RR{newSRV("100.server1.development.region1.skydns.test. 3600 SRV 10 0 8080 server2.")},
 	},
 	// A Record Test
 	{
@@ -235,8 +236,8 @@ var dnsTestCases = []dnsTestCase{
 	},
 	// AAAAA Record Test
 	{
-		Qname: "105.server1.development.region1.skydns.test.", Qtype: dns.TypeAAAA,
-		Answer: []dns.RR{newAAAA("105.server1.development.region1.skydns.test. 3600 AAAA 2001::8:8:8:8")},
+		Qname: "105.server3.production.region2.skydns.test.", Qtype: dns.TypeAAAA,
+		Answer: []dns.RR{newAAAA("105.server3.production.region2.skydns.test. 3600 AAAA 2001::8:8:8:8")},
 	},
 	// Subdomain Test
 	{
