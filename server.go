@@ -45,8 +45,8 @@ func (s *server) Run() error {
 	mux.Handle(".", s)
 
 	s.group.Add(2)
-	go runDNSServer(s.group, mux, "tcp", s.config.DnsAddr, 0, s.config.WriteTimeout, s.config.ReadTimeout)
-	go runDNSServer(s.group, mux, "udp", s.config.DnsAddr, 0, s.config.WriteTimeout, s.config.ReadTimeout)
+	go runDNSServer(s.group, mux, "tcp", s.config.DnsAddr, s.config.ReadTimeout)
+	go runDNSServer(s.group, mux, "udp", s.config.DnsAddr, s.config.ReadTimeout)
 
 	s.group.Wait()
 	return nil
@@ -57,16 +57,14 @@ func (s *server) Stop() {
 	//s.group.Add(-2)
 }
 
-func runDNSServer(group *sync.WaitGroup, mux *dns.ServeMux, net, addr string, udpsize int, writeTimeout, readTimeout time.Duration) {
+func runDNSServer(group *sync.WaitGroup, mux *dns.ServeMux, net, addr string, readTimeout time.Duration) {
 	defer group.Done()
 
 	server := &dns.Server{
 		Addr:         addr,
 		Net:          net,
 		Handler:      mux,
-		UDPSize:      udpsize,
 		ReadTimeout:  readTimeout,
-		WriteTimeout: writeTimeout,
 	}
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatal(err)

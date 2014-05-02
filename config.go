@@ -27,7 +27,6 @@ type Config struct {
 	// List of ip:port, seperated by commas of recursive nameservers to forward queries to.
 	Nameservers  []string      `json:"nameservers,omitempty"`
 	ReadTimeout  time.Duration `json:"read_timeout,omitempty"`
-	WriteTimeout time.Duration `json:"write_timeout,omitempty"`
 	// Default priority on SRV records when none is given. Defaults to 10.
 	Priority uint16 `json:"priority"`
 	// Default TTL, in seconds, when none is given in etcd. Defaults to 3600.
@@ -43,7 +42,7 @@ type Config struct {
 }
 
 func LoadConfig(client *etcd.Client) (*Config, error) {
-	config := &Config{ReadTimeout: 0, WriteTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
+	config := &Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
 	n, err := client.Get("/skydns/config", false, false)
 	if err != nil {
 		c, err := dns.ClientConfigFromFile("/etc/resolv.conf")
@@ -67,9 +66,6 @@ func LoadConfig(client *etcd.Client) (*Config, error) {
 func setDefaults(config *Config) error {
 	if config.ReadTimeout == 0 {
 		config.ReadTimeout = 2 * time.Second
-	}
-	if config.WriteTimeout == 0 {
-		config.WriteTimeout = 2 * time.Second
 	}
 	if config.DnsAddr == "" {
 		config.DnsAddr = "127.0.0.1:53"
