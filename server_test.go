@@ -111,7 +111,7 @@ func TestDNSForward(t *testing.T) {
 }
 
 func TestDNS(t *testing.T) {
-	s := newTestServer(t)
+	s := newTestServerDNSSEC(t)
 	defer s.Stop()
 
 	for _, serv := range services {
@@ -123,88 +123,103 @@ func TestDNS(t *testing.T) {
 	for _, tc := range dnsTestCases {
 		m := new(dns.Msg)
 		m.SetQuestion(tc.Qname, tc.Qtype)
+		if tc.dnssec == true {
+			m.SetEdns0(4096, true)
+		}
 		resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
 		t.Logf("%s\n", resp)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(resp.Answer) != len(tc.Answer) {
-			t.Fatalf("Response for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
+			t.Fatalf("response for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
 		}
 		for i, a := range resp.Answer {
 			if a.Header().Name != tc.Answer[i].Header().Name {
-				t.Errorf("Answer %d should have a Header Name of %q, but has %q", i, tc.Answer[i].Header().Name, a.Header().Name)
+				t.Errorf("answer %d should have a Header Name of %q, but has %q", i, tc.Answer[i].Header().Name, a.Header().Name)
 			}
 			if a.Header().Ttl != tc.Answer[i].Header().Ttl {
 				t.Errorf("Answer %d should have a Header TTL of %d, but has %d", i, tc.Answer[i].Header().Ttl, a.Header().Ttl)
 			}
 			if a.Header().Rrtype != tc.Answer[i].Header().Rrtype {
-				t.Errorf("Answer %d should have a Header Response Type of %d, but has %d", i, tc.Answer[i].Header().Rrtype, a.Header().Rrtype)
+				t.Errorf("answer %d should have a header response type of %d, but has %d", i, tc.Answer[i].Header().Rrtype, a.Header().Rrtype)
 			}
 
 			switch x := a.(type) {
 			case *dns.SRV:
 				if x.Priority != tc.Answer[i].(*dns.SRV).Priority {
-					t.Errorf("Answer %d should have a Priority of %d, but has %d", i, tc.Answer[i].(*dns.SRV).Priority, x.Priority)
+					t.Errorf("answer %d should have a Priority of %d, but has %d", i, tc.Answer[i].(*dns.SRV).Priority, x.Priority)
 				}
 				if x.Weight != tc.Answer[i].(*dns.SRV).Weight {
-					t.Errorf("Answer %d should have a Weight of %d, but has %d", i, tc.Answer[i].(*dns.SRV).Weight, x.Weight)
+					t.Errorf("answer %d should have a Weight of %d, but has %d", i, tc.Answer[i].(*dns.SRV).Weight, x.Weight)
 				}
 				if x.Port != tc.Answer[i].(*dns.SRV).Port {
-					t.Errorf("Answer %d should have a Port of %d, but has %d", i, tc.Answer[i].(*dns.SRV).Port, x.Port)
+					t.Errorf("answer %d should have a Port of %d, but has %d", i, tc.Answer[i].(*dns.SRV).Port, x.Port)
 				}
 				if x.Target != tc.Answer[i].(*dns.SRV).Target {
-					t.Errorf("Answer %d should have a Target of %q, but has %q", i, tc.Answer[i].(*dns.SRV).Target, x.Target)
+					t.Errorf("answer %d should have a Target of %q, but has %q", i, tc.Answer[i].(*dns.SRV).Target, x.Target)
 				}
 			case *dns.A:
 				if x.A.String() != tc.Answer[i].(*dns.A).A.String() {
-					t.Errorf("Answer %d should have a Address of %q, but has %q", i, tc.Answer[i].(*dns.A).A.String(), x.A.String())
+					t.Errorf("answer %d should have a Address of %q, but has %q", i, tc.Answer[i].(*dns.A).A.String(), x.A.String())
 				}
 			case *dns.AAAA:
 				if x.AAAA.String() != tc.Answer[i].(*dns.AAAA).AAAA.String() {
-					t.Errorf("Answer %d should have a Address of %q, but has %q", i, tc.Answer[i].(*dns.AAAA).AAAA.String(), x.AAAA.String())
+					t.Errorf("answer %d should have a Address of %q, but has %q", i, tc.Answer[i].(*dns.AAAA).AAAA.String(), x.AAAA.String())
+				}
+			case *dns.DNSKEY:
+				tt := tc.Answer[i].(*dns.DNSKEY)
+				if x.Flags != tt.Flags {
+					t.Errorf("DNSKEY flags should be %q, but is %q", x.Flags, tt.Flags)
+				}
+				if x.Protocol != tt.Protocol {
+					t.Errorf("DNSKEY protocol should be %q, but is %q", x.Protocol, tt.Protocol)
+				}
+				if x.Algorithm != tt.Algorithm {
+					t.Errorf("DNSKEY algorithm should be %q, but is %q", x.Algorithm, tt.Algorithm)
+				}
+			case *dns.RRSIG:
+				tt := tc.Answer[i].(*dns.RRSIG)
+				if x.TypeCovered != tt.TypeCovered {
+					t.Errorf("RRSIG type-covered should be %q, but is %q", x.TypeCovered, tt.TypeCovered)
+				}
+				if x.Algorithm != tt.Algorithm {
+					t.Errorf("RRSIG algorithm should be %q, but is %q", x.Algorithm, tt.Algorithm)
+				}
+				if x.Labels != tt.Labels {
+					t.Errorf("RRSIG label should be %q, but is %q", x.Labels, tt.Labels)
+				}
+				if x.OrigTtl != tt.OrigTtl {
+					t.Errorf("RRSIG orig-ttl should be %q, but is %q", x.OrigTtl, tt.OrigTtl)
+				}
+				if x.KeyTag != tt.KeyTag {
+					t.Errorf("RRSIG key-tag should be %q, but is %q", x.KeyTag, tt.KeyTag)
+				}
+				if x.SignerName != tt.SignerName {
+					t.Errorf("RRSIG signer-name should be %q, but is %q", x.SignerName, tt.SignerName)
+				}
+				// NSEC3
+			}
+			for i, n := range resp.Ns {
+				// TODO(miek)
+				i = i
+				n = n
+			}
+			for i, e := range resp.Extra {
+				switch x := e.(type) {
+				case *dns.A:
+					if x.A.String() != tc.Extra[i].(*dns.A).A.String() {
+						t.Errorf("extra %d should have a address of %q, but has %q", i, tc.Extra[i].(*dns.A).A.String(), x.A.String())
+					}
+				case *dns.AAAA:
+					if x.AAAA.String() != tc.Extra[i].(*dns.AAAA).AAAA.String() {
+						t.Errorf("extra %d should have a address of %q, but has %q", i, tc.Extra[i].(*dns.AAAA).AAAA.String(), x.AAAA.String())
+					}
 				}
 			}
 		}
-		for i, n := range resp.Ns {
-			i = i
-			n = n
-		}
-		for i, e := range resp.Extra {
-			switch x := e.(type) {
-			case *dns.A:
-				if x.A.String() != tc.Extra[i].(*dns.A).A.String() {
-					t.Errorf("Extra %d should have a Address of %q, but has %q", i, tc.Extra[i].(*dns.A).A.String(), x.A.String())
-				}
-			case *dns.AAAA:
-				if x.AAAA.String() != tc.Extra[i].(*dns.AAAA).AAAA.String() {
-					t.Errorf("Extra %d should have a Address of %q, but has %q", i, tc.Extra[i].(*dns.AAAA).AAAA.String(), x.AAAA.String())
-				}
-			}
-
-		}
 	}
 }
-
-/*
-func TestDNSSEC(t *testing.T) {
-	s := newTestServer("", "", "")
-	defer s.Stop()
-
-	for _, m := range services {
-		s.registry.Add(m)
-	}
-	c := new(dns.Client)
-	for _, tc := range dnssecTestCases {
-		m := newMsg(tc)
-		resp, _, err := c.Exchange(m, "localhost:"+StrPort)
-		if err != nil {
-			t.Fatal(err)
-		}
-		sectionCheck(t, resp.Answer, tc.Answer)
-	}
-}
-*/
 
 var services = []*Service{
 	{Host: "server2", Port: 8080, key: "100.server1.development.region1.skydns.test."},
@@ -218,6 +233,7 @@ var services = []*Service{
 type dnsTestCase struct {
 	Qname  string
 	Qtype  uint16
+	dnssec bool
 	Answer []dns.RR
 	Ns     []dns.RR
 	Extra  []dns.RR
@@ -256,76 +272,23 @@ var dnsTestCases = []dnsTestCase{
 	},
 	// NXDOMAIN Test
 	// NODATA Test
-}
 
-var dnssecTestCases = []dnsTestCase{
+	// DNSSEC
+
 	// DNSKEY Test
 	{
 		Qname: "skydns.test.", Qtype: dns.TypeDNSKEY,
+		dnssec: true,
 		Answer: []dns.RR{newDNSKEY("skydns.test. 3600 DNSKEY 256 3 5 deadbeaf"),
 			newRRSIG("skydns.test. 3600 RRSIG DNSKEY 5 2 3600 0 0 51945 skydns.test. deadbeaf"),
 		},
 	},
 	// NXDOMAIN Test
 
-
 	// NODATA Test
 
 	// Wildcard Test
 }
-
-
-/*
-// DNSSEC tests
-
-func sectionCheck(t *testing.T, resp []dns.RR, tc []dns.RR) {
-	// check the RRs in the response
-	for i, r := range resp {
-		if r.Header().Name != tc[i].Header().Name {
-			t.Errorf("Response should have a Header Name of %q, but has %q", r.Header().Name, tc[i].Header().Name)
-		}
-		if r.Header().Rrtype != tc[i].Header().Rrtype {
-			t.Errorf("Response should have a Header Type of %q, but has %q", r.Header().Rrtype, tc[i].Header().Rrtype)
-		}
-		if r.Header().Ttl != tc[i].Header().Ttl {
-			t.Errorf("Response should have a Header Ttl of %q, but has %q", r.Header().Ttl, tc[i].Header().Ttl)
-		}
-		switch rt := r.(type) {
-		case *dns.DNSKEY:
-			tt := tc[i].(*dns.DNSKEY)
-			if rt.Flags != tt.Flags {
-				t.Errorf("DNSKEY flags should be %q, but is %q", rt.Flags, tt.Flags)
-			}
-			if rt.Protocol != tt.Protocol {
-				t.Errorf("DNSKEY protocol should be %q, but is %q", rt.Protocol, tt.Protocol)
-			}
-			if rt.Algorithm != tt.Algorithm {
-				t.Errorf("DNSKEY algorithm should be %q, but is %q", rt.Algorithm, tt.Algorithm)
-			}
-		case *dns.RRSIG:
-			tt := tc[i].(*dns.RRSIG)
-			if rt.TypeCovered != tt.TypeCovered {
-				t.Errorf("RRSIG type-covered should be %q, but is %q", rt.TypeCovered, tt.TypeCovered)
-			}
-			if rt.Algorithm != tt.Algorithm {
-				t.Errorf("RRSIG algorithm should be %q, but is %q", rt.Algorithm, tt.Algorithm)
-			}
-			if rt.Labels != tt.Labels {
-				t.Errorf("RRSIG label should be %q, but is %q", rt.Labels, tt.Labels)
-			}
-			if rt.OrigTtl != tt.OrigTtl {
-				t.Errorf("RRSIG orig-ttl should be %q, but is %q", rt.OrigTtl, tt.OrigTtl)
-			}
-			if rt.KeyTag != tt.KeyTag {
-				t.Errorf("RRSIG key-tag should be %q, but is %q", rt.KeyTag, tt.KeyTag)
-			}
-			if rt.SignerName != tt.SignerName {
-				t.Errorf("RRSIG signer-name should be %q, but is %q", rt.SignerName, tt.SignerName)
-			}
-		}
-	}
-}
-*/
 
 func newA(rr string) *dns.A           { r, _ := dns.NewRR(rr); return r.(*dns.A) }
 func newAAAA(rr string) *dns.AAAA     { r, _ := dns.NewRR(rr); return r.(*dns.AAAA) }
