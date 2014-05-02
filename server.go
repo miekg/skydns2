@@ -24,6 +24,7 @@ import (
 // * SSL
 // * Tests
 // * Re-introduce notion of region, i.e. a format for a domain name
+// * Docs
 
 type server struct {
 	domainLabels int
