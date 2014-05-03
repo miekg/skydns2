@@ -314,6 +314,10 @@ var dnsTestCases = []dnsTestCase{
 		Extra: []dns.RR{newAAAA("105.server3.production.region2.skydns.test. 3600 IN AAAA 2001::8:8:8:8")},
 	},
 	// NXDOMAIN Test
+	{
+		Qname: "doesnotexist.skydns.test.", Qtype: dns.TypeA,
+		Ns: []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+	},
 	// NODATA Test
 
 	// DNSSEC
