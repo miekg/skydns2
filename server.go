@@ -236,7 +236,7 @@ Redo:
 		goto Redo
 	}
 
-	s.config.log.Infof("error: failure to forward request %q", err)
+	s.config.log.Errorf("failure to forward request %q", err)
 	m := new(dns.Msg)
 	m.SetReply(req)
 	m.SetRcode(req, dns.RcodeServerFailure)
