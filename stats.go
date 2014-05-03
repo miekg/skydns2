@@ -26,12 +26,17 @@ func init() {
 	influxConfig = &influxdb.Config{}
 
 	//	TODO(miek): env vars
-	//	flag.BoolVar(&metricsToStdErr, "metricsToStdErr", false, "Write metrics to stderr periodically")
+	// GRAPHITE_SERVER
 	//	flag.StringVar(&graphiteServer, "graphiteServer", "", "Graphite Server connection string e.g. 127.0.0.1:2003")
+	// STATHAT_USER
 	//	flag.StringVar(&stathatUser, "stathatUser", "", "StatHat account for metrics")
+	// INFLUX_SERVER
 	//	flag.StringVar(&influxConfig.Host, "influxdbHost", "", "Influxdb host address for metrics")
+	// INFLUX_DATABASE
 	//	flag.StringVar(&influxConfig.Database, "influxdbDatabase", "", "Influxdb database name for metrics")
+	// INFLUX_USER
 	//	flag.StringVar(&influxConfig.Username, "influxdbUsername", "", "Influxdb username for metrics")
+	// INFLUX_PASSWORD
 	//	flag.StringVar(&influxConfig.Password, "influxdbPassword", "", "Influxdb password for metrics")
 
 	StatsForwardCount = metrics.NewCounter()
