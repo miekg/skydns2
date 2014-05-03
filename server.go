@@ -114,7 +114,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}()
 
 	if strings.HasSuffix(name, "dns."+s.config.Domain) || name == s.config.Domain {
-		// As we hijack dns.skydns.local we need to return NODATA for query for that name.
+		// As we hijack dns.skydns.local we need to return NODATA for that name.
 		if name == "dns."+s.config.Domain {
 			m.Ns = []dns.RR{s.NewSOA()}
 			return
@@ -258,6 +258,7 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 	if !r.Node.Dir { // single element
 		var serv *Service
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
+			s.config.log.Infof("failed to parse json: %s", err.Error())
 			return nil, err
 		}
 		ip := net.ParseIP(serv.Host)
@@ -277,6 +278,7 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 	}
 	nodes, err := s.loopNodes(&r.Node.Nodes, strings.Split(PathNoWildcard(name), "/"), star)
 	if err != nil {
+		s.config.log.Infof("failed to parse json: %s", err.Error())
 		return nil, err
 	}
 	for _, serv := range nodes {
@@ -323,6 +325,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 	if !r.Node.Dir { // single element
 		var serv *Service
 		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
+			s.config.log.Infof("failed to parse json: %s", err.Error())
 			return nil, nil, err
 		}
 		ip := net.ParseIP(serv.Host)
