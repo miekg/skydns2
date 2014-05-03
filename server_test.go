@@ -145,7 +145,6 @@ func TestDNS(t *testing.T) {
 			if a.Header().Rrtype != tc.Answer[i].Header().Rrtype {
 				t.Errorf("answer %d should have a header response type of %d, but has %d", i, tc.Answer[i].Header().Rrtype, a.Header().Rrtype)
 			}
-
 			switch x := a.(type) {
 			case *dns.SRV:
 				if x.Priority != tc.Answer[i].(*dns.SRV).Priority {
@@ -182,19 +181,19 @@ func TestDNS(t *testing.T) {
 			case *dns.RRSIG:
 				tt := tc.Answer[i].(*dns.RRSIG)
 				if x.TypeCovered != tt.TypeCovered {
-					t.Errorf("RRSIG type-covered should be %q, but is %q", x.TypeCovered, tt.TypeCovered)
+					t.Errorf("RRSIG type-covered should be %d, but is %d", x.TypeCovered, tt.TypeCovered)
 				}
 				if x.Algorithm != tt.Algorithm {
-					t.Errorf("RRSIG algorithm should be %q, but is %q", x.Algorithm, tt.Algorithm)
+					t.Errorf("RRSIG algorithm should be %d, but is %d", x.Algorithm, tt.Algorithm)
 				}
 				if x.Labels != tt.Labels {
-					t.Errorf("RRSIG label should be %q, but is %q", x.Labels, tt.Labels)
+					t.Errorf("RRSIG label should be %d, but is %d", x.Labels, tt.Labels)
 				}
 				if x.OrigTtl != tt.OrigTtl {
-					t.Errorf("RRSIG orig-ttl should be %q, but is %q", x.OrigTtl, tt.OrigTtl)
+					t.Errorf("RRSIG orig-ttl should be %d, but is %d", x.OrigTtl, tt.OrigTtl)
 				}
 				if x.KeyTag != tt.KeyTag {
-					t.Errorf("RRSIG key-tag should be %q, but is %q", x.KeyTag, tt.KeyTag)
+					t.Errorf("RRSIG key-tag should be %d, but is %d", x.KeyTag, tt.KeyTag)
 				}
 				if x.SignerName != tt.SignerName {
 					t.Errorf("RRSIG signer-name should be %q, but is %q", x.SignerName, tt.SignerName)
@@ -296,14 +295,14 @@ var dnsTestCases = []dnsTestCase{
 		Answer: []dns.RR{newDNSKEY("skydns.test. 3600 DNSKEY 256 3 5 deadbeaf"),
 			newRRSIG("skydns.test. 3600 RRSIG DNSKEY 5 2 3600 0 0 51945 skydns.test. deadbeaf")},
 	},
-	//	{
-	//		dnssec: true,
-	//		Qname:  "104.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
-	//		Answer: []dns.RR{newSRV("104.server1.development.region1.skydns.test. 3600 SRV 10 100 0 104.server1.development.region1.skydns.test."),
-	//			newRRSIG("skydns.test. 3600 RRSIG DNSKEY 5 6 3600 0 0 51945 skydns.test. deadbeaf")},
-	//		Extra: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1"),
-	//			newRRSIG("104.server1.developmen.region1.skydns.test. 3600 RRSIG A 5 6 3600 0 0 51945 skydns.test. deadbeaf")},
-	//	},
+		{
+			dnssec: true,
+			Qname:  "104.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
+			Answer: []dns.RR{newSRV("104.server1.development.region1.skydns.test. 3600 SRV 10 100 0 104.server1.development.region1.skydns.test."),
+				newRRSIG("104.server1.development.region1.skydns.test. 3600 RRSIG SRV 5 6 3600 0 0 51945 skydns.test. deadbeaf")},
+			Extra: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1"),
+				newRRSIG("104.server1.developmen.region1.skydns.test. 3600 RRSIG A 5 6 3600 0 0 51945 skydns.test. deadbeaf")},
+		},
 	// NXDOMAIN Test
 
 	// NODATA Test
