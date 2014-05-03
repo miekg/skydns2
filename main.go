@@ -13,22 +13,26 @@ import (
 )
 
 var (
-	machines = strings.Split(os.Getenv("ETCD_MACHINES"), ",") // URL to ectd
-	tlskey   = os.Getenv("ETCD_TLSKEY")                       // TLS private key path
-	tlspem   = os.Getenv("ETCD_TLSPEM")                       // X509 certificate
+	machines = os.Getenv("ETCD_MACHINES") // List of URLs to etcd
+	tlskey   = os.Getenv("ETCD_TLSKEY")   // TLS private key path
+	tlspem   = os.Getenv("ETCD_TLSPEM")   // X509 certificate
 )
 
 func newClient() (client *etcd.Client) {
-	if len(machines) == 0 {
-		machines = append(machines, "http://127.0.0.1:4001")
+	var etcdHosts []string
+	if machines == "" {
+		etcdHosts = []string{"http://127.0.0.1:4001"}
+	} else {
+		etcdHosts = strings.Split(machines, ",")
 	}
-	if strings.HasPrefix(machines[0], "https://") {
+	log.Println("Connecting to etcd cluster at", etcdHosts)
+	if strings.HasPrefix(etcdHosts[0], "https://") {
 		var err error
-		if client, err = etcd.NewTLSClient(machines, tlspem, tlskey, ""); err != nil {
+		if client, err = etcd.NewTLSClient(etcdHosts, tlspem, tlskey, ""); err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		client = etcd.NewClient(machines)
+		client = etcd.NewClient(etcdHosts)
 	}
 	client.SyncCluster()
 	return client
