@@ -88,69 +88,26 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 		if r[0].Header().Rrtype == dns.TypeRRSIG {
 			continue
 		}
-		key := cache.key(r)
-		if s := cache.search(key); s != nil {
-			if s.ValidityPeriod(now.Add(-24 * time.Hour)) {
-				m.Answer = append(m.Answer, s)
-				continue
-			}
-			cache.remove(key)
+		if sig, err := s.signSet(r, now, incep, expir); err == nil {
+			m.Answer = append(m.Answer, sig)
 		}
-		sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
-			sig1 := s.NewRRSIG(incep, expir)
-			if r[0].Header().Rrtype == dns.TypeNSEC3 {
-				sig1.OrigTtl = s.config.MinTtl
-				sig1.Header().Ttl = s.config.MinTtl
-			}
-			e := sig1.Sign(s.config.PrivKey, r)
-			if e != nil {
-				log.Printf("failed to sign: %s\n", e.Error())
-			}
-			return sig1, e
-		})
-		if err != nil {
-			continue
-		}
-		if !shared {
-			// is it possible to miss this, due the the c.dups > 0 in Do()? TODO(miek)
-			cache.insert(key, sig)
-		}
-		m.Answer = append(m.Answer, dns.Copy(sig).(*dns.RRSIG))
 	}
 	for _, r := range rrSets(m.Ns) {
 		if r[0].Header().Rrtype == dns.TypeRRSIG {
 			continue
 		}
-		key := cache.key(r)
-		if s := cache.search(key); s != nil {
-			if s.ValidityPeriod(now.Add(-24 * time.Hour)) {
-				m.Ns = append(m.Ns, s)
-				continue
-			}
-			cache.remove(key)
+		if sig, err := s.signSet(r, now, incep, expir); err == nil {
+			m.Ns = append(m.Ns, sig)
 		}
-		sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
-			sig1 := s.NewRRSIG(incep, expir)
-			if r[0].Header().Rrtype == dns.TypeNSEC3 {
-				sig1.OrigTtl = s.config.MinTtl
-				sig1.Header().Ttl = s.config.MinTtl
-			}
-			e := sig1.Sign(s.config.PrivKey, r)
-			if e != nil {
-				log.Printf("failed to sign: %s\n", e.Error())
-			}
-			return sig1, e
-		})
-		if err != nil {
+	}
+	for _, r := range rrSets(m.Extra) {
+		if r[0].Header().Rrtype == dns.TypeRRSIG {
 			continue
 		}
-		if !shared {
-			// is it possible to miss this, due the the c.dups > 0 in Do()? TODO(miek)
-			cache.insert(key, sig)
+		if sig, err := s.signSet(r, now, incep, expir); err == nil {
+			m.Extra = append(m.Extra, sig)
 		}
-		m.Ns = append(m.Ns, dns.Copy(sig).(*dns.RRSIG))
 	}
-	// TODO(miek): Forget the additional section for now
 	if bufsize >= 512 || bufsize <= 4096 {
 		m.Truncated = m.Len() > int(bufsize)
 	}
@@ -161,6 +118,35 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 	o.SetUDPSize(4096)
 	m.Extra = append(m.Extra, o)
 	return
+}
+
+func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.RRSIG, error) {
+	key := cache.key(r)
+	if sig := cache.search(key); sig != nil {
+		if sig.ValidityPeriod(now.Add(-24 * time.Hour)) {
+			return sig, nil
+		}
+		cache.remove(key)
+	}
+	sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
+		sig1 := s.NewRRSIG(incep, expir)
+		if r[0].Header().Rrtype == dns.TypeNSEC3 {
+			sig1.OrigTtl = s.config.MinTtl
+			sig1.Header().Ttl = s.config.MinTtl
+		}
+		e := sig1.Sign(s.config.PrivKey, r)
+		if e != nil {
+			log.Printf("failed to sign: %s\n", e.Error())
+		}
+		return sig1, e
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !shared {
+		cache.insert(key, sig)
+	}
+	return dns.Copy(sig).(*dns.RRSIG), nil
 }
 
 func (s *server) NewRRSIG(incep, expir uint32) *dns.RRSIG {
