@@ -24,7 +24,7 @@ type Config struct {
 	Domain string `json:"domain,omitempty"`
 	// The hostmaster responsible for this domain, defaults to hostmaster.<Domain>.
 	Hostmaster string `json:"hostmaster,omitempty"`
-	DNSSEC string `json:"dnssec,omitempty"`
+	DNSSEC     string `json:"dnssec,omitempty"`
 	// Round robin A/AAAA replies. Default is true.
 	RoundRobin bool `json:"round_robin,omitempty"`
 	// List of ip:port, seperated by commas of recursive nameservers to forward queries to.

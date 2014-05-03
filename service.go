@@ -40,7 +40,7 @@ func (s *Service) NewAAAA(name string, ttl uint32, ip net.IP) *dns.AAAA {
 }
 
 // NewNS returns a new NS record based on the Service.
-func(s *Service) NewNS(name string, ttl uint32, target string) *dns.NS {
+func (s *Service) NewNS(name string, ttl uint32, target string) *dns.NS {
 	return &dns.NS{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: ttl}, Ns: target}
 }
 
