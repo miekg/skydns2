@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"strings"
 	"time"
@@ -45,6 +46,8 @@ func LoadConfig(client *etcd.Client) (*Config, error) {
 	config := &Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
 	n, err := client.Get("/skydns/config", false, false)
 	if err != nil {
+		log.Println("error getting config from etcd:", err)
+		log.Println("falling back to local configuration")
 		c, err := dns.ClientConfigFromFile("/etc/resolv.conf")
 		if err != nil {
 			return nil, err
@@ -60,6 +63,7 @@ func LoadConfig(client *etcd.Client) (*Config, error) {
 	if err := setDefaults(config); err != nil {
 		return nil, err
 	}
+	log.Println("successfully initialized configuration from etcd")
 	return config, nil
 }
 
@@ -95,8 +99,8 @@ func setDefaults(config *Config) error {
 	config.Domain = dns.Fqdn(strings.ToLower(config.Domain))
 	config.DomainLabels = dns.CountLabel(config.Domain)
 	if config.DNSSEC != "" {
-		// For some reason the + are replaced by spaces in etcd. Re-replace them.
-		keyfile := strings.Replace(config.DNSSEC, " ",  "+", -1)
+		// For some reason the + are replaces by spaces in etcd. Re-replace them
+		keyfile := strings.Replace(config.DNSSEC, " ", "+", -1)
 		k, p, err := ParseKeyFile(keyfile)
 		if err != nil {
 			return err
