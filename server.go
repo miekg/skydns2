@@ -129,18 +129,15 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 		if q.Qtype == dns.TypeTXT && name == s.config.Domain {
 			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 0}
-			authors := 4
-			m.Answer = []dns.RR{
-				&dns.TXT{Hdr: hdr, Txt: []string{"Erik St. Martin"}},
-				&dns.TXT{Hdr: hdr, Txt: []string{"Brian Ketelsen"}},
-				&dns.TXT{Hdr: hdr, Txt: []string{"Miek Gieben"}},
-				&dns.TXT{Hdr: hdr, Txt: []string{"Michael Crosby"}},
+			authors := []string{"Erik St. Martin", "Brian Ketelsen", "Miek Gieben", "Michael Crosby"}
+			for _, a := range authors {
+				m.Answer = append(m.Answer, &dns.TXT{Hdr: hdr, Txt: []string{a}})
 			}
-			for j := 0; j < authors*(int(dns.Id())%4+1); j++ {
-				q := int(dns.Id()) % authors
-				p := int(dns.Id()) % authors
+			for j := 0; j < len(authors)*(int(dns.Id())%4+1); j++ {
+				q := int(dns.Id()) % len(authors)
+				p := int(dns.Id()) % len(authors)
 				if q == p {
-					p = (p + 1) % authors
+					p = (p + 1) % len(authors)
 				}
 				m.Answer[q], m.Answer[p] = m.Answer[p], m.Answer[q]
 			}
