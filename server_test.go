@@ -221,15 +221,6 @@ func TestDNS(t *testing.T) {
 	}
 }
 
-var services = []*Service{
-	{Host: "server2", Port: 8080, key: "100.server1.development.region1.skydns.test."},
-	{Host: "server2", Port: 80, key: "101.server2.production.region1.skydns.test."},
-	{Host: "server5", key: "102.server3.production.region2.skydns.test."},
-	{Host: "server6", key: "103.server4.development.region1.skydns.test."},
-	{Host: "10.0.0.1", key: "104.server1.development.region1.skydns.test."},
-	{Host: "2001::8:8:8:8", key: "105.server3.production.region2.skydns.test."},
-}
-
 type dnsTestCase struct {
 	Qname  string
 	Qtype  uint16
@@ -239,16 +230,30 @@ type dnsTestCase struct {
 	Extra  []dns.RR
 }
 
+var services = []*Service{
+	{Host: "server1", Port: 8080, key: "100.server1.development.region1.skydns.test."},
+	{Host: "server2", Port: 80, key: "101.server2.production.region1.skydns.test."},
+	{Host: "server3", key: "103.server4.development.region2.skydns.test."},
+	{Host: "10.0.0.1", key: "104.server1.development.region1.skydns.test."},
+	{Host: "2001::8:8:8:8", key: "105.server3.production.region2.skydns.test."},
+}
+
 var dnsTestCases = []dnsTestCase{
 	// Full Name Test
 	{
 		Qname: "100.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
-		Answer: []dns.RR{newSRV("100.server1.development.region1.skydns.test. 3600 SRV 10 0 8080 server2.")},
+		Answer: []dns.RR{newSRV("100.server1.development.region1.skydns.test. 3600 SRV 10 100 8080 server1.")},
 	},
 	// A Record Test
 	{
 		Qname: "104.server1.development.region1.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
+	},
+	// A Record Test with SRV
+	{
+		Qname: "104.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{newSRV("104.server1.development.region1.skydns.test. 3600 SRV 10 100 0 104.server1.development.region1.skydns.test.")},
+		Extra:  []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
 	},
 	// AAAAA Record Test
 	{
@@ -257,18 +262,26 @@ var dnsTestCases = []dnsTestCase{
 	},
 	// Subdomain Test
 	{
-		Qname: "production.region1.skydns.test.", Qtype: dns.TypeSRV,
-		Answer: []dns.RR{newSRV("region1.*.testservice.production.skydns.test. 30 SRV 10 100 9001 server2")},
-	},
-	// Wildcard Test
-	{
-		Qname: "production.*.skydns.test.", Qtype: dns.TypeSRV,
-		Answer: []dns.RR{newSRV("region1.*.testservice.production.skydns.test. 30 SRV 10 100 9001 server2")},
+		Qname: "region1.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{newSRV("region1.skydns.test. 3600 SRV 10 33 8080 server1."),
+			newSRV("region1.skydns.test. 3600 SRV 10 33 0 104.server1.development.region1.skydns.test."),
+			newSRV("region1.skydns.test. 3600 SRV 10 33 80 server2")},
+		Extra:  []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
 	},
 	// Wildcard Test
 	{
 		Qname: "*.region1.skydns.test.", Qtype: dns.TypeSRV,
-		Answer: []dns.RR{newSRV("region1.*.testservice.production.skydns.test. 30 SRV 10 100 9001 server2")},
+		Answer: []dns.RR{newSRV("*.region1.skydns.test. 3600 SRV 10 33 8080 server1."),
+			newSRV("*.region1.skydns.test. 3600 SRV 10 33 0 104.server1.development.region1.skydns.test."),
+			newSRV("*.region1.skydns.test. 3600 SRV 10 33 80 server2")},
+		Extra:  []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
+	},
+	// Wildcard Test
+	{
+		Qname: "production.*.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{newSRV("production.*.skydns.test. 3600 IN SRV 10 50 80 server2."),
+			newSRV("production.*.skydns.test. 3600 IN SRV 10 50 0 105.server3.production.region2.skydns.test.")},
+			Extra: []dns.RR{newAAAA("105.server3.production.region2.skydns.test. 3600 IN AAAA 2001::8:8:8:8")},
 	},
 	// NXDOMAIN Test
 	// NODATA Test
@@ -277,8 +290,8 @@ var dnsTestCases = []dnsTestCase{
 
 	// DNSKEY Test
 	{
-		Qname: "skydns.test.", Qtype: dns.TypeDNSKEY,
 		dnssec: true,
+		Qname:  "skydns.test.", Qtype: dns.TypeDNSKEY,
 		Answer: []dns.RR{newDNSKEY("skydns.test. 3600 DNSKEY 256 3 5 deadbeaf"),
 			newRRSIG("skydns.test. 3600 RRSIG DNSKEY 5 2 3600 0 0 51945 skydns.test. deadbeaf"),
 		},
