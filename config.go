@@ -46,8 +46,8 @@ func LoadConfig(client *etcd.Client) (*Config, error) {
 	config := &Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
 	n, err := client.Get("/skydns/config", false, false)
 	if err != nil {
-		log.Println("Error getting config from etcd:", err)
-		log.Println("Falling back to local configuration")
+		log.Println("error getting config from etcd:", err)
+		log.Println("falling back to local configuration")
 		c, err := dns.ClientConfigFromFile("/etc/resolv.conf")
 		if err != nil {
 			return nil, err
@@ -63,7 +63,7 @@ func LoadConfig(client *etcd.Client) (*Config, error) {
 	if err := setDefaults(config); err != nil {
 		return nil, err
 	}
-	log.Println("Successfully initialized configuration from etcd")
+	log.Println("successfully initialized configuration from etcd")
 	return config, nil
 }
 
