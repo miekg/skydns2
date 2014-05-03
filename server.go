@@ -112,6 +112,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}()
 
 	if strings.HasSuffix(name, "dns."+s.config.Domain) || name == s.config.Domain {
+		// As we hijack dns.skydns.local we need to return NODATA for query for that name.
+		if name == "dns."+s.config.Domain {
+			m.Ns = []dns.RR{s.NewSOA()}
+			return
+		}
 		if q.Qtype == dns.TypeSOA && name == s.config.Domain {
 			m.Answer = []dns.RR{s.NewSOA()}
 			return
