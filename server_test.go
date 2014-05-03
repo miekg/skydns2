@@ -329,6 +329,7 @@ var dnsTestCases = []dnsTestCase{
 		Answer: []dns.RR{newDNSKEY("skydns.test. 3600 DNSKEY 256 3 5 deadbeaf"),
 			newRRSIG("skydns.test. 3600 RRSIG DNSKEY 5 2 3600 0 0 51945 skydns.test. deadbeaf")},
 	},
+	// Signed Response Test
 	{
 		dnssec: true,
 		Qname:  "104.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
