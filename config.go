@@ -95,7 +95,7 @@ func setDefaults(config *Config) error {
 	config.Domain = dns.Fqdn(strings.ToLower(config.Domain))
 	config.DomainLabels = dns.CountLabel(config.Domain)
 	if config.DNSSEC != "" {
-		// For some reason the + are replaces by spaces in etcd. Re-replace them
+		// For some reason the + are replaced by spaces in etcd. Re-replace them.
 		keyfile := strings.Replace(config.DNSSEC, " ",  "+", -1)
 		k, p, err := ParseKeyFile(keyfile)
 		if err != nil {
