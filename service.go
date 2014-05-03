@@ -39,6 +39,11 @@ func (s *Service) NewAAAA(name string, ttl uint32, ip net.IP) *dns.AAAA {
 	return &dns.AAAA{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: ttl}, AAAA: ip}
 }
 
+// NewNS returns a new NS record based on the Service.
+func(s *Service) NewNS(name string, ttl uint32, target string) *dns.NS {
+	return &dns.NS{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: ttl}, Ns: target}
+}
+
 // Path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
 // the resulting key will be /skydns/local/skydns/staging/service .
 // If a name contains wildcards (*), the name will be chopped of before the (first) wildcard, and

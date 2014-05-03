@@ -170,6 +170,13 @@ Because we're returning A records and not SRV records, there are no ports
 listed, so this is only useful when you're querying for services running on
 ports known to you in advance.
 
+#### NS Records
+
+SkyDNS will internally synthesis name which will be used for NS records. The first
+nameserver used will be named `ns1.dns.skydns.local` in the default setup . Extra
+nameserver will be numbered ns2, ns3, etc. The subdomain `dns.skydns.local` will take
+precedence over services with a similar name.
+
 #### DNS Forwarding
 
 By specifying nameservers in SkyDNS's config, for instance `8.8.8.8:53,8.8.4.4:53`,

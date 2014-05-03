@@ -56,8 +56,8 @@ func newTestServer(t *testing.T) *server {
 	s.config.DnsAddr = "127.0.0.1:" + StrPort
 	s.config.Nameservers = []string{"8.8.4.4:53"}
 	s.config.Domain = "skydns.test."
+	s.config.Hostmaster = "hostmaster.skydns.test."
 	s.config.DomainLabels = 2
-	// some defaults copied over from config.go
 	s.config.Priority = 10
 	s.config.Ttl = 3600
 	go s.Run()
@@ -129,7 +129,7 @@ func TestDNS(t *testing.T) {
 		}
 		resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("failing: %s: %s\n", m.String(), err.Error())
 		}
 		t.Logf("%s\n", resp)
 		if len(resp.Answer) != len(tc.Answer) {
@@ -198,12 +198,27 @@ func TestDNS(t *testing.T) {
 				if x.SignerName != tt.SignerName {
 					t.Errorf("RRSIG signer-name should be %q, but is %q", x.SignerName, tt.SignerName)
 				}
-				// NSEC3
+			case *dns.SOA:
+				tt := tc.Answer[i].(*dns.SOA)
+				if x.Ns != tt.Ns {
+					t.Errorf("SOA nameserver should be %q, but is %q", x.Ns, tt.Ns)
+				}
+
 			}
 			for i, n := range resp.Ns {
-				// TODO(miek)
 				i = i
-				n = n
+				switch x := n.(type) {
+				case *dns.SOA:
+					tt := tc.Answer[i].(*dns.SOA)
+					if x.Ns != tt.Ns {
+						t.Errorf("SOA nameserver should be %q, but is %q", x.Ns, tt.Ns)
+					}
+				case *dns.NS:
+					tt := tc.Answer[i].(*dns.NS)
+					if x.Ns != tt.Ns {
+						t.Errorf("NS nameserver should be %q, but is %q", x.Ns, tt.Ns)
+					}
+				}
 			}
 			for i, e := range resp.Extra {
 				switch x := e.(type) {
@@ -243,6 +258,21 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "100.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
 		Answer: []dns.RR{newSRV("100.server1.development.region1.skydns.test. 3600 SRV 10 100 8080 server1.")},
+	},
+	// SOA Record Test
+	{
+		Qname: "skydns.test.", Qtype: dns.TypeSOA,
+		Answer: []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+	},
+	// NS Record Test
+	{
+		Qname: "skydns.test.", Qtype: dns.TypeNS,
+		Answer: []dns.RR{newNS("skydns.test. 3600 NS ns1.dns.skydns.test.")},
+	},
+	// A Record For NS Record Test
+	{
+		Qname: "ns1.dns.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{newA("ns1.dns.skydns.test. 3600 A 127.0.0.1")},
 	},
 	// A Record Test
 	{
@@ -295,14 +325,14 @@ var dnsTestCases = []dnsTestCase{
 		Answer: []dns.RR{newDNSKEY("skydns.test. 3600 DNSKEY 256 3 5 deadbeaf"),
 			newRRSIG("skydns.test. 3600 RRSIG DNSKEY 5 2 3600 0 0 51945 skydns.test. deadbeaf")},
 	},
-		{
-			dnssec: true,
-			Qname:  "104.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
-			Answer: []dns.RR{newSRV("104.server1.development.region1.skydns.test. 3600 SRV 10 100 0 104.server1.development.region1.skydns.test."),
-				newRRSIG("104.server1.development.region1.skydns.test. 3600 RRSIG SRV 5 6 3600 0 0 51945 skydns.test. deadbeaf")},
-			Extra: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1"),
-				newRRSIG("104.server1.developmen.region1.skydns.test. 3600 RRSIG A 5 6 3600 0 0 51945 skydns.test. deadbeaf")},
-		},
+	{
+		dnssec: true,
+		Qname:  "104.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{newSRV("104.server1.development.region1.skydns.test. 3600 SRV 10 100 0 104.server1.development.region1.skydns.test."),
+			newRRSIG("104.server1.development.region1.skydns.test. 3600 RRSIG SRV 5 6 3600 0 0 51945 skydns.test. deadbeaf")},
+		Extra: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1"),
+			newRRSIG("104.server1.developmen.region1.skydns.test. 3600 RRSIG A 5 6 3600 0 0 51945 skydns.test. deadbeaf")},
+	},
 	// NXDOMAIN Test
 
 	// NODATA Test
@@ -315,3 +345,5 @@ func newAAAA(rr string) *dns.AAAA     { r, _ := dns.NewRR(rr); return r.(*dns.AA
 func newSRV(rr string) *dns.SRV       { r, _ := dns.NewRR(rr); return r.(*dns.SRV) }
 func newDNSKEY(rr string) *dns.DNSKEY { r, _ := dns.NewRR(rr); return r.(*dns.DNSKEY) }
 func newRRSIG(rr string) *dns.RRSIG   { r, _ := dns.NewRR(rr); return r.(*dns.RRSIG) }
+func newSOA(rr string) *dns.SOA       { r, _ := dns.NewRR(rr); return r.(*dns.SOA) }
+func newNS(rr string) *dns.NS         { r, _ := dns.NewRR(rr); return r.(*dns.NS) }

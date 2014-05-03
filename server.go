@@ -6,6 +6,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"net"
@@ -110,18 +111,61 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		w.WriteMsg(m)
 	}()
 
-	if name == s.config.Domain {
-		switch q.Qtype {
-		case dns.TypeDNSKEY:
+	if strings.HasSuffix(name, "dns."+s.config.Domain) || name == s.config.Domain {
+		if q.Qtype == dns.TypeSOA && name == s.config.Domain {
+			m.Answer = []dns.RR{s.NewSOA()}
+			return
+		}
+		if q.Qtype == dns.TypeDNSKEY && name == s.config.Domain {
 			if s.config.PubKey != nil {
 				m.Answer = append(m.Answer, s.config.PubKey)
 				return
 			}
-		case dns.TypeSOA:
-			m.Answer = []dns.RR{s.NewSOA()}
+		}
+		if q.Qtype == dns.TypeTXT && name == s.config.Domain {
+			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 0}
+			authors := 4
+			m.Answer = []dns.RR{
+				&dns.TXT{Hdr: hdr, Txt: []string{"Erik St. Martin"}},
+				&dns.TXT{Hdr: hdr, Txt: []string{"Brian Ketelsen"}},
+				&dns.TXT{Hdr: hdr, Txt: []string{"Miek Gieben"}},
+				&dns.TXT{Hdr: hdr, Txt: []string{"Michael Crosby"}},
+			}
+			for j := 0; j < authors*(int(dns.Id())%4+1); j++ {
+				q := int(dns.Id()) % authors
+				p := int(dns.Id()) % authors
+				if q == p {
+					p = (p + 1) % authors
+				}
+				m.Answer[q], m.Answer[p] = m.Answer[p], m.Answer[q]
+			}
+			return
+		}
+		for i, c := range s.client.GetCluster() {
+			u, e := url.Parse(c)
+			if e != nil {
+				continue
+			}
+			h, _, e := net.SplitHostPort(u.Host)
+			if e != nil {
+				continue
+			}
+			ip := net.ParseIP(h)
+			serv := new(Service)
+			switch {
+			case name == s.config.Domain && q.Qtype == dns.TypeNS:
+				m.Answer = append(m.Answer, serv.NewNS(s.config.Domain, s.config.Ttl, fmt.Sprintf("ns%d.dns.%s", i+1, s.config.Domain)))
+			case ip.To4() != nil && q.Qtype == dns.TypeA && q.Name == fmt.Sprintf("ns%d.dns.%s", i+1, s.config.Domain):
+				m.Answer = append(m.Answer, serv.NewA(q.Name, s.config.Ttl, ip.To4()))
+			case ip.To4() == nil && q.Qtype == dns.TypeAAAA && q.Name == fmt.Sprintf("ns%d.dns.%s", i+1, s.config.Domain):
+				m.Answer = append(m.Answer, serv.NewAAAA(q.Name, s.config.Ttl, ip.To16()))
+			}
+		}
+		if len(m.Answer) > 0 {
 			return
 		}
 	}
+
 	if q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA {
 		records, err := s.AddressRecords(q)
 		if err != nil {
@@ -198,27 +242,6 @@ Redo:
 
 func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
-	if name == "master."+s.config.Domain || name == s.config.Domain {
-		for _, m := range s.client.GetCluster() {
-			u, e := url.Parse(m)
-			if e != nil {
-				continue
-			}
-			h, _, e := net.SplitHostPort(u.Host)
-			if e != nil {
-				continue
-			}
-			ip := net.ParseIP(h)
-			serv := new(Service) // noop for now, but will be actually do something when create A/AAAA
-			switch {
-			case ip.To4() != nil && q.Qtype == dns.TypeA:
-				records = append(records, serv.NewA(q.Name, s.config.Ttl, ip.To4()))
-			case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
-				records = append(records, serv.NewAAAA(q.Name, s.config.Ttl, ip.To16()))
-			}
-		}
-		return
-	}
 	path, star := Path(name)
 	r, err := s.client.Get(path, false, true)
 	if err != nil {
@@ -347,8 +370,8 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 // SOA returns a SOA record for this SkyDNS instance.
 func (s *server) NewSOA() dns.RR {
 	return &dns.SOA{Hdr: dns.RR_Header{Name: s.config.Domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: s.config.Ttl},
-		Ns:      "master." + s.config.Domain,
-		Mbox:    "hostmaster." + s.config.Domain,
+		Ns:      "ns1.dns." + s.config.Domain,
+		Mbox:    s.config.Hostmaster,
 		Serial:  uint32(time.Now().Truncate(time.Hour).Unix()),
 		Refresh: 28800,
 		Retry:   7200,

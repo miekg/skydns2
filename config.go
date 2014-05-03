@@ -22,6 +22,8 @@ type Config struct {
 	DnsAddr string `json:"dns_addr,omitempty"`
 	// The domain SkyDNS is authoritative for, defaults to skydns.local.
 	Domain string `json:"domain,omitempty"`
+	// The hostmaster responsible for this domain, defaults to hostmaster.<Domain>.
+	Hostmaster string `json:"hostmaster,omitempty"`
 	DNSSEC string `json:"dnssec,omitempty"`
 	// Round robin A/AAAA replies. Default is true.
 	RoundRobin bool `json:"round_robin,omitempty"`
@@ -76,6 +78,12 @@ func setDefaults(config *Config) error {
 	if config.Domain == "" {
 		config.Domain = "skydns.local"
 	}
+	if config.Hostmaster == "" {
+		config.Hostmaster = "hostmaster.skydns.local."
+	}
+	// People probably don't know that SOA's email addresses cannot
+	// contain @-signs, replace them with dots
+	config.Hostmaster = dns.Fqdn(strings.Replace(config.Hostmaster, "@", ".", -1))
 	if config.MinTtl == 0 {
 		config.MinTtl = 60
 	}
