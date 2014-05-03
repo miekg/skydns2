@@ -65,11 +65,11 @@ func newTestServer(t *testing.T) *server {
 }
 
 func newTestServerDNSSEC(t *testing.T) *server {
+	var err error
 	s := newTestServer(t)
 	s.config.PubKey = newDNSKEY("skydns.test. IN DNSKEY 256 3 5 AwEAAaXfO+DOBMJsQ5H4TfiabwSpqE4cGL0Qlvh5hrQumrjr9eNSdIOjIHJJKCe56qBU5mH+iBlXP29SVf6UiiMjIrAPDVhClLeWFe0PC+XlWseAyRgiLHdQ8r95+AfkhO5aZgnCwYf9FGGSaT0+CRYN+PyDbXBTLK5FN+j5b6bb7z+d")
 	s.config.KeyTag = s.config.PubKey.KeyTag()
-	s.config.PrivKey, _ = s.config.PubKey.ReadPrivateKey(strings.NewReader(`
-Private-key-format: v1.3
+	s.config.PrivKey, err = s.config.PubKey.ReadPrivateKey(strings.NewReader(`Private-key-format: v1.3
 Algorithm: 5 (RSASHA1)
 Modulus: pd874M4EwmxDkfhN+JpvBKmoThwYvRCW+HmGtC6auOv141J0g6MgckkoJ7nqoFTmYf6IGVc/b1JV/pSKIyMisA8NWEKUt5YV7Q8L5eVax4DJGCIsd1Dyv3n4B+SE7lpmCcLBh/0UYZJpPT4JFg34/INtcFMsrkU36PlvptvvP50=
 PublicExponent: AQAB
@@ -79,9 +79,10 @@ Prime2: wmxLpp9rTzU4OREEVwF43b/TxSUBlUq6W83n2XP8YrCm1nS480w4HCUuXfON1ncGYHUuq+v4
 Exponent1: wkdTngUcIiau67YMmSFBoFOq9Lldy9HvpVzK/R0e5vDsnS8ZKTb4QJJ7BaG2ADpno7pISvkoJaRttaEWD3a8rQ==
 Exponent2: YrC8OglEXIGkV3tm2494vf9ozPL6+cBkFsPPg9dXbvVCyyuW0pGHDeplvfUqs4nZp87z8PsoUL+LAUqdldnwcQ==
 Coefficient: mMFr4+rDY5V24HZU3Oa5NEb55iQ56ZNa182GnNhWqX7UqWjcUUGjnkCy40BqeFAQ7lp52xKHvP5Zon56mwuQRw==
-Created: 20140126132645
-Publish: 20140126132645
-Activate: 20140126132645`), "stdin")
+`), "stdin")
+	if err != nil {
+		t.Fatal(err)
+	}
 	return s
 }
 
@@ -127,10 +128,10 @@ func TestDNS(t *testing.T) {
 			m.SetEdns0(4096, true)
 		}
 		resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
-		t.Logf("%s\n", resp)
 		if err != nil {
 			t.Fatal(err)
 		}
+		t.Logf("%s\n", resp)
 		if len(resp.Answer) != len(tc.Answer) {
 			t.Fatalf("response for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
 		}
