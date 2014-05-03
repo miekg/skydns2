@@ -8,12 +8,14 @@ package main
 
 import (
 	"encoding/json"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/coreos/go-log/log"
 	"github.com/miekg/dns"
 )
 
@@ -60,6 +62,8 @@ func newTestServer(t *testing.T) *server {
 	s.config.DomainLabels = 2
 	s.config.Priority = 10
 	s.config.Ttl = 3600
+	s.config.log = log.New("skydns", false,
+		log.CombinedSink(os.Stdout, "[%s] %s %-9s | %s\n", []string{"prefix", "time", "priority", "message"}))
 	go s.Run()
 	return s
 }
