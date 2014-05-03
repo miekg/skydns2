@@ -7,12 +7,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/coreos/go-log/log"
 	"github.com/miekg/dns"
 )
 
@@ -42,14 +43,19 @@ type Config struct {
 	KeyTag       uint16         `json:"-"`
 	PrivKey      dns.PrivateKey `json:"-"`
 	DomainLabels int            `json:"-"`
+
+	log *log.Logger	`json:"-"`
 }
 
 func LoadConfig(client *etcd.Client) (*Config, error) {
 	config := &Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
+	config.log = log.New("skydns", false,
+		log.CombinedSink(os.Stdout, "[%s] %s %-9s | %s\n", []string{"prefix", "time", "priority", "message"}))
+
 	n, err := client.Get("/skydns/config", false, false)
 	if err != nil {
 		// TODO(miek): split out: can't connect from can't find key
-		log.Printf("falling back to default configuration")
+		config.log.Info("falling back to default configuration")
 		c, err := dns.ClientConfigFromFile("/etc/resolv.conf")
 		if err != nil {
 			return nil, err

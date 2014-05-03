@@ -7,7 +7,6 @@ package main
 import (
 	"crypto/sha1"
 	"encoding/base32"
-	"log"
 	"os"
 	"strings"
 	"sync"
@@ -140,7 +139,7 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 		}
 		e := sig1.Sign(s.config.PrivKey, r)
 		if e != nil {
-			log.Printf("failed to sign: %s\n", e.Error())
+			s.config.log.Errorf("failed to sign: %s\n", e.Error())
 		}
 		return sig1, e
 	})
@@ -311,8 +310,6 @@ func (c *sigCache) key(rrs []dns.RR) string {
 		case *dns.DNSKEY:
 		case *dns.NS:
 		case *dns.TXT:
-		default:
-			log.Printf("signature for unhandled type %T seen", t)
 		}
 	}
 	return string(h.Sum(i))

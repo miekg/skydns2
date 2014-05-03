@@ -48,6 +48,7 @@ func (s *server) Run() error {
 	s.group.Add(2)
 	go runDNSServer(s.group, mux, "tcp", s.config.DnsAddr, s.config.ReadTimeout)
 	go runDNSServer(s.group, mux, "udp", s.config.DnsAddr, s.config.ReadTimeout)
+	s.config.log.Printf("connected to etcd cluster at %s", machines)
 
 	s.group.Wait()
 	return nil
@@ -235,7 +236,7 @@ Redo:
 		goto Redo
 	}
 
-	log.Printf("error: failure to forward request %q", err)
+	s.config.log.Infof("error: failure to forward request %q", err)
 	m := new(dns.Msg)
 	m.SetReply(req)
 	m.SetRcode(req, dns.RcodeServerFailure)

@@ -22,7 +22,6 @@ func newClient() (client *etcd.Client) {
 	if len(machines) == 1 && machines[0] == "" {
 		machines[0] = "http://127.0.0.1:4001"
 	}
-	log.Printf("connecting to etcd cluster at %s", machines)
 	if strings.HasPrefix(machines[0], "https://") {
 		var err error
 		if client, err = etcd.NewTLSClient(machines, tlspem, tlskey, ""); err != nil {
