@@ -23,8 +23,7 @@ import (
 // * Priority is fixed to 20
 // * Fix DNSSEC
 // * SSL
-// * Tests
-// * Re-introduce notion of region, i.e. a format for a domain name
+// * Re-introduce notion of region, i.e. a format for a domain name?
 // * Docs
 
 type server struct {
@@ -78,6 +77,7 @@ func runDNSServer(group *sync.WaitGroup, mux *dns.ServeMux, net, addr string, re
 func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
+	StatsRequestCount.Inc(1)
 
 	if !strings.HasSuffix(name, s.config.Domain) {
 		s.ServeDNSForward(w, req)
@@ -103,8 +103,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 		// Check if we need to do DNSSEC and sign the reply.
-		if s.config.PubKey != nil {
-			if opt := req.IsEdns0(); opt != nil && opt.Do() {
+		if opt := req.IsEdns0(); opt != nil && opt.Do() {
+			StatsDnssecOkCount.Inc(1)
+			if s.config.PubKey != nil {
 				s.Denial(m)
 				s.sign(m, opt.UDPSize())
 			}
@@ -176,6 +177,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				if e.ErrorCode == 100 {
 					m.SetRcode(req, dns.RcodeNameError)
 					m.Ns = []dns.RR{s.NewSOA()}
+					StatsNameErrorCount.Inc(1)
 					return
 				}
 			}
@@ -189,6 +191,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				if e.ErrorCode == 100 {
 					m.SetRcode(req, dns.RcodeNameError)
 					m.Ns = []dns.RR{s.NewSOA()}
+					StatsNameErrorCount.Inc(1)
 					return
 				}
 			}
@@ -197,12 +200,14 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.Extra = append(m.Extra, extra...)
 	}
 	if len(m.Answer) == 0 { // NODATA response
+		StatsNoDataCount.Inc(1)
 		m.Ns = []dns.RR{s.NewSOA()}
 	}
 }
 
 // ServeDNSForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
+	StatsDnssecOkCount.Inc(1)
 	if len(s.config.Nameservers) == 0 {
 		m := new(dns.Msg)
 		m.SetReply(req)
