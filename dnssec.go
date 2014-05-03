@@ -21,7 +21,6 @@ import (
 // the NSEC3 that covers the qname.
 // Ofcourse sometimes we need a wildcard bla bla
 
-
 var (
 	cache    *sigCache = newCache()
 	inflight *single   = new(single)
