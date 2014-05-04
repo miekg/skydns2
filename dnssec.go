@@ -131,13 +131,9 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 	StatsDnssecCacheMiss.Inc(1)
 	sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
 		sig1 := s.NewRRSIG(incep, expir)
-		if r[0].Header().Rrtype == dns.TypeNSEC3 {
-			sig1.OrigTtl = s.config.MinTtl
-			sig1.Header().Ttl = s.config.MinTtl
-		}
+		sig1.Header().Ttl = r[0].Header().Ttl
 		if r[0].Header().Rrtype == dns.TypeTXT {
 			sig1.OrigTtl = 0
-			sig1.Header().Ttl = 0
 		}
 		e := sig1.Sign(s.config.PrivKey, r)
 		if e != nil {
