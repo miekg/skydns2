@@ -437,3 +437,27 @@ func BenchmarkDNSWildcard(b *testing.B) {
 		c.Exchange(m, "127.0.0.1:"+StrPort)
 	}
 }
+
+func BenchmarkDNSSECSingle(b *testing.B) {
+	b.StopTimer()
+	t := new(testing.T)
+	s := newTestServerDNSSEC(t)
+	defer s.Stop()
+
+	serv := services[0]
+	addService(t, s, serv.key, 0, &Service{Host: serv.Host, Port: serv.Port})
+	defer delService(t, s, serv.key)
+
+	c := new(dns.Client)
+	tc := dnsTestCases[0]
+	m := new(dns.Msg)
+	m.SetQuestion(tc.Qname, tc.Qtype)
+	m.SetEdns0(4096, true)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		c.Exchange(m, "127.0.0.1:"+StrPort)
+	}
+}
+
+// BenchmarkDNSSECError(b *testing.B) {}
