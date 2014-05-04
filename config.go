@@ -50,7 +50,7 @@ type Config struct {
 func LoadConfig(client *etcd.Client) (*Config, error) {
 	config := &Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
 	config.log = log.New("skydns", false,
-		log.CombinedSink(os.Stdout, "[%s] %s %-9s | %s\n", []string{"prefix", "time", "priority", "message"}))
+		log.CombinedSink(os.Stderr, "[%s] %s %-9s | %s\n", []string{"prefix", "time", "priority", "message"}))
 
 	n, err := client.Get("/skydns/config", false, false)
 	if err != nil {
