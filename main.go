@@ -43,6 +43,8 @@ func main() {
 	}
 	s := NewServer(config, client)
 
+	statsCollect()
+
 	if err := s.Run(); err != nil {
 		log.Fatal(err)
 	}

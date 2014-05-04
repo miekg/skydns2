@@ -45,6 +45,12 @@ To set the configuration, use something like:
 
 SkyDNS needs to be restarted for configuration changes to take effect.
 
+### Environment Variables
+
+SkyDNS uses these environment variables:
+
+TODO(miek): list them here
+
 ## Service Announcements
 Announce your service by submitting JSON over HTTP to etcd with information about your service.
 This information will then be available for queries via DNS.

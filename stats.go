@@ -9,36 +9,32 @@ import (
 	"github.com/rcrowley/go-metrics/influxdb"
 	"github.com/rcrowley/go-metrics/stathat"
 	"net"
+	"os"
 )
 
 var (
-	StatsForwardCount   metrics.Counter
-	StatsRequestCount   metrics.Counter
-	StatsDnssecOkCount  metrics.Counter
-	StatsDnssecCacheMiss  metrics.Counter
-	StatsNameErrorCount metrics.Counter
-	StatsNoDataCount    metrics.Counter
+	StatsForwardCount    metrics.Counter
+	StatsRequestCount    metrics.Counter
+	StatsDnssecOkCount   metrics.Counter
+	StatsDnssecCacheMiss metrics.Counter
+	StatsNameErrorCount  metrics.Counter
+	StatsNoDataCount     metrics.Counter
 
-	graphiteServer, stathatUser string
-	influxConfig                *influxdb.Config
+	influxConfig   *influxdb.Config
+	graphiteServer = os.Getenv("GRAPHITE_SERVER")
+	stathatUser    = os.Getenv("STATHAT_USER")
+	influxServer   = os.Getenv("INFLUX_SERVER")
+	influxDatabase = os.Getenv("INFLUX_DATABASE")
+	influxUser     = os.Getenv("INFLUX_USER")
+	influxPassword = os.Getenv("INFLUX_PASSWORD")
 )
 
 func init() {
 	influxConfig = &influxdb.Config{}
-
-	//	TODO(miek): env vars
-	// GRAPHITE_SERVER
-	//	flag.StringVar(&graphiteServer, "graphiteServer", "", "Graphite Server connection string e.g. 127.0.0.1:2003")
-	// STATHAT_USER
-	//	flag.StringVar(&stathatUser, "stathatUser", "", "StatHat account for metrics")
-	// INFLUX_SERVER
-	//	flag.StringVar(&influxConfig.Host, "influxdbHost", "", "Influxdb host address for metrics")
-	// INFLUX_DATABASE
-	//	flag.StringVar(&influxConfig.Database, "influxdbDatabase", "", "Influxdb database name for metrics")
-	// INFLUX_USER
-	//	flag.StringVar(&influxConfig.Username, "influxdbUsername", "", "Influxdb username for metrics")
-	// INFLUX_PASSWORD
-	//	flag.StringVar(&influxConfig.Password, "influxdbPassword", "", "Influxdb password for metrics")
+	influxConfig.Host = influxServer
+	influxConfig.Database = influxDatabase
+	influxConfig.Username = influxUser
+	influxConfig.Password = influxPassword
 
 	StatsForwardCount = metrics.NewCounter()
 	metrics.Register("skydns-forward-requests", StatsForwardCount)
@@ -59,15 +55,14 @@ func init() {
 	metrics.Register("skydns-nodata-responses", StatsNoDataCount)
 }
 
-func Collect() {
-	if len(graphiteServer) > 1 {
+func statsCollect() {
+	if graphiteServer != "" {
 		addr, err := net.ResolveTCPAddr("tcp", graphiteServer)
 		if err != nil {
 			go metrics.Graphite(metrics.DefaultRegistry, 10e9, "skydns", addr)
 		}
 	}
-
-	if len(stathatUser) > 1 {
+	if stathatUser != "" {
 		go stathat.Stathat(metrics.DefaultRegistry, 10e9, stathatUser)
 	}
 

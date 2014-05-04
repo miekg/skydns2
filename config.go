@@ -44,7 +44,7 @@ type Config struct {
 	PrivKey      dns.PrivateKey `json:"-"`
 	DomainLabels int            `json:"-"`
 
-	log *log.Logger	`json:"-"`
+	log *log.Logger `json:"-"`
 }
 
 func LoadConfig(client *etcd.Client) (*Config, error) {
