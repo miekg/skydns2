@@ -8,7 +8,6 @@ package main
 
 import (
 	"encoding/json"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -63,8 +62,7 @@ func newTestServer(t *testing.T) *server {
 	s.config.DomainLabels = 2
 	s.config.Priority = 10
 	s.config.Ttl = 3600
-	s.config.log = log.New("skydns", false,
-		log.CombinedSink(os.Stdout, "[%s] %s %-9s | %s\n", []string{"prefix", "time", "priority", "message"}))
+	s.config.log = log.New("skydns", false, log.NullSink())
 	go s.Run()
 	return s
 }
@@ -395,3 +393,24 @@ func newNS(rr string) *dns.NS         { r, _ := dns.NewRR(rr); return r.(*dns.NS
 func newDNSKEY(rr string) *dns.DNSKEY { r, _ := dns.NewRR(rr); return r.(*dns.DNSKEY) }
 func newRRSIG(rr string) *dns.RRSIG   { r, _ := dns.NewRR(rr); return r.(*dns.RRSIG) }
 func newNNSEC3(rr string) *dns.NSEC3  { r, _ := dns.NewRR(rr); return r.(*dns.NSEC3) }
+
+func BenchmarkDNS(b *testing.B) {
+	b.StopTimer()
+	t := new(testing.T)
+	s := newTestServerDNSSEC(t)
+	defer s.Stop()
+
+	serv := services[0]
+	addService(t, s, serv.key, 0, &Service{Host: serv.Host, Port: serv.Port})
+	defer delService(t, s, serv.key)
+
+	c := new(dns.Client)
+	tc := dnsTestCases[0]
+	m := new(dns.Msg)
+	m.SetQuestion(tc.Qname, tc.Qtype)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		c.Exchange(m, "127.0.0.1:"+StrPort)
+	}
+}
