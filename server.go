@@ -19,18 +19,10 @@ import (
 	"github.com/miekg/dns"
 )
 
-// TODO
-// * Priority is fixed to 20
-// * Fix DNSSEC
-// * SSL
-// * Re-introduce notion of region, i.e. a format for a domain name?
-// * Docs
-
 type server struct {
-	client       *etcd.Client
-	config       *Config
-
-	group *sync.WaitGroup
+	client *etcd.Client
+	config *Config
+	group  *sync.WaitGroup
 }
 
 // Newserver returns a new server.
@@ -176,6 +168,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				if e.ErrorCode == 100 {
 					m.SetRcode(req, dns.RcodeNameError)
 					m.Ns = []dns.RR{s.NewSOA()}
+					m.Ns[0].Header().Ttl = s.config.MinTtl
 					StatsNameErrorCount.Inc(1)
 					return
 				}
@@ -190,6 +183,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				if e.ErrorCode == 100 {
 					m.SetRcode(req, dns.RcodeNameError)
 					m.Ns = []dns.RR{s.NewSOA()}
+					m.Ns[0].Header().Ttl = s.config.MinTtl
 					StatsNameErrorCount.Inc(1)
 					return
 				}
@@ -201,6 +195,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	if len(m.Answer) == 0 { // NODATA response
 		StatsNoDataCount.Inc(1)
 		m.Ns = []dns.RR{s.NewSOA()}
+		m.Ns[0].Header().Ttl = s.config.MinTtl
 	}
 }
 
