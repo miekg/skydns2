@@ -27,7 +27,6 @@ import (
 // * Docs
 
 type server struct {
-	domainLabels int
 	client       *etcd.Client
 	config       *Config
 
