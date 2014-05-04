@@ -15,6 +15,7 @@ var (
 	StatsForwardCount   metrics.Counter
 	StatsRequestCount   metrics.Counter
 	StatsDnssecOkCount  metrics.Counter
+	StatsDnssecCacheMiss  metrics.Counter
 	StatsNameErrorCount metrics.Counter
 	StatsNoDataCount    metrics.Counter
 
@@ -44,6 +45,9 @@ func init() {
 
 	StatsDnssecOkCount = metrics.NewCounter()
 	metrics.Register("skydns-dnssecok-requests", StatsDnssecOkCount)
+
+	StatsDnssecCacheMiss = metrics.NewCounter()
+	metrics.Register("skydns-dnssec-cache-miss", StatsDnssecCacheMiss)
 
 	StatsRequestCount = metrics.NewCounter()
 	metrics.Register("skydns-requests", StatsRequestCount)

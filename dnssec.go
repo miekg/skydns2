@@ -122,11 +122,13 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.RRSIG, error) {
 	key := cache.key(r)
 	if sig := cache.search(key); sig != nil {
-		if sig.ValidityPeriod(now.Add(-24 * time.Hour)) {
+		if sig.ValidityPeriod(now.Add(-3 * time.Hour)) {
 			return sig, nil
 		}
 		cache.remove(key)
 	}
+	s.config.log.Infof("cache miss for %s type %d", r[0].Header().Name, r[0].Header().Rrtype)
+	StatsDnssecCacheMiss.Inc(1)
 	sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
 		sig1 := s.NewRRSIG(incep, expir)
 		if r[0].Header().Rrtype == dns.TypeNSEC3 {
@@ -139,7 +141,7 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 		}
 		e := sig1.Sign(s.config.PrivKey, r)
 		if e != nil {
-			s.config.log.Errorf("failed to sign: %s\n", e.Error())
+			s.config.log.Errorf("failed to sign: %s", e.Error())
 		}
 		return sig1, e
 	})
