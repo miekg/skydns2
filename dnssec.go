@@ -52,24 +52,23 @@ func ParseKeyFile(file string) (*dns.DNSKEY, dns.PrivateKey, error) {
 // Denial creates (if needed) NSEC3 records that are included in the reply.
 func (s *server) Denial(m *dns.Msg) {
 	if m.Rcode == dns.RcodeNameError {
-		// qname nsec
-		nsec3 := s.NewNSEC3(m.Question[0].Name)
+		// Deny Qname nsec3
+		nsec3 := s.NewNSEC3NameError(m.Question[0].Name)
 		m.Ns = append(m.Ns, nsec3)
-		// wildcard nsec
-		//		idx := dns.Split(m.Question[0].Name)
-		//		wildcard := "*." + m.Question[0].Name[idx[0]:]
-		//		nsec2 := s.NewNSEC3(wildcard)
-		//		if nsec1.Hdr.Name != nsec2.Hdr.Name || nsec1.NextDomain != nsec2.NextDomain {
-		//			// different NSEC3, add it
-		//			m.Ns = append(m.Ns, nsec2)
-		//		}
+
+		if nsec3.Hdr.Name != s.config.ClosestEncloser.Hdr.Name {
+			m.Ns = append(m.Ns, s.config.ClosestEncloser)
+		}
+		if nsec3.Hdr.Name != s.config.DenyWildcard.Hdr.Name {
+			m.Ns = append(m.Ns, s.config.DenyWildcard)
+		}
 	}
 	if m.Rcode == dns.RcodeSuccess && len(m.Ns) == 1 {
-		//		if _, ok := m.Ns[0].(*dns.SOA); ok {
-		//			m.Ns = append(m.Ns, s.NewNSEC3(m.Question[0].Name))
-		//		}
+		// NODATA
+		if _, ok := m.Ns[0].(*dns.SOA); ok {
+		m.Ns = append(m.Ns, s.NewNSEC3NoData(m.Question[0].Name))
+		}
 	}
-	// wildcard for positive responses
 }
 
 // sign signs a message m, it takes care of negative or nodata responses as
@@ -182,8 +181,8 @@ func unpackBase32(b []byte) string {
 	return string(b32)
 }
 
-// NewNSEC3 returns the NSEC3 record need to denial qname, or gives back a NODATA NSEC3.
-func (s *server) NewNSEC3(qname string) *dns.NSEC3 {
+// NewNSEC3 returns the NSEC3 record needed to denial qname.
+func (s *server) NewNSEC3NameError(qname string) *dns.NSEC3 {
 	n := new(dns.NSEC3)
 	n.Hdr.Class = dns.ClassINET
 	n.Hdr.Rrtype = dns.TypeNSEC3
@@ -195,16 +194,68 @@ func (s *server) NewNSEC3(qname string) *dns.NSEC3 {
 
 	covername := dns.HashName(qname, dns.SHA1, 0, "")
 
-	// one before
 	buf := packBase32(covername)
-	byteArith(buf, false)
+	byteArith(buf, false) // one before
 	n.Hdr.Name = strings.ToLower(unpackBase32(buf)) + "." + s.config.Domain
-	// one next
-	byteArith(buf, true)
-	byteArith(buf, true)
+	byteArith(buf, true) // one next
+	byteArith(buf, true) // and another one
+	n.NextDomain = unpackBase32(buf)
+	return n
+}
+
+// NewNSEC3 returns the NSEC3 record needed to denial the types
+func (s *server) NewNSEC3NoData(qname string) *dns.NSEC3 {
+	n := new(dns.NSEC3)
+	n.Hdr.Class = dns.ClassINET
+	n.Hdr.Rrtype = dns.TypeNSEC3
+	n.Hdr.Ttl = s.config.MinTtl
+	n.Hash = dns.SHA1
+	n.Flags = 0
+	n.Salt = ""
+	n.TypeBitMap = []uint16{}
+
+	n.Hdr.Name = dns.HashName(qname, dns.SHA1, 0, "")
+	buf := packBase32(n.Hdr.Name)
+	byteArith(buf, true) // one next
 	n.NextDomain = unpackBase32(buf)
 
+	n.Hdr.Name += "." + s.config.Domain
 	return n
+}
+
+// newNSEC3CEandWildcard returns the NSEC3 for the closest encloser
+// and the NSEC3 that denies that wildcard at that level.
+func newNSEC3CEandWildcard(apex, ce string, ttl uint32) (*dns.NSEC3, *dns.NSEC3) {
+	n1 := new(dns.NSEC3)
+	n1.Hdr.Class = dns.ClassINET
+	n1.Hdr.Rrtype = dns.TypeNSEC3
+	n1.Hdr.Ttl = ttl
+	n1.Hash = dns.SHA1
+	n1.Flags = 0
+	n1.Salt = ""
+	//n.TypeBitMap = []uint16{dns.TypeA, dns.TypeNS, dns.TypeSOA, dns.TypeAAAA, dns.TypeRRSIG, dns.TypeDNSKEY}
+	n1.TypeBitMap = []uint16{}
+	n1.Hdr.Name = dns.HashName(ce, dns.SHA1, 0, "") + "." + apex
+	buf := packBase32(n1.Hdr.Name)
+	byteArith(buf, true) // one next
+	n1.NextDomain = unpackBase32(buf)
+
+	n2 := new(dns.NSEC3)
+	n2.Hdr.Class = dns.ClassINET
+	n2.Hdr.Rrtype = dns.TypeNSEC3
+	n2.Hdr.Ttl = ttl
+	n2.Hash = dns.SHA1
+	n2.Flags = 0
+	n2.Salt = ""
+
+	buf = packBase32("*." + apex)
+	byteArith(buf, false) // one before
+	n2.Hdr.Name = strings.ToLower(unpackBase32(buf)) + "." + apex
+	byteArith(buf, true) // one next
+	byteArith(buf, true) // and another one
+	n2.NextDomain = unpackBase32(buf)
+
+	return n1, n2
 }
 
 // byteArith adds either 1 or -1 to b, there is no check for under- or overflow.

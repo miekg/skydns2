@@ -212,6 +212,8 @@ option: `Kskydns.local.+005+49860`, like so (together with some other options):
         value='{"dns_addr":"127.0.0.1:5354","dnssec":"Kskydns.local.+005+55656"}'
 
 If you then query with `dig +dnssec` you will get signatures, keys and NSEC3 records returned.
+Authenticated denial of existence is implemented using NSEC3 whitelies, 
+see [RFC7129](http://tools.ietf.org/html/rfc7129), Appendix B.
 
 ## License
 The MIT License (MIT)

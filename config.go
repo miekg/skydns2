@@ -39,10 +39,12 @@ type Config struct {
 	MinTtl uint32 `json:"min_ttl,omitempty"`
 
 	// DNSSEC key material
-	PubKey       *dns.DNSKEY    `json:"-"`
-	KeyTag       uint16         `json:"-"`
-	PrivKey      dns.PrivateKey `json:"-"`
-	DomainLabels int            `json:"-"`
+	PubKey          *dns.DNSKEY    `json:"-"`
+	KeyTag          uint16         `json:"-"`
+	PrivKey         dns.PrivateKey `json:"-"`
+	DomainLabels    int            `json:"-"`
+	ClosestEncloser *dns.NSEC3     `json:"-"`
+	DenyWildcard    *dns.NSEC3     `json:"-"`
 
 	log *log.Logger `json:"-"`
 }
@@ -125,6 +127,7 @@ func setDefaults(config *Config) error {
 		config.PubKey = k
 		config.KeyTag = k.KeyTag()
 		config.PrivKey = p
+		config.ClosestEncloser, config.DenyWildcard = newNSEC3CEandWildcard(config.Domain, config.Domain, config.MinTtl)
 	}
 	return nil
 }
