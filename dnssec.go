@@ -122,7 +122,7 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.RRSIG, error) {
 	key := cache.key(r)
 	if sig := cache.search(key); sig != nil {
-		// Is it still valid 24 hours from now.
+		// Is it still valid 24 hours from now?
 		if sig.ValidityPeriod(now.Add(+24 * time.Hour)) {
 			return sig, nil
 		}
