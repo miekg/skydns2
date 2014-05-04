@@ -394,7 +394,7 @@ func newDNSKEY(rr string) *dns.DNSKEY { r, _ := dns.NewRR(rr); return r.(*dns.DN
 func newRRSIG(rr string) *dns.RRSIG   { r, _ := dns.NewRR(rr); return r.(*dns.RRSIG) }
 func newNNSEC3(rr string) *dns.NSEC3  { r, _ := dns.NewRR(rr); return r.(*dns.NSEC3) }
 
-func BenchmarkDNS(b *testing.B) {
+func BenchmarkDNSSingle(b *testing.B) {
 	b.StopTimer()
 	t := new(testing.T)
 	s := newTestServerDNSSEC(t)
@@ -406,6 +406,29 @@ func BenchmarkDNS(b *testing.B) {
 
 	c := new(dns.Client)
 	tc := dnsTestCases[0]
+	m := new(dns.Msg)
+	m.SetQuestion(tc.Qname, tc.Qtype)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		c.Exchange(m, "127.0.0.1:"+StrPort)
+	}
+}
+
+func BenchmarkDNSWildcard(b *testing.B) {
+	b.StopTimer()
+	t := new(testing.T)
+	s := newTestServerDNSSEC(t)
+	defer s.Stop()
+
+	for _, serv := range services {
+		m := &Service{Host: serv.Host, Port: serv.Port}
+		addService(t, s, serv.key, 0, m)
+		defer delService(t, s, serv.key)
+	}
+
+	c := new(dns.Client)
+	tc := dnsTestCases[8] // Wildcard Test
 	m := new(dns.Msg)
 	m.SetQuestion(tc.Qname, tc.Qtype)
 
