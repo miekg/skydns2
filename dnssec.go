@@ -16,11 +16,10 @@ import (
 )
 
 // Do DNSSEC NXDOMAIN with NSEC3 whitelies: rfc 7129, appendix B.
-// The closest encloser will always be server.config.Domain and we
-// will deny the wildcard for *.server.config.Domain. This allows
+// The closest encloser will always be config.Domain and we
+// will deny the wildcard for *.config.Domain. This allows
 // use to pre-compute those records. We then only need to compute
 // the NSEC3 that covers the qname.
-// Ofcourse sometimes we need a wildcard bla bla
 
 var (
 	cache    *sigCache = newCache()
@@ -77,6 +76,7 @@ func (s *server) Denial(m *dns.Msg) {
 // We also fake the origin TTL in the signature, because we don't want to
 // throw away signatures when services decide to have longer TTL. So we just
 // set the origTTL to 60.
+// TODO(miek): revisit origTTL
 func (s *server) sign(m *dns.Msg, bufsize uint16) {
 	now := time.Now().UTC()
 	incep := uint32(now.Add(-3 * time.Hour).Unix())     // 2+1 hours, be sure to catch daylight saving time and such
