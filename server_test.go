@@ -152,27 +152,31 @@ func TestDNSTtlRRset(t *testing.T) {
 	s := newTestServerDNSSEC(t)
 	defer s.Stop()
 
-	ttl := 60
+	ttl := uint32(60)
 	for _, serv := range services {
 		m := &Service{Host: serv.Host, Port: serv.Port}
-		addService(t, s, serv.key, ttl, m)
+		addService(t, s, serv.key, uint64(ttl), m)
 		defer delService(t, s, serv.key)
 		ttl += 60
 	}
 	c := new(dns.Client)
-	for _, tc := range dnsTestCases {
-		m := new(dns.Msg)
-		m.SetQuestion(tc.Qname, tc.Qtype)
-		if tc.dnssec == true {
-			m.SetEdns0(4096, true)
-		}
-		resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
-		if err != nil {
-			t.Fatalf("failing: %s: %s\n", m.String(), err.Error())
-		}
-		t.Logf("%s\n", resp)
+	tc := dnsTestCases[7]
+	m := new(dns.Msg)
+	m.SetQuestion(tc.Qname, tc.Qtype)
+	if tc.dnssec == true {
+		m.SetEdns0(4096, true)
 	}
-	t.Fail()
+	resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
+	if err != nil {
+		t.Fatalf("failing: %s: %s\n", m.String(), err.Error())
+	}
+	t.Logf("%s\n", resp)
+	ttl = 60
+	for i, a := range resp.Answer {
+		if a.Header().Ttl != ttl {
+			t.Errorf("Answer %d should have a Header TTL of %d, but has %d", i, ttl, a.Header().Ttl)
+		}
+	}
 }
 
 func TestDNS(t *testing.T) {
