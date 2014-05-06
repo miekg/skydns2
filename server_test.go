@@ -148,6 +148,32 @@ func TestDNSForward(t *testing.T) {
 		t.Fatal("Answer expected to have A records or rcode not equal to RcodeSuccess")
 	}
 }
+func TestDNSTtlRRset(t *testing.T) {
+	s := newTestServerDNSSEC(t)
+	defer s.Stop()
+
+	ttl := 60
+	for _, serv := range services {
+		m := &Service{Host: serv.Host, Port: serv.Port}
+		addService(t, s, serv.key, ttl, m)
+		defer delService(t, s, serv.key)
+		ttl += 60
+	}
+	c := new(dns.Client)
+	for _, tc := range dnsTestCases {
+		m := new(dns.Msg)
+		m.SetQuestion(tc.Qname, tc.Qtype)
+		if tc.dnssec == true {
+			m.SetEdns0(4096, true)
+		}
+		resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
+		if err != nil {
+			t.Fatalf("failing: %s: %s\n", m.String(), err.Error())
+		}
+		t.Logf("%s\n", resp)
+	}
+	t.Fail()
+}
 
 func TestDNS(t *testing.T) {
 	s := newTestServerDNSSEC(t)
