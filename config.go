@@ -56,14 +56,9 @@ func LoadConfig(client *etcd.Client) (*Config, error) {
 
 	n, err := client.Get("/skydns/config", false, false)
 	if err != nil {
-		// TODO(miek): split out: can't connect from can't find key
 		config.log.Info("falling back to default configuration")
-		c, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-		if err != nil {
+		if err := setDefaults(config); err != nil {
 			return nil, err
-		}
-		for _, s := range c.Servers {
-			config.Nameservers = append(config.Nameservers, net.JoinHostPort(s, c.Port))
 		}
 		return config, nil
 	}
