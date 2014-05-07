@@ -9,6 +9,17 @@ with special meaning given to subdomains, priorities and weights.
 This is the original [announcement blog post](http://blog.gopheracademy.com/skydns) for version 1. 
 Since then, SkyDNS has seen some changes, most notably the ability to use etcd as a backend.
 
+# Changes with version 1
+
+SkyDNS version 1 has a raft implemention 
+
+SkyDNS2:
+
+* Does away with Raft and uses Etcd (which uses raft).
+* Makes is possible to query arbitrary domain names.
+* Is basically a thin layer above etcd that translates etcd keys and values to the DNS.
+
+
 ## Setup / Install
 Download/compile and run etcd. See the documentation for etcd at <https://github.com/coreos/etcd>.
 
