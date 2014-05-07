@@ -11,13 +11,11 @@ Since then, SkyDNS has seen some changes, most notably the ability to use etcd a
 
 # Changes with version 1
 
-SkyDNS version 1 has a raft implemention 
-
 SkyDNS2:
 
 * Does away with Raft and uses Etcd (which uses raft).
 * Makes is possible to query arbitrary domain names.
-* Is basically a thin layer above etcd that translates etcd keys and values to the DNS.
+* Basically is a thin layer above etcd that translates etcd keys and values to the DNS.
 
 
 ## Setup / Install
@@ -60,7 +58,18 @@ SkyDNS needs to be restarted for configuration changes to take effect.
 
 SkyDNS uses these environment variables:
 
-TODO(miek): list them here
+* ETCD_MACHINES - list of etcd machines, "http://localhost:4001,http://etcd.example.com:4001"
+* ETCD_TLSKEY - TLS private key path
+* ETCD_TLSPEM - X509 certificate path
+
+And these are used for statistics:
+
+* GRAPHITE_SERVER
+* STATHAT_USER
+* INFLUX_SERVER
+* INFLUX_DATABASE
+* INFLUX_USER
+* INFLUX_PASSWORD
 
 ## Service Announcements
 Announce your service by submitting JSON over HTTP to etcd with information about your service.
@@ -122,7 +131,7 @@ Testing one of the names with `dig`:
 
 ### Wildcards
 
-Of course using the full names isn't *that* useful, so SkyDNS lets you query for subdomains, and returns responses based upon the amount of services matched by the subdomain or from the the wildcard query.
+Of course using the full names isn't *that* useful, so SkyDNS lets you query for subdomains, and returns responses based upon the amount of services matched by the subdomain or from the wildcard query.
 
 If we are interested in all the servers in the `east` region, we simply omit the rightmost labels from our query:
 
@@ -146,7 +155,9 @@ There is one other feature at play here. The second and third names, `{4,6}.rail
     % dig @localhost -p 5354 +noall +answer A 4.rails.staging.east.skydns.local.
     4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
 
-TODO(miek): wildcard queries
+Another way to leads to the same result it to query for `*.east.skydns.local`, you even put the wildcard
+(the `*`) in the middle of a name `staging.*.skydns.local` is a valid query, which returns all name
+in staging, regardless of the region. Multiple wildcards per name are also permitted.
 
 ### Examples
 
