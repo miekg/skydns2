@@ -58,18 +58,18 @@ SkyDNS needs to be restarted for configuration changes to take effect.
 
 SkyDNS uses these environment variables:
 
-* ETCD_MACHINES - list of etcd machines, "http://localhost:4001,http://etcd.example.com:4001"
-* ETCD_TLSKEY - TLS private key path
-* ETCD_TLSPEM - X509 certificate path
+* `ETCD_MACHINES` - list of etcd machines, "http://localhost:4001,http://etcd.example.com:4001".
+* `ETCD_TLSKEY` - TLS private key path.
+* `ETCD_TLSPEM` - X509 certificate path.
 
 And these are used for statistics:
 
-* GRAPHITE_SERVER
-* STATHAT_USER
-* INFLUX_SERVER
-* INFLUX_DATABASE
-* INFLUX_USER
-* INFLUX_PASSWORD
+* `GRAPHITE_SERVER`
+* `STATHAT_USER`
+* `INFLUX_SERVER`
+* `INFLUX_DATABASE`
+* `INFLUX_USER`
+* `INFLUX_PASSWORD`
 
 ## Service Announcements
 Announce your service by submitting JSON over HTTP to etcd with information about your service.
