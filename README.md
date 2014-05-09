@@ -34,14 +34,14 @@ etcd machines with the environment variable ETCD_MACHINES:
 If `ETCD_MACHINES` is not set, SkyDNS will default to using `http://127.0.0.1:4001` to connect to etcd.
 
 ## Configuration
-SkyDNS' configuration is stored in etcd under the key `/skydns/config`. The following parameters
+SkyDNS' configuration is stored in etcd as a JSON object under the key `/skydns/config`. The following parameters
 may be set:
 
 * `dns_addr`: IP:port on which SkyDNS should listen, defaults to `127.0.0.1:53`.
 * `domain`: domain for which SkyDNS is authoritative, defaults to `skydns.local.`.
 * `dnssec`: enable DNSSEC (broken at the moment).
 * `round_robin`: enable round-robin sorting for A and AAAA responses, defaults to true.
-* `nameservers`: forward DNS requests to these nameservers (IP:port combination), when not
+* `nameservers`: forward DNS requests to these nameservers (array of IP:port combination), when not
     authoritative for a domain.
 * `read_timeout`: network read timeout, for DNS and talking with etcd.
 * `ttl`: default TTL in seconds to use on replies when none is set in etcd, defaults to 3600.
@@ -50,7 +50,7 @@ may be set:
 To set the configuration, use something like:
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/config \
-        -d value='{"dns_addr":"127.0.0.1:5354","ttl":3600}'
+        -d value='{"dns_addr":"127.0.0.1:5354","ttl":3600, "nameservers": ["8.8.8.8:53","8.8.4.4:53"]}'
 
 SkyDNS needs to be restarted for configuration changes to take effect.
 
