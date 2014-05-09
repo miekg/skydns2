@@ -9,15 +9,19 @@ with special meaning given to subdomains, priorities and weights.
 This is the original [announcement blog post](http://blog.gopheracademy.com/skydns) for version 1. 
 Since then, SkyDNS has seen some changes, most notably the ability to use etcd as a backend.
 
-# Changes with version 1
+# Changes sence version 1
 
 SkyDNS2:
 
 * Does away with Raft and uses Etcd (which uses raft).
 * Makes is possible to query arbitrary domain names.
-* Basically is a thin layer above etcd that translates etcd keys and values to the DNS.
+* Is a thin layer above etcd that translates etcd keys and values to the DNS.
+    In the near future, SkyDNS2 will possibly be upstreamed and incoperated directly in etcd.
+* Does DNSSEC with NSEC3 instead of NSEC.
 
-
+Note thats bugs in SkyDNS1 will still be fixed, but the main development effort will be focussed on version 2.
+[Version 1 of SkyDNS can be found here](https://github.com/skynetservices/skydns1).
+ 
 ## Setup / Install
 Download/compile and run etcd. See the documentation for etcd at <https://github.com/coreos/etcd>.
 
