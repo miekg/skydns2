@@ -389,6 +389,10 @@ var dnsTestCases = []dnsTestCase{
 		Ns: []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
 	},
 	// NODATA Test
+	{
+		Qname: "104.server1.development.region1.skydns.test.", Qtype: dns.TypeTXT,
+		Ns: []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+	},
 
 	// DNSSEC
 
