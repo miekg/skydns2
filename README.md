@@ -219,26 +219,26 @@ Requests for which SkyDNS isn't authoritative will be forwarded and proxied back
 the client. This means that you can set SkyDNS as the primary DNS server in 
 `/etc/resolv.conf` and use it for both service discovery and normal DNS operations.
 
-####DNSSEC
+#### DNSSEC
 
-SkyDNS support signing DNS answers (also know as DNSSEC). To use it you need to
-create a DNSSEC keypair and use that in SkyDNS. For instance if the domain for
+SkyDNS supports signing DNS answers, also known as DNSSEC. To use it, you need to
+create a DNSSEC keypair and use that in SkyDNS. For instance, if the domain for
 SkyDNS is `skydns.local`:
 
     % dnssec-keygen skydns.local
     Generating key pair............++++++ ...................................++++++
     Kskydns.local.+005+49860
 
-This creates two files both with the basename `Kskydns.local.+005.49860`, one of the
+This creates two files with the basename `Kskydns.local.+005.49860`, one with the
 extension `.key` (this holds the public key) and one with the extension `.private` which
-hold the private key. The basename of this file should be given to SkyDNS's DNSSEC configuration
-option: `Kskydns.local.+005+49860`, like so (together with some other options):
+holds the private key. The basename of these files should be given to SkyDNS's DNSSEC configuration
+option like so (together with some other options):
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/config -d \
         value='{"dns_addr":"127.0.0.1:5354","dnssec":"Kskydns.local.+005+55656"}'
 
 If you then query with `dig +dnssec` you will get signatures, keys and NSEC3 records returned.
-Authenticated denial of existence is implemented using NSEC3 whitelies, 
+Authenticated denial of existence is implemented using NSEC3 white lies, 
 see [RFC7129](http://tools.ietf.org/html/rfc7129), Appendix B.
 
 ## License
