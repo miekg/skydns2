@@ -5,10 +5,11 @@
 package main
 
 import (
-	"github.com/miekg/dns"
 	"net"
 	"path"
 	"strings"
+
+	"github.com/miekg/dns"
 )
 
 // This *is* the rdata from a SRV record, but with a twist.
@@ -37,6 +38,11 @@ func (s *Service) NewA(name string, ttl uint32, ip net.IP) *dns.A {
 // NewAAAA returns a new AAAA record based on the Service.
 func (s *Service) NewAAAA(name string, ttl uint32, ip net.IP) *dns.AAAA {
 	return &dns.AAAA{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: ttl}, AAAA: ip}
+}
+
+// NewCNAME returns a new CNAME record based on the Service.
+func (s *Service) NewCNAME(name string, ttl uint32, target string) *dns.CNAME {
+	return &dns.CNAME{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: ttl}, Target: target}
 }
 
 // NewNS returns a new NS record based on the Service.

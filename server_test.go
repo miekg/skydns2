@@ -160,7 +160,7 @@ func TestDNSTtlRRset(t *testing.T) {
 		ttl += 60
 	}
 	c := new(dns.Client)
-	tc := dnsTestCases[7]
+	tc := dnsTestCases[10]
 	m := new(dns.Msg)
 	m.SetQuestion(tc.Qname, tc.Qtype)
 	if tc.dnssec == true {
@@ -321,6 +321,10 @@ var services = []*Service{
 	{Host: "server3", key: "103.server4.development.region2.skydns.test."},
 	{Host: "10.0.0.1", key: "104.server1.development.region1.skydns.test."},
 	{Host: "2001::8:8:8:8", key: "105.server3.production.region2.skydns.test."},
+	{Host: "104.server1.development.region1.skydns.test", key: "1.cname.skydns.test."},
+	{Host: "100.server1.development.region1.skydns.test", key: "2.cname.skydns.test."},
+	{Host: "4.cname.skydns.test", key: "3.cname.skydns.test."},
+	{Host: "3.cname.skydns.test", key: "4.cname.skydns.test."},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -359,6 +363,24 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "105.server3.production.region2.skydns.test.", Qtype: dns.TypeAAAA,
 		Answer: []dns.RR{newAAAA("105.server3.production.region2.skydns.test. 3600 AAAA 2001::8:8:8:8")},
+	},
+	// CNAME Test
+	{
+		Qname: "1.cname.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{
+			newCNAME("1.cname.skydns.test. 3600 CNAME 104.server1.development.region1.skydns.test."),
+			newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1"),
+		},
+	},
+	// CNAME (unresolvable)
+	{
+		Qname: "2.cname.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{},
+	},
+	// CNAME loop detection
+	{
+		Qname: "3.cname.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{},
 	},
 	// Subdomain Test
 	{
@@ -421,6 +443,7 @@ var dnsTestCases = []dnsTestCase{
 
 func newA(rr string) *dns.A           { r, _ := dns.NewRR(rr); return r.(*dns.A) }
 func newAAAA(rr string) *dns.AAAA     { r, _ := dns.NewRR(rr); return r.(*dns.AAAA) }
+func newCNAME(rr string) *dns.CNAME   { r, _ := dns.NewRR(rr); return r.(*dns.CNAME) }
 func newSRV(rr string) *dns.SRV       { r, _ := dns.NewRR(rr); return r.(*dns.SRV) }
 func newSOA(rr string) *dns.SOA       { r, _ := dns.NewRR(rr); return r.(*dns.SOA) }
 func newNS(rr string) *dns.NS         { r, _ := dns.NewRR(rr); return r.(*dns.NS) }
