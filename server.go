@@ -260,6 +260,7 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 		if ttl == 0 {
 			ttl = s.config.Ttl
 		}
+		// TODO(miek): direct CNAME queries.
 		serv.key = r.Node.Key
 		switch {
 		case ip == nil:
