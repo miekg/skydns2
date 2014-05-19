@@ -65,7 +65,7 @@ func (s *server) Denial(m *dns.Msg) {
 	if m.Rcode == dns.RcodeSuccess && len(m.Ns) == 1 {
 		// NODATA
 		if _, ok := m.Ns[0].(*dns.SOA); ok {
-		m.Ns = append(m.Ns, s.NewNSEC3NoData(m.Question[0].Name))
+			m.Ns = append(m.Ns, s.NewNSEC3NoData(m.Question[0].Name))
 		}
 	}
 }

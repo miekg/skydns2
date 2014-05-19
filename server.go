@@ -218,7 +218,7 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 
 	c := &dns.Client{Net: network, ReadTimeout: s.config.ReadTimeout}
 
-	// Use request Id for "random" nameserver selection
+	// Use request Id for "random" nameserver selection.
 	nsid := int(req.Id) % len(s.config.Nameservers)
 	try := 0
 Redo:
@@ -228,7 +228,7 @@ Redo:
 		return
 	}
 	// Seen an error, this can only mean, "server not reached", try again
-	// but only if we have not exausted our nameservers
+	// but only if we have not exausted our nameservers.
 	if try < len(s.config.Nameservers) {
 		try++
 		nsid = (nsid + 1) % len(s.config.Nameservers)
@@ -263,15 +263,15 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 		serv.key = r.Node.Key
 		switch {
 		case ip == nil:
-			// Try to resolve as CNAME if it's not an IP
+			// Try to resolve as CNAME if it's not an IP.
 			if serv.Host == "" {
-				// Don't bother looking up an obviously invalid entry
+				// Don't bother looking up an obviously invalid entry.
 				s.config.log.Errorf("Empty host field for %s", name)
 				return nil, fmt.Errorf("Host entry for %s is empty", name)
 			}
 
 			newRecord := serv.NewCNAME(q.Name, ttl, serv.Host+".")
-			if len(previousRecords) >= 8 {
+			if len(previousRecords) > 7 {
 				s.config.log.Errorf("CNAME lookup limit of 8 exceeded for %s", newRecord)
 				return nil, fmt.Errorf("Exceeded CNAME lookup limit")
 			}
@@ -282,9 +282,7 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 
 			records = append(records, newRecord)
 
-			newQ := q
-			newQ.Name = serv.Host + "."
-			nextRecords, err := s.AddressRecords(newQ, append(previousRecords, newRecord))
+			nextRecords, err := s.AddressRecords(dns.Question{Name: dns.Fqdn(serv.Host), Qtype: q.Qtype, Qclass: q.Qclass}, append(previousRecords, newRecord))
 			if err != nil {
 				return nil, err
 			}
@@ -464,13 +462,11 @@ Nodes:
 
 func (s *server) isDuplicateCNAME(r *dns.CNAME, records []dns.RR) bool {
 	for _, rec := range records {
-		switch t := rec.(type) {
-		case *dns.CNAME:
-			if t.Target == r.Target {
+		if v, ok := rec.(*dns.CNAME); ok {
+			if v.Target == r.Target {
 				return true
 			}
 		}
 	}
-
 	return false
 }

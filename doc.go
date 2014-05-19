@@ -54,7 +54,7 @@ We use the directory `/skydns` to anchor all names.
 
 When providing information you will need to fill out the following values.
 
-* Path - The path of the key in etcd, e.g. if the domain you want to register is "rails.production.east.skydns.local", you need to reverse it and replace the dots with slashes. So the name here becomes: local/skydns/east/production/rails. 
+* Path - The path of the key in etcd, e.g. if the domain you want to register is "rails.production.east.skydns.local", you need to reverse it and replace the dots with slashes. So the name here becomes: local/skydns/east/production/rails.
   Then prefix the `/skydns/` string too, so the final path becomes `/v2/keys/skdydns/local/skydns/east/production/rails`
 
 * Host - The name of your service, e.g., `service5.mydomain.com`,  and IP address (either v4 or v6)
@@ -104,7 +104,7 @@ query:
     4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
     6.rails.staging.east.skydns.local. 3600 IN AAAA 2003::8:1
 
-Here three entries of the `east` are returned. 
+Here three entries of the `east` are returned.
 
 There is one other feature at play here. The second and third names,
 `{4,6}.rails.staging.east.skydns.local`, only had an IP record configured. Here
@@ -124,8 +124,8 @@ By specifying nameservers in SkyDNS's config, for instance `8.8.8.8:53,8.8.4.4:5
 you create a DNS forwarding proxy. In this case it round-robins between the two
 nameserver IPs mentioned.
 
-Requests for which SkyDNS isn't authoritative will be forwarded and proxied back to 
-the client. This means that you can set SkyDNS as the primary DNS server in 
+Requests for which SkyDNS isn't authoritative will be forwarded and proxied back to
+the client. This means that you can set SkyDNS as the primary DNS server in
 `/etc/resolv.conf` and use it for both service discovery and normal DNS operations.
 
 SkyDNS support signing DNS answers (also know as DNSSEC). To use it you need to
@@ -145,7 +145,7 @@ option: `Kskydns.local.+005+49860`, like so (together with some other options):
         value='{"dns_addr":"127.0.0.1:5354","dnssec":"Kskydns.local.+005+55656"}'
 
 If you then query with `dig +dnssec` you will get signatures, keys and NSEC3 records returned.
-Authenticated denial of existence is implemented using NSEC3 whitelies, 
+Authenticated denial of existence is implemented using NSEC3 whitelies,
 see RFC7129 (http://tools.ietf.org/html/rfc7129), Appendix B.
 */
 package main
