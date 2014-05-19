@@ -6,7 +6,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -263,16 +262,26 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 		}
 		serv.key = r.Node.Key
 		switch {
-		case serv.Host == "":
 		case ip == nil:
 			// Try to resolve as CNAME if it's not an IP
+			if serv.Host == "" {
+				// Don't bother looking up an obviously invalid entry
+				s.config.log.Errorf("Empty host field for %s", name)
+				return nil, fmt.Errorf("Host entry for %s is empty", name)
+			}
+
 			newRecord := serv.NewCNAME(q.Name, ttl, serv.Host+".")
+			if len(previousRecords) >= 8 {
+				s.config.log.Errorf("CNAME lookup limit of 8 exceeded for %s", newRecord)
+				return nil, fmt.Errorf("Exceeded CNAME lookup limit")
+			}
 			if s.isDuplicateCNAME(newRecord, previousRecords) {
 				s.config.log.Errorf("CNAME loop detected for record %s", newRecord)
-				return nil, errors.New("dns: CNAME loop")
+				return nil, fmt.Errorf("Detected CNAME loop")
 			}
+
 			records = append(records, newRecord)
-			s.config.log.Infof("%s", records)
+
 			newQ := q
 			newQ.Name = serv.Host + "."
 			nextRecords, err := s.AddressRecords(newQ, append(previousRecords, newRecord))
