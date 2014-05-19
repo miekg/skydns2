@@ -192,6 +192,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.Answer = append(m.Answer, records...)
 		m.Extra = append(m.Extra, extra...)
 	}
+	if q.Qtype == dns.TypeCNAME {
+		// TODO(miek): look for cname
+	}
 	if len(m.Answer) == 0 { // NODATA response
 		StatsNoDataCount.Inc(1)
 		m.Ns = []dns.RR{s.NewSOA()}
@@ -260,7 +263,6 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 		if ttl == 0 {
 			ttl = s.config.Ttl
 		}
-		// TODO(miek): direct CNAME queries.
 		serv.key = r.Node.Key
 		switch {
 		case ip == nil:
@@ -271,7 +273,7 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 				return nil, fmt.Errorf("Host entry for %s is empty", name)
 			}
 
-			newRecord := serv.NewCNAME(q.Name, ttl, serv.Host+".")
+			newRecord := serv.NewCNAME(q.Name, ttl, dns.Fqdn(serv.Host))
 			if len(previousRecords) > 7 {
 				s.config.log.Errorf("CNAME lookup limit of 8 exceeded for %s", newRecord)
 				return nil, fmt.Errorf("Exceeded CNAME lookup limit")
