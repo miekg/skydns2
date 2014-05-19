@@ -6,6 +6,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -162,7 +163,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	if q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA {
-		records, err := s.AddressRecords(q)
+		records, err := s.AddressRecords(q, nil)
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
@@ -242,7 +243,7 @@ Redo:
 	w.WriteMsg(m)
 }
 
-func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
+func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (records []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
 	path, star := Path(name)
 	r, err := s.client.Get(path, false, true)
@@ -262,7 +263,23 @@ func (s *server) AddressRecords(q dns.Question) (records []dns.RR, err error) {
 		}
 		serv.key = r.Node.Key
 		switch {
+		case serv.Host == "":
 		case ip == nil:
+			// Try to resolve as CNAME if it's not an IP
+			newRecord := serv.NewCNAME(q.Name, ttl, serv.Host+".")
+			if s.isDuplicateCNAME(newRecord, previousRecords) {
+				s.config.log.Errorf("CNAME loop detected for record %s", newRecord)
+				return nil, errors.New("dns: CNAME loop")
+			}
+			records = append(records, newRecord)
+			s.config.log.Infof("%s", records)
+			newQ := q
+			newQ.Name = serv.Host + "."
+			nextRecords, err := s.AddressRecords(newQ, append(previousRecords, newRecord))
+			if err != nil {
+				return nil, err
+			}
+			records = append(records, nextRecords...)
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
 			records = append(records, serv.NewA(q.Name, ttl, ip.To4()))
 		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
@@ -434,4 +451,17 @@ Nodes:
 		sx = append(sx, serv)
 	}
 	return sx, nil
+}
+
+func (s *server) isDuplicateCNAME(r *dns.CNAME, records []dns.RR) bool {
+	for _, rec := range records {
+		switch t := rec.(type) {
+		case *dns.CNAME:
+			if t.Target == r.Target {
+				return true
+			}
+		}
+	}
+
+	return false
 }
