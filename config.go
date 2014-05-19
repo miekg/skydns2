@@ -56,7 +56,7 @@ func LoadConfig(client *etcd.Client) (*Config, error) {
 
 	n, err := client.Get("/skydns/config", false, false)
 	if err != nil {
-		config.log.Info("falling back to default configuration")
+		config.log.Info("falling back to default configuration, could not read from etcd:", err)
 		if err := setDefaults(config); err != nil {
 			return nil, err
 		}
