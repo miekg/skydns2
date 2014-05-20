@@ -188,6 +188,14 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
+			// Hack alert, TOOD(miek)
+			if err.Error() == "incomplete CNAME chain" {
+				m.SetRcode(req, dns.RcodeNameError)
+				m.Ns = []dns.RR{s.NewSOA()}
+				m.Ns[0].Header().Ttl = s.config.MinTtl
+				StatsNameErrorCount.Inc(1)
+				return
+			}
 		}
 		m.Answer = append(m.Answer, records...)
 		m.Extra = append(m.Extra, extra...)
@@ -282,22 +290,22 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 			newRecord := serv.NewCNAME(q.Name, ttl, dns.Fqdn(serv.Host))
 			if len(previousRecords) > 7 {
 				s.config.log.Errorf("CNAME lookup limit of 8 exceeded for %s", newRecord)
-				return nil, fmt.Errorf("Exceeded CNAME lookup limit")
+				return nil, fmt.Errorf("exceeded CNAME lookup limit")
 			}
 			if s.isDuplicateCNAME(newRecord, previousRecords) {
 				s.config.log.Errorf("CNAME loop detected for record %s", newRecord)
-				return nil, fmt.Errorf("Detected CNAME loop")
+				return nil, fmt.Errorf("detected CNAME loop")
 			}
 
 			records = append(records, newRecord)
 			nextRecords, err := s.AddressRecords(dns.Question{Name: dns.Fqdn(serv.Host), Qtype: q.Qtype, Qclass: q.Qclass}, append(previousRecords, newRecord))
 			if err != nil {
-				// This means we can not complete the CNAME, this is OK, but 
+				// This means we can not complete the CNAME, this is OK, but
 				// if we return an error this will trigger an NXDOMAIN.
-				// We also don't want to return the CNAME, because of the 
+				// We also don't want to return the CNAME, because of the
 				// no other data rule. So return nothing and let NODATA
-				// kick in
-				return nil, nil
+				// kick in (via a hack).
+				return nil, fmt.Errorf("incomplete CNAME chain")
 			}
 			records = append(records, nextRecords...)
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
