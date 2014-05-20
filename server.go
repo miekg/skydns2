@@ -279,12 +279,6 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 		switch {
 		case ip == nil:
 			// Try to resolve as CNAME if it's not an IP.
-			if serv.Host == "" {
-				// Don't bother looking up an obviously invalid entry.
-				s.config.log.Errorf("Empty host field for %s", name)
-				return nil, fmt.Errorf("Host entry for %s is empty", name)
-			}
-
 			newRecord := serv.NewCNAME(q.Name, ttl, dns.Fqdn(serv.Host))
 			if len(previousRecords) > 7 {
 				s.config.log.Errorf("CNAME lookup limit of 8 exceeded for %s", newRecord)
@@ -296,10 +290,14 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 			}
 
 			records = append(records, newRecord)
-
 			nextRecords, err := s.AddressRecords(dns.Question{Name: dns.Fqdn(serv.Host), Qtype: q.Qtype, Qclass: q.Qclass}, append(previousRecords, newRecord))
 			if err != nil {
-				return nil, err
+				// This means we can not complete the CNAME, this is OK, but 
+				// if we return an error this will trigger an NXDOMAIN.
+				// We also don't want to return the CNAME, because of the 
+				// no other data rule. So return nothing and let NODATA
+				// kick in
+				return nil, nil
 			}
 			records = append(records, nextRecords...)
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
@@ -413,7 +411,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 
 func (s *server) CNAMERecords(q dns.Question) (records []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
-	path, _ := Path(name)	 // no wildcards here
+	path, _ := Path(name) // no wildcards here
 	r, err := s.client.Get(path, false, true)
 	if err != nil {
 		return nil, err
@@ -431,11 +429,6 @@ func (s *server) CNAMERecords(q dns.Question) (records []dns.RR, err error) {
 		}
 		serv.key = r.Node.Key
 		if ip == nil {
-			if serv.Host == "" {
-				// Don't bother looking up an obviously invalid entry.
-				s.config.log.Errorf("Empty host field for %s", name)
-				return nil, fmt.Errorf("Host entry for %s is empty", name)
-			}
 			records = append(records, serv.NewCNAME(q.Name, ttl, dns.Fqdn(serv.Host)))
 		}
 	}

@@ -17,7 +17,7 @@ SkyDNS2:
 * Makes is possible to query arbitrary domain names.
 * Is a thin layer above etcd that translates etcd keys and values to the DNS.
     In the near future, SkyDNS2 will possibly be upstreamed and incoperated directly in etcd.
-* Does DNSSEC with NSEC3 instead of NSEC.
+* Does DNSSEC with NSEC3 instead of NSEC (Work in progress).
 
 Note thats bugs in SkyDNS1 will still be fixed, but the main development effort will be focussed on version 2.
 [Version 1 of SkyDNS can be found here](https://github.com/skynetservices/skydns1).
@@ -167,7 +167,9 @@ in staging, regardless of the region. Multiple wildcards per name are also permi
 
 Now we can try some of our example DNS lookups:
 
-#### All Services in staging.east 
+#### SRV Records
+
+Get all Services in staging.east:
 
     % dig @localhost staging.east.skydns.local. SRV
 
@@ -201,6 +203,25 @@ the east area.
 Because we're returning A records and not SRV records, there are no ports
 listed, so this is only useful when you're querying for services running on
 ports known to you in advance.
+
+#### CNAME Records
+If for an A or AAAA query the IP address can not be parsed, SkyDNS will try to see if there is
+a chain of names that will lead to an IP address. The chain can not be longer than 8. So for instance
+if the following services have been registered:
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/production/rails/1 \
+        -d value='{"host":"service1.skydns.local","port":8080}'
+
+and
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/service1 \
+        -d value='{"host":"10.0.2.15","port":8080}'
+
+We have created the following CNAME chain: `1.rails.production.east.skydns.local` -> `service1.skydns.local` ->
+`10.0.2.15`. If you then query for an A or AAAA for 1.rails.production.east.skydns.local SkyDNS returns:
+
+    1.rails.production.east.skydns.local. 3600  IN  CNAME   server1.skydns.local.
+    server1.skydns.local.                 3600  IN  A       10.0.2.15
 
 #### NS Records
 
