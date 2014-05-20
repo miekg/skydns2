@@ -193,7 +193,19 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.Extra = append(m.Extra, extra...)
 	}
 	if q.Qtype == dns.TypeCNAME {
-		// TODO(miek): look for cname
+		records, err := s.CNAMERecords(q)
+		if err != nil {
+			if e, ok := err.(*etcd.EtcdError); ok {
+				if e.ErrorCode == 100 {
+					m.SetRcode(req, dns.RcodeNameError)
+					m.Ns = []dns.RR{s.NewSOA()}
+					m.Ns[0].Header().Ttl = s.config.MinTtl
+					StatsNameErrorCount.Inc(1)
+					return
+				}
+			}
+		}
+		m.Answer = append(m.Answer, records...)
 	}
 	if len(m.Answer) == 0 { // NODATA response
 		StatsNoDataCount.Inc(1)
@@ -397,6 +409,37 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		}
 	}
 	return records, extra, nil
+}
+
+func (s *server) CNAMERecords(q dns.Question) (records []dns.RR, err error) {
+	name := strings.ToLower(q.Name)
+	path, _ := Path(name)	 // no wildcards here
+	r, err := s.client.Get(path, false, true)
+	if err != nil {
+		return nil, err
+	}
+	if !r.Node.Dir {
+		var serv *Service
+		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
+			s.config.log.Infof("failed to parse json: %s", err.Error())
+			return nil, err
+		}
+		ip := net.ParseIP(serv.Host)
+		ttl := uint32(r.Node.TTL)
+		if ttl == 0 {
+			ttl = s.config.Ttl
+		}
+		serv.key = r.Node.Key
+		if ip == nil {
+			if serv.Host == "" {
+				// Don't bother looking up an obviously invalid entry.
+				s.config.log.Errorf("Empty host field for %s", name)
+				return nil, fmt.Errorf("Host entry for %s is empty", name)
+			}
+			records = append(records, serv.NewCNAME(q.Name, ttl, dns.Fqdn(serv.Host)))
+		}
+	}
+	return records, nil
 }
 
 // SOA returns a SOA record for this SkyDNS instance.

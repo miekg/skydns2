@@ -372,15 +372,13 @@ var dnsTestCases = []dnsTestCase{
 			newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1"),
 		},
 	},
-	// Direct CNAME Test // TODO(miek)
-	/*
+	// Direct CNAME Test
 		{
 			Qname: "1.cname.skydns.test.", Qtype: dns.TypeCNAME,
 			Answer: []dns.RR{
 				newCNAME("1.cname.skydns.test. 3600 CNAME 104.server1.development.region1.skydns.test."),
 			},
 		},
-	*/
 	// CNAME (unresolvable)
 	{
 		Qname: "2.cname.skydns.test.", Qtype: dns.TypeA,
