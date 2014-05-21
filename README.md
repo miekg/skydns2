@@ -230,7 +230,7 @@ nameserver used will be named `ns1.dns.skydns.local` in the default setup . Extr
 nameserver will be numbered ns2, ns3, etc. The subdomain `dns.skydns.local` will take
 precedence over services with a similar name.
 
-#### Reverse addresses
+#### PTR Records: Reverse Addresses
 
 When registering a service with an IP address only, you might also want to register
 the reverse (the hostname the address points to). In the DNS these records are called
