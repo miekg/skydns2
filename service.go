@@ -66,6 +66,10 @@ func Path(s string) (string, bool) {
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
 		l[i], l[j] = l[j], l[i]
 	}
+	// a reverse address name
+	if len(l) > 2 && l[0] == "arpa" && ( l[1] == "ip6" || l[1] == "in-addr") {
+		return path.Join(l...), false
+	}
 	for i, k := range l {
 		if k == "*" {
 			return path.Join(append([]string{"/skydns/"}, l[:i]...)...), true

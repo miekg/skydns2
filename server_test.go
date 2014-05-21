@@ -271,7 +271,11 @@ func TestDNS(t *testing.T) {
 				if x.Ns != tt.Ns {
 					t.Errorf("SOA nameserver should be %q, but is %q", x.Ns, tt.Ns)
 				}
-
+			case *dns.PTR:
+				tt := tc.Answer[i].(*dns.PTR)
+				if x.Ptr != tt.Ptr {
+					t.Errorf("PTR ptr should be %q, but is %q", x.Ptr, tt.Ptr)
+				}
 			}
 			for i, n := range resp.Ns {
 				i = i
@@ -325,6 +329,8 @@ var services = []*Service{
 	{Host: "100.server1.development.region1.skydns.test", key: "2.cname.skydns.test."},
 	{Host: "4.cname.skydns.test", key: "3.cname.skydns.test."},
 	{Host: "3.cname.skydns.test", key: "4.cname.skydns.test."},
+	{Host: "reverse.example.com", key: "arpa.in-addr.10.0.0.1."},
+	{Host: "reverse6.example.com", key: "arpa.ip6.2.0.0.1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.0.0.0.8.0.0.0.8.0.0.0.8."},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -446,6 +452,13 @@ var dnsTestCases = []dnsTestCase{
 	// NODATA Test
 
 	// Wildcard Test
+
+	// Reverse
+
+	// Reverse v4 local answer
+	// Reverse v6 local answer
+	// Reverse forwarding answer
+	// Reverse no answer
 }
 
 func newA(rr string) *dns.A           { r, _ := dns.NewRR(rr); return r.(*dns.A) }
@@ -457,6 +470,7 @@ func newNS(rr string) *dns.NS         { r, _ := dns.NewRR(rr); return r.(*dns.NS
 func newDNSKEY(rr string) *dns.DNSKEY { r, _ := dns.NewRR(rr); return r.(*dns.DNSKEY) }
 func newRRSIG(rr string) *dns.RRSIG   { r, _ := dns.NewRR(rr); return r.(*dns.RRSIG) }
 func newNNSEC3(rr string) *dns.NSEC3  { r, _ := dns.NewRR(rr); return r.(*dns.NSEC3) }
+func newPTR(rr string) *dns.PTR       { r, _ := dns.NewRR(rr); return r.(*dns.PTR) }
 
 func BenchmarkDNSSingle(b *testing.B) {
 	b.StopTimer()
