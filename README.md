@@ -249,10 +249,9 @@ To add the reverse of these address you need to add the following names and valu
 
 These can be added with:
 
-    curl -XPUT http://127.0.0.1:4001/v2/keys/arpa/in-addr/10/0/1/125 \
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/125/1/0/10/in-addr/arpa \
         -d value='{"host":"service1.example.com}'
-    curl -XPUT http://127.0.0.1:4001/v2/keys/arpa/ip6/2/0/0/3/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/8/0/0/0/1 \
-        -d value='{"host":"service1.example.com}'
+    TODO(miek): ipv6 value here
 
 (Yes, the reverse of ip6 is not optimal.) If SkyDNS receives a PTR query it will check these paths and
 will return the contents.

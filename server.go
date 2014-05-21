@@ -188,7 +188,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
-			// Hack alert, TOOD(miek)
+			// Hack alert, TODO:(miek)
 			if err.Error() == "incomplete CNAME chain" {
 				m.SetRcode(req, dns.RcodeNameError)
 				m.Ns = []dns.RR{s.NewSOA()}
@@ -453,9 +453,31 @@ func (s *server) CNAMERecords(q dns.Question) (records []dns.RR, err error) {
 }
 
 func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
-	// check if we have something
-	// if server has a forward, forward the query
-	return nil, nil
+	name := strings.ToLower(q.Name)
+	path, star := Path(name)
+	if star {
+		return nil, fmt.Errorf("reverse can not contain wildcards")
+	}
+	r, err := s.client.Get(path, false, false)
+	if err != nil {
+		// if server has a forward, forward the query
+		return nil, err
+	}
+	if r.Node.Dir {
+		return nil, fmt.Errorf("reverse should not be a directory")
+	}
+	var serv *Service
+	if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
+		s.config.log.Infof("failed to parse json: %s", err.Error())
+		return nil, err
+	}
+	ttl := uint32(r.Node.TTL)
+	if ttl == 0 {
+		ttl = s.config.Ttl
+	}
+	serv.key = r.Node.Key
+	records = append(records, serv.NewPTR(q.Name, ttl))
+	return records, nil
 }
 
 // SOA returns a SOA record for this SkyDNS instance.

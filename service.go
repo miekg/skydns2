@@ -51,8 +51,8 @@ func (s *Service) NewNS(name string, ttl uint32, target string) *dns.NS {
 }
 
 // NewPTR returns a new PTR record based on the Service.
-func (s *Service) NewPTR(name string, ttl uint32, target string) *dns.PTR {
-	return &dns.PTR{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: ttl}, Ptr: target}
+func (s *Service) NewPTR(name string, ttl uint32) *dns.PTR {
+	return &dns.PTR{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: ttl}, Ptr: dns.Fqdn(s.Host)}
 }
 
 // Path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
@@ -65,10 +65,6 @@ func Path(s string) (string, bool) {
 	l := dns.SplitDomainName(s)
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
 		l[i], l[j] = l[j], l[i]
-	}
-	// a reverse address name
-	if len(l) > 2 && l[0] == "arpa" && ( l[1] == "ip6" || l[1] == "in-addr") {
-		return path.Join(l...), false
 	}
 	for i, k := range l {
 		if k == "*" {
