@@ -230,6 +230,35 @@ nameserver used will be named `ns1.dns.skydns.local` in the default setup . Extr
 nameserver will be numbered ns2, ns3, etc. The subdomain `dns.skydns.local` will take
 precedence over services with a similar name.
 
+#### Reverse addresses
+
+When registering a service with an IP address only, you might also want to register
+the reverse (the hostname the address points to). In the DNS these records are called
+PTR records.
+
+So looking back at some of the services in the section [](#service-discovery-via-the-dns),
+we register these IP only ones:
+
+    4.rails.staging.east.skydns.local. 10.0.1.125
+    6.rails.stating.east.skydns.local. 2003::8:1
+
+To add the reverse of these address you need to add the following names and values:
+
+    125.1.0.10.in-addr.arpa. service1.example.com.
+    1.0.0.0.8.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.3.0.0.2.ip6.arpa. service1.example.com.
+
+These can be added with:
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/arpa/in-addr/10/0/1/125 \
+        -d value='{"host":"service1.example.com}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/arpa/ip6/2/0/0/3/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/8/0/0/0/1 \
+        -d value='{"host":"service1.example.com}'
+
+(Yes, the reverse of ip6 is not optimal.) If SkyDNS receives a PTR query it will check these paths and
+will return the contents.
+If nothing is found locally the query is forwarded to the local recursor (if so configured), 
+otherwise SERVFAIL is returned.
+
 #### DNS Forwarding
 
 By specifying nameservers in SkyDNS's config, for instance `8.8.8.8:53,8.8.4.4:53`,
