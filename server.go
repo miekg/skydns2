@@ -215,6 +215,15 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 		m.Answer = append(m.Answer, records...)
 	}
+	if q.Qtype == dns.TypePTR {
+		records, err := s.PTRRecords(q)
+		if err != nil {
+			// An error, we don't do anything magic here, so SERVFAIL
+			m.SetRcode(req, dns.RcodeServerFailure)
+			return
+		}
+		m.Answer = append(m.Answer, records...)
+	}
 	if len(m.Answer) == 0 { // NODATA response
 		StatsNoDataCount.Inc(1)
 		m.Ns = []dns.RR{s.NewSOA()}
@@ -441,6 +450,12 @@ func (s *server) CNAMERecords(q dns.Question) (records []dns.RR, err error) {
 		}
 	}
 	return records, nil
+}
+
+func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
+	// check if we have something
+	// if server has a forward, forward the query
+	return nil, nil
 }
 
 // SOA returns a SOA record for this SkyDNS instance.
