@@ -279,10 +279,7 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 			return nil, err
 		}
 		ip := net.ParseIP(serv.Host)
-		ttl := uint32(r.Node.TTL)
-		if ttl == 0 {
-			ttl = s.config.Ttl
-		}
+		ttl := s.calculateTtl(r.Node)
 		serv.key = r.Node.Key
 		switch {
 		case ip == nil:
@@ -368,10 +365,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 			return nil, nil, err
 		}
 		ip := net.ParseIP(serv.Host)
-		ttl := uint32(r.Node.TTL)
-		if ttl == 0 {
-			ttl = s.config.Ttl
-		}
+		ttl := s.calculateTtl(r.Node)
 		if serv.Priority == 0 {
 			serv.Priority = int(s.config.Priority)
 		}
@@ -431,10 +425,7 @@ func (s *server) CNAMERecords(q dns.Question) (records []dns.RR, err error) {
 			return nil, err
 		}
 		ip := net.ParseIP(serv.Host)
-		ttl := uint32(r.Node.TTL)
-		if ttl == 0 {
-			ttl = s.config.Ttl
-		}
+		ttl := s.calculateTtl(r.Node)
 		serv.key = r.Node.Key
 		if ip == nil {
 			records = append(records, serv.NewCNAME(q.Name, ttl, dns.Fqdn(serv.Host)))
@@ -494,10 +485,7 @@ Nodes:
 		if err := json.Unmarshal([]byte(n.Value), &serv); err != nil {
 			return nil, err
 		}
-		serv.ttl = uint32(n.TTL)
-		if serv.ttl == 0 {
-			serv.ttl = s.config.Ttl
-		}
+		serv.ttl = s.calculateTtl(n)
 		if serv.Priority == 0 {
 			serv.Priority = int(s.config.Priority)
 		}
@@ -516,4 +504,12 @@ func (s *server) isDuplicateCNAME(r *dns.CNAME, records []dns.RR) bool {
 		}
 	}
 	return false
+}
+
+func (s *server) calculateTtl(node *etcd.Node) uint32 {
+	ttl := uint32(node.TTL)
+	if ttl == 0 {
+		ttl = s.config.Ttl
+	}
+	return ttl
 }
