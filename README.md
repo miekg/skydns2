@@ -89,6 +89,7 @@ When providing information you will need to fill out the following values.
 * Host - The name of your service, e.g., `service5.mydomain.com`,  and IP address (either v4 or v6)
 * Port - the port where the service can be reached.
 * Priority - the priority of the service.
+* TTL - the time-to-live of the service, overriding the default TTL. If the etcd key also has a TTL, the minimum of this value and the etcd TTL is used.
 
 Adding the service can thus be done with:
 

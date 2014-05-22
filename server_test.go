@@ -184,7 +184,7 @@ func TestDNS(t *testing.T) {
 	defer s.Stop()
 
 	for _, serv := range services {
-		m := &Service{Host: serv.Host, Port: serv.Port}
+		m := &Service{Host: serv.Host, Port: serv.Port, Ttl: serv.Ttl}
 		addService(t, s, serv.key, 0, m)
 		defer delService(t, s, serv.key)
 	}
@@ -325,6 +325,7 @@ var services = []*Service{
 	{Host: "100.server1.development.region1.skydns.test", key: "2.cname.skydns.test."},
 	{Host: "4.cname.skydns.test", key: "3.cname.skydns.test."},
 	{Host: "3.cname.skydns.test", key: "4.cname.skydns.test."},
+	{Host: "10.0.0.2", key: "ttl.skydns.test.", Ttl: 360},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -363,6 +364,11 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "105.server3.production.region2.skydns.test.", Qtype: dns.TypeAAAA,
 		Answer: []dns.RR{newAAAA("105.server3.production.region2.skydns.test. 3600 AAAA 2001::8:8:8:8")},
+	},
+	// TTL Test
+	{
+		Qname: "ttl.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{newA("ttl.skydns.test. 360 A 10.0.0.2")},
 	},
 	// CNAME Test
 	{
