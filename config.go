@@ -49,11 +49,11 @@ type Config struct {
 	log *log.Logger `json:"-"`
 }
 
-func LoadConfig(client *etcd.Client) (*Config, error) {
-	config := &Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
+func LoadConfig(client *etcd.Client, config *Config) (*Config, error) {
 	config.log = log.New("skydns", false,
 		log.CombinedSink(os.Stderr, "[%s] %s %-9s | %s\n", []string{"prefix", "time", "priority", "message"}))
 
+	// Override wat isn't set yet from the command line.
 	n, err := client.Get("/skydns/config", false, false)
 	if err != nil {
 		config.log.Info("falling back to default configuration, could not read from etcd:", err)
@@ -79,10 +79,10 @@ func setDefaults(config *Config) error {
 		config.DnsAddr = "127.0.0.1:53"
 	}
 	if config.Domain == "" {
-		config.Domain = "skydns.local"
+		config.Domain = "skydns.local."
 	}
 	if config.Hostmaster == "" {
-		config.Hostmaster = "hostmaster.skydns.local."
+		config.Hostmaster = "hostmaster." + config.Domain
 	}
 	// People probably don't know that SOA's email addresses cannot
 	// contain @-signs, replace them with dots
