@@ -80,7 +80,7 @@ Announce your service by submitting JSON over HTTP to etcd with information abou
 This information will then be available for queries via DNS.
 We use the directory `/skydns` to anchor all names.
 
-When providing information you will need to fill out the following values.
+When providing information you will need to fill out (some of) the following values.
 
 * Path - The path of the key in etcd, e.g. if the domain you want to register is "rails.production.east.skydns.local", you need to reverse it and replace the dots with slashes. So the name here becomes:
     `local/skydns/east/production/rails`. 
@@ -88,8 +88,11 @@ When providing information you will need to fill out the following values.
     `/v2/keys/skdydns/local/skydns/east/production/rails`
 * Host - The name of your service, e.g., `service5.mydomain.com`,  and IP address (either v4 or v6)
 * Port - the port where the service can be reached.
-* Priority - the priority of the service.
+* Priority - the priority of the service, the lower the value, the more preferred;
+* Weight - a weight factor that will be used for services with the same Priority.
 * TTL - the time-to-live of the service, overriding the default TTL. If the etcd key also has a TTL, the minimum of this value and the etcd TTL is used.
+
+Path and Host are mandatory.
 
 Adding the service can thus be done with:
 
@@ -102,6 +105,25 @@ Or with [`etcdctl`](https://github.com/coreos/etcdctl):
         '{"host":"service5.example.com","priority":20}'
 
 When querying the DNS for services you can use wildcards or query for subdomains. See the section named "Wildcards" below for more information.
+
+The Weight of a service is calculated as follows. We treat Weight as a percentage, so if there are
+3 services, the weight is set to 33 for each:
+
+| Service | Weight  | SRV.Weight |
+| --------| ------- | ---------- |
+|    a    |   1     |    33      |
+|    b    |   1     |    33      |
+|    c    |   1     |    33      |
+
+If we add some other weight to the equation some service got a higher Weight:
+
+| Service | Weight  | SRV.Weight |
+| --------| ------- | ---------- |
+|    a    |   1.2   |    34      |
+|    b    |   1     |    28      |
+|    c    |   1.3   |    37      |
+
+Note, all calculations are rounded down, so the sum total might be lower than 100.
 
 ## Service Discovery via the DNS
 
