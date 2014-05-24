@@ -147,6 +147,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 			ip := net.ParseIP(h)
 			serv := new(Service)
+			serv.Ttl = s.config.Ttl
 			switch {
 			case name == s.config.Domain && q.Qtype == dns.TypeNS:
 				m.Answer = append(m.Answer, serv.NewNS(s.config.Domain, s.config.Ttl, fmt.Sprintf("ns%d.dns.%s", i+1, s.config.Domain)))
@@ -280,6 +281,7 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 		}
 		ip := net.ParseIP(serv.Host)
 		ttl := s.calculateTtl(r.Node, serv)
+		serv.Ttl = ttl
 		serv.key = r.Node.Key
 		switch {
 		case ip == nil:
@@ -370,6 +372,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 			serv.Priority = int(s.config.Priority)
 		}
 		serv.key = r.Node.Key
+		serv.Ttl = ttl
 		switch {
 		case ip == nil:
 			records = append(records, serv.NewSRV(q.Name, ttl, weight))
@@ -427,6 +430,7 @@ func (s *server) CNAMERecords(q dns.Question) (records []dns.RR, err error) {
 		ip := net.ParseIP(serv.Host)
 		ttl := s.calculateTtl(r.Node, serv)
 		serv.key = r.Node.Key
+		serv.Ttl = ttl
 		if ip == nil {
 			records = append(records, serv.NewCNAME(q.Name, ttl, dns.Fqdn(serv.Host)))
 		}
