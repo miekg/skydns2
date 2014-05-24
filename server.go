@@ -150,11 +150,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			serv.Ttl = s.config.Ttl
 			switch {
 			case name == s.config.Domain && q.Qtype == dns.TypeNS:
-				m.Answer = append(m.Answer, serv.NewNS(s.config.Domain, s.config.Ttl, fmt.Sprintf("ns%d.dns.%s", i+1, s.config.Domain)))
+				m.Answer = append(m.Answer, serv.NewNS(s.config.Domain, fmt.Sprintf("ns%d.dns.%s", i+1, s.config.Domain)))
 			case ip.To4() != nil && q.Qtype == dns.TypeA && q.Name == fmt.Sprintf("ns%d.dns.%s", i+1, s.config.Domain):
-				m.Answer = append(m.Answer, serv.NewA(q.Name, s.config.Ttl, ip.To4()))
+				m.Answer = append(m.Answer, serv.NewA(q.Name, ip.To4()))
 			case ip.To4() == nil && q.Qtype == dns.TypeAAAA && q.Name == fmt.Sprintf("ns%d.dns.%s", i+1, s.config.Domain):
-				m.Answer = append(m.Answer, serv.NewAAAA(q.Name, s.config.Ttl, ip.To16()))
+				m.Answer = append(m.Answer, serv.NewAAAA(q.Name, ip.To16()))
 			}
 		}
 		if len(m.Answer) > 0 {
@@ -286,7 +286,7 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 		switch {
 		case ip == nil:
 			// Try to resolve as CNAME if it's not an IP.
-			newRecord := serv.NewCNAME(q.Name, ttl, dns.Fqdn(serv.Host))
+			newRecord := serv.NewCNAME(q.Name, dns.Fqdn(serv.Host))
 			if len(previousRecords) > 7 {
 				s.config.log.Errorf("CNAME lookup limit of 8 exceeded for %s", newRecord)
 				return nil, fmt.Errorf("exceeded CNAME lookup limit")
@@ -308,9 +308,9 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 			}
 			records = append(records, nextRecords...)
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
-			records = append(records, serv.NewA(q.Name, ttl, ip.To4()))
+			records = append(records, serv.NewA(q.Name, ip.To4()))
 		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
-			records = append(records, serv.NewAAAA(q.Name, ttl, ip.To16()))
+			records = append(records, serv.NewAAAA(q.Name, ip.To16()))
 		}
 		return records, nil
 	}
@@ -324,9 +324,9 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 		switch {
 		case ip == nil:
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
-			records = append(records, serv.NewA(q.Name, serv.Ttl, ip.To4()))
+			records = append(records, serv.NewA(q.Name, ip.To4()))
 		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
-			records = append(records, serv.NewAAAA(q.Name, serv.Ttl, ip.To16()))
+			records = append(records, serv.NewAAAA(q.Name, ip.To16()))
 		}
 	}
 	if s.config.RoundRobin {
@@ -375,15 +375,15 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		serv.Ttl = ttl
 		switch {
 		case ip == nil:
-			records = append(records, serv.NewSRV(q.Name, ttl, weight))
+			records = append(records, serv.NewSRV(q.Name, weight))
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key) // TODO(miek): ugly
-			records = append(records, serv.NewSRV(q.Name, ttl, weight))
-			extra = append(extra, serv.NewA(Domain(r.Node.Key), ttl, ip.To4()))
+			records = append(records, serv.NewSRV(q.Name, weight))
+			extra = append(extra, serv.NewA(Domain(r.Node.Key), ip.To4()))
 		case ip.To4() == nil:
 			serv.Host = Domain(serv.key) // TODO(miek): ugly
-			records = append(records, serv.NewSRV(q.Name, ttl, weight))
-			extra = append(extra, serv.NewAAAA(Domain(r.Node.Key), ttl, ip.To16()))
+			records = append(records, serv.NewSRV(q.Name, weight))
+			extra = append(extra, serv.NewAAAA(Domain(r.Node.Key), ip.To16()))
 		}
 		return records, extra, nil
 	}
@@ -400,15 +400,15 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
-			records = append(records, serv.NewSRV(q.Name, serv.Ttl, weight))
+			records = append(records, serv.NewSRV(q.Name, weight))
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key) // TODO(miek): ugly
-			records = append(records, serv.NewSRV(q.Name, serv.Ttl, weight))
-			extra = append(extra, serv.NewA(Domain(serv.key), serv.Ttl, ip.To4()))
+			records = append(records, serv.NewSRV(q.Name, weight))
+			extra = append(extra, serv.NewA(Domain(serv.key), ip.To4()))
 		case ip.To4() == nil:
 			serv.Host = Domain(serv.key)
-			records = append(records, serv.NewSRV(q.Name, serv.Ttl, weight))
-			extra = append(extra, serv.NewAAAA(Domain(serv.key), serv.Ttl, ip.To16()))
+			records = append(records, serv.NewSRV(q.Name, weight))
+			extra = append(extra, serv.NewAAAA(Domain(serv.key), ip.To16()))
 		}
 	}
 	return records, extra, nil
@@ -432,7 +432,7 @@ func (s *server) CNAMERecords(q dns.Question) (records []dns.RR, err error) {
 		serv.key = r.Node.Key
 		serv.Ttl = ttl
 		if ip == nil {
-			records = append(records, serv.NewCNAME(q.Name, ttl, dns.Fqdn(serv.Host)))
+			records = append(records, serv.NewCNAME(q.Name, dns.Fqdn(serv.Host)))
 		}
 	}
 	return records, nil

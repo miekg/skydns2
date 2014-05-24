@@ -25,29 +25,29 @@ type Service struct {
 }
 
 // NewSRV returns a new SRV record based on the Service.
-func (s *Service) NewSRV(name string, ttl uint32, weight uint16) *dns.SRV {
-	return &dns.SRV{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: ttl},
+func (s *Service) NewSRV(name string, weight uint16) *dns.SRV {
+	return &dns.SRV{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: s.Ttl},
 		Priority: uint16(s.Priority), Weight: weight, Port: uint16(s.Port), Target: dns.Fqdn(s.Host)}
 }
 
 // NewA returns a new A record based on the Service.
-func (s *Service) NewA(name string, ttl uint32, ip net.IP) *dns.A {
-	return &dns.A{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: ttl}, A: ip}
+func (s *Service) NewA(name string, ip net.IP) *dns.A {
+	return &dns.A{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: s.Ttl}, A: ip}
 }
 
 // NewAAAA returns a new AAAA record based on the Service.
-func (s *Service) NewAAAA(name string, ttl uint32, ip net.IP) *dns.AAAA {
-	return &dns.AAAA{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: ttl}, AAAA: ip}
+func (s *Service) NewAAAA(name string, ip net.IP) *dns.AAAA {
+	return &dns.AAAA{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeAAAA, Class: dns.ClassINET, Ttl: s.Ttl}, AAAA: ip}
 }
 
 // NewCNAME returns a new CNAME record based on the Service.
-func (s *Service) NewCNAME(name string, ttl uint32, target string) *dns.CNAME {
-	return &dns.CNAME{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: ttl}, Target: target}
+func (s *Service) NewCNAME(name string, target string) *dns.CNAME {
+	return &dns.CNAME{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeCNAME, Class: dns.ClassINET, Ttl: s.Ttl}, Target: target}
 }
 
 // NewNS returns a new NS record based on the Service.
-func (s *Service) NewNS(name string, ttl uint32, target string) *dns.NS {
-	return &dns.NS{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: ttl}, Ns: target}
+func (s *Service) NewNS(name string, target string) *dns.NS {
+	return &dns.NS{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: s.Ttl}, Ns: target}
 }
 
 // Path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
