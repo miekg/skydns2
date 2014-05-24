@@ -30,7 +30,6 @@ func addService(t *testing.T, s *server, k string, ttl uint64, m *Service) {
 		t.Fatal(err)
 	}
 	path, _ := Path(k)
-	println("PATH", path)
 	_, err = s.client.Create(path, string(b), ttl)
 	if err != nil {
 		// TODO(miek): allow for existing keys...
@@ -463,6 +462,10 @@ var dnsTestCases = []dnsTestCase{
 	},
 	// Reverse v6 local answer
 	// Reverse forwarding answer
+	{
+		Qname: "10.0.0.10.in-addr.arpa.", Qtype: dns.TypePTR,
+		Ns: []dns.RR{newSOA("10.in-addr.arpa. 10800 SOA localhost. nobody.invalid. 1 0 0 0 0")},
+	},
 	// Reverse no answer
 }
 

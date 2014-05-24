@@ -70,6 +70,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	name := strings.ToLower(q.Name)
 	StatsRequestCount.Inc(1)
 
+	if q.Qtype == dns.TypePTR && strings.HasSuffix(name, ".in-addr.arpa.") || strings.HasSuffix(name, ".ip6.arpa.") {
+		s.ServeDNSReverse(w, req)
+		return
+	}
+
 	if !strings.HasSuffix(name, s.config.Domain) {
 		s.ServeDNSForward(w, req)
 		return
@@ -215,15 +220,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 		m.Answer = append(m.Answer, records...)
 	}
-	if q.Qtype == dns.TypePTR {
-		records, err := s.PTRRecords(q)
-		if err != nil {
-			// An error, we don't do anything magic here, so SERVFAIL
-			m.SetRcode(req, dns.RcodeServerFailure)
-			return
-		}
-		m.Answer = append(m.Answer, records...)
-	}
 	if len(m.Answer) == 0 { // NODATA response
 		StatsNoDataCount.Inc(1)
 		m.Ns = []dns.RR{s.NewSOA()}
@@ -272,6 +268,23 @@ Redo:
 	m.SetReply(req)
 	m.SetRcode(req, dns.RcodeServerFailure)
 	w.WriteMsg(m)
+}
+
+// ServeDNSReverse is the handler for DNS requests for the reverse zone. If nothing is found
+// locally the request is forwarded to the forwarder for resolution.
+func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) {
+	m := new(dns.Msg)
+	m.SetReply(req)
+	m.Authoritative = true
+	m.RecursionAvailable = true
+	var err error
+	if m.Answer, err = s.PTRRecords(req.Question[0]); err == nil {
+		// TODO(miek): Reverse DNSSEC. We should sign this, but requires a key....and more
+		// Probably not worth the hassle?
+		w.WriteMsg(m)
+	}
+	// Always forward if not found locally.
+	s.ServeDNSForward(w, req)
 }
 
 func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (records []dns.RR, err error) {
@@ -476,6 +489,8 @@ func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
 		ttl = s.config.Ttl
 	}
 	serv.key = r.Node.Key
+	// If serv.Host is parseble as a IP address we should not return anything.
+	// TODO(miek).
 	records = append(records, serv.NewPTR(q.Name, ttl))
 	return records, nil
 }
