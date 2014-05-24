@@ -279,10 +279,7 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 			return nil, err
 		}
 		ip := net.ParseIP(serv.Host)
-		ttl := uint32(r.Node.TTL)
-		if ttl == 0 {
-			ttl = s.config.Ttl
-		}
+		ttl := s.calculateTtl(r.Node, serv)
 		serv.key = r.Node.Key
 		switch {
 		case ip == nil:
@@ -325,9 +322,9 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 		switch {
 		case ip == nil:
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
-			records = append(records, serv.NewA(q.Name, serv.ttl, ip.To4()))
+			records = append(records, serv.NewA(q.Name, serv.Ttl, ip.To4()))
 		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
-			records = append(records, serv.NewAAAA(q.Name, serv.ttl, ip.To16()))
+			records = append(records, serv.NewAAAA(q.Name, serv.Ttl, ip.To16()))
 		}
 	}
 	if s.config.RoundRobin {
@@ -368,10 +365,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 			return nil, nil, err
 		}
 		ip := net.ParseIP(serv.Host)
-		ttl := uint32(r.Node.TTL)
-		if ttl == 0 {
-			ttl = s.config.Ttl
-		}
+		ttl := s.calculateTtl(r.Node, serv)
 		if serv.Priority == 0 {
 			serv.Priority = int(s.config.Priority)
 		}
@@ -403,15 +397,15 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
-			records = append(records, serv.NewSRV(q.Name, serv.ttl, weight))
+			records = append(records, serv.NewSRV(q.Name, serv.Ttl, weight))
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key) // TODO(miek): ugly
-			records = append(records, serv.NewSRV(q.Name, serv.ttl, weight))
-			extra = append(extra, serv.NewA(Domain(serv.key), serv.ttl, ip.To4()))
+			records = append(records, serv.NewSRV(q.Name, serv.Ttl, weight))
+			extra = append(extra, serv.NewA(Domain(serv.key), serv.Ttl, ip.To4()))
 		case ip.To4() == nil:
 			serv.Host = Domain(serv.key)
-			records = append(records, serv.NewSRV(q.Name, serv.ttl, weight))
-			extra = append(extra, serv.NewAAAA(Domain(serv.key), serv.ttl, ip.To16()))
+			records = append(records, serv.NewSRV(q.Name, serv.Ttl, weight))
+			extra = append(extra, serv.NewAAAA(Domain(serv.key), serv.Ttl, ip.To16()))
 		}
 	}
 	return records, extra, nil
@@ -431,10 +425,7 @@ func (s *server) CNAMERecords(q dns.Question) (records []dns.RR, err error) {
 			return nil, err
 		}
 		ip := net.ParseIP(serv.Host)
-		ttl := uint32(r.Node.TTL)
-		if ttl == 0 {
-			ttl = s.config.Ttl
-		}
+		ttl := s.calculateTtl(r.Node, serv)
 		serv.key = r.Node.Key
 		if ip == nil {
 			records = append(records, serv.NewCNAME(q.Name, ttl, dns.Fqdn(serv.Host)))
@@ -494,10 +485,7 @@ Nodes:
 		if err := json.Unmarshal([]byte(n.Value), &serv); err != nil {
 			return nil, err
 		}
-		serv.ttl = uint32(n.TTL)
-		if serv.ttl == 0 {
-			serv.ttl = s.config.Ttl
-		}
+		serv.Ttl = s.calculateTtl(n, serv)
 		if serv.Priority == 0 {
 			serv.Priority = int(s.config.Priority)
 		}
@@ -516,4 +504,29 @@ func (s *server) isDuplicateCNAME(r *dns.CNAME, records []dns.RR) bool {
 		}
 	}
 	return false
+}
+
+// calculateTtl returns the smaller of the etcd TTL and the service's
+// TTL. If neither of these are set (have a zero value), the server
+// default is used.
+func (s *server) calculateTtl(node *etcd.Node, serv *Service) uint32 {
+	etcd_ttl := uint32(node.TTL)
+
+	if etcd_ttl == 0 && serv.Ttl == 0 {
+		return s.config.Ttl
+	}
+
+	if etcd_ttl == 0 {
+		return serv.Ttl
+	}
+
+	if serv.Ttl == 0 {
+		return etcd_ttl
+	}
+
+	if etcd_ttl < serv.Ttl {
+		return etcd_ttl
+	}
+
+	return serv.Ttl
 }
