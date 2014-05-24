@@ -485,7 +485,7 @@ Nodes:
 		if err := json.Unmarshal([]byte(n.Value), &serv); err != nil {
 			return nil, err
 		}
-		serv.Ttl = s.calculateTtl(n, serv)
+		serv.Ttl = s.calculateTtl(&n, serv)
 		if serv.Priority == 0 {
 			serv.Priority = int(s.config.Priority)
 		}
@@ -515,18 +515,14 @@ func (s *server) calculateTtl(node *etcd.Node, serv *Service) uint32 {
 	if etcd_ttl == 0 && serv.Ttl == 0 {
 		return s.config.Ttl
 	}
-
 	if etcd_ttl == 0 {
 		return serv.Ttl
 	}
-
 	if serv.Ttl == 0 {
 		return etcd_ttl
 	}
-
 	if etcd_ttl < serv.Ttl {
 		return etcd_ttl
 	}
-
 	return serv.Ttl
 }
