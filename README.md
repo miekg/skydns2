@@ -254,7 +254,7 @@ These can be added with:
     TODO(miek): ipv6 value here
 
 (Yes, the reverse of ip6 is not optimal.) If SkyDNS receives a PTR query it will check these paths and
-will return the contents.
+will return the contents. Note that these replies are sent with the AA (Authoritative Answer) bit off.
 If nothing is found locally the query is forwarded to the local recursor (if so configured), 
 otherwise SERVFAIL is returned.
 
