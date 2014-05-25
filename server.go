@@ -70,6 +70,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	name := strings.ToLower(q.Name)
 	StatsRequestCount.Inc(1)
 
+	if q.Qtype == dns.TypePTR && strings.HasSuffix(name, ".in-addr.arpa.") || strings.HasSuffix(name, ".ip6.arpa.") {
+		s.ServeDNSReverse(w, req)
+		return
+	}
+
 	if !strings.HasSuffix(name, s.config.Domain) {
 		s.ServeDNSForward(w, req)
 		return
@@ -189,7 +194,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
-			// Hack alert, TOOD(miek)
+			// Hack alert, TODO:(miek)
 			if err.Error() == "incomplete CNAME chain" {
 				m.SetRcode(req, dns.RcodeNameError)
 				m.Ns = []dns.RR{s.NewSOA()}
@@ -264,6 +269,23 @@ Redo:
 	m.SetReply(req)
 	m.SetRcode(req, dns.RcodeServerFailure)
 	w.WriteMsg(m)
+}
+
+// ServeDNSReverse is the handler for DNS requests for the reverse zone. If nothing is found
+// locally the request is forwarded to the forwarder for resolution.
+func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) {
+	m := new(dns.Msg)
+	m.SetReply(req)
+	m.Authoritative = false // Set to false, because I don't know what to do wrt DNSSEC.
+	m.RecursionAvailable = true
+	var err error
+	if m.Answer, err = s.PTRRecords(req.Question[0]); err == nil {
+		// TODO(miek): Reverse DNSSEC. We should sign this, but requires a key....and more
+		// Probably not worth the hassle?
+		w.WriteMsg(m)
+	}
+	// Always forward if not found locally.
+	s.ServeDNSForward(w, req)
 }
 
 func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (records []dns.RR, err error) {
@@ -435,6 +457,36 @@ func (s *server) CNAMERecords(q dns.Question) (records []dns.RR, err error) {
 			records = append(records, serv.NewCNAME(q.Name, dns.Fqdn(serv.Host)))
 		}
 	}
+	return records, nil
+}
+
+func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
+	name := strings.ToLower(q.Name)
+	path, star := Path(name)
+	if star {
+		return nil, fmt.Errorf("reverse can not contain wildcards")
+	}
+	r, err := s.client.Get(path, false, false)
+	if err != nil {
+		// if server has a forward, forward the query
+		return nil, err
+	}
+	if r.Node.Dir {
+		return nil, fmt.Errorf("reverse should not be a directory")
+	}
+	var serv *Service
+	if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
+		s.config.log.Infof("failed to parse json: %s", err.Error())
+		return nil, err
+	}
+	ttl := uint32(r.Node.TTL)
+	if ttl == 0 {
+		ttl = s.config.Ttl
+	}
+	serv.key = r.Node.Key
+	// If serv.Host is parseble as a IP address we should not return anything.
+	// TODO(miek).
+	records = append(records, serv.NewPTR(q.Name, ttl))
 	return records, nil
 }
 

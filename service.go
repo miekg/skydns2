@@ -50,6 +50,11 @@ func (s *Service) NewNS(name string, target string) *dns.NS {
 	return &dns.NS{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: s.Ttl}, Ns: target}
 }
 
+// NewPTR returns a new PTR record based on the Service.
+func (s *Service) NewPTR(name string, ttl uint32) *dns.PTR {
+	return &dns.PTR{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: ttl}, Ptr: dns.Fqdn(s.Host)}
+}
+
 // Path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
 // the resulting key will be /skydns/local/skydns/staging/service .
 // If a name contains wildcards (*), the name will be chopped of before the (first) wildcard, and
