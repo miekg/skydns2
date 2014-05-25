@@ -275,7 +275,7 @@ Redo:
 func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) {
 	m := new(dns.Msg)
 	m.SetReply(req)
-	m.Authoritative = true
+	m.Authoritative = false // Set to false, because I don't know what to do wrt DNSSEC.
 	m.RecursionAvailable = true
 	var err error
 	if m.Answer, err = s.PTRRecords(req.Question[0]); err == nil {
