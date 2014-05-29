@@ -541,7 +541,7 @@ Nodes:
 		if err := json.Unmarshal([]byte(n.Value), &serv); err != nil {
 			return nil, err
 		}
-		serv.Ttl = s.calculateTtl(&n, serv)
+		serv.Ttl = s.calculateTtl(n, serv)
 		if serv.Priority == 0 {
 			serv.Priority = int(s.config.Priority)
 		}
