@@ -21,6 +21,11 @@ SkyDNS2:
 
 Note thats bugs in SkyDNS1 will still be fixed, but the main development effort will be focussed on version 2.
 [Version 1 of SkyDNS can be found here](https://github.com/skynetservices/skydns1).
+
+# Future ideas
+
+* Abstract away the backend in an interface, so different backends can be used.
+* Make SkyDNS a full blown library and provide a small server.
  
 ## Setup / Install
 Download/compile and run etcd. See the documentation for etcd at <https://github.com/coreos/etcd>.
