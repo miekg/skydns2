@@ -16,7 +16,7 @@ SkyDNS2:
 * Does away with Raft and uses Etcd (which uses raft).
 * Makes is possible to query arbitrary domain names.
 * Is a thin layer above etcd, that translates etcd keys and values to the DNS.
-    In the near future, SkyDNS2 will possibly be upstreamed and incorperated directly in etcd.
+    In the near future, SkyDNS2 will possibly be upstreamed and incorporated directly in etcd.
 * Does DNSSEC with NSEC3 instead of NSEC (Work in progress).
 
 Note thats bugs in SkyDNS1 will still be fixed, but the main development effort will be focussed on version 2.
