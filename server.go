@@ -382,7 +382,6 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 	if err != nil {
 		return nil, nil, err
 	}
-	weight := uint16(100)
 	if !r.Node.Dir { // single element
 		serv := new(Service)
 		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
@@ -398,14 +397,14 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		serv.Ttl = ttl
 		switch {
 		case ip == nil:
-			records = append(records, serv.NewSRV(q.Name, weight))
+			records = append(records, serv.NewSRV(q.Name, uint16(100)))
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key) // TODO(miek): ugly
-			records = append(records, serv.NewSRV(q.Name, weight))
+			records = append(records, serv.NewSRV(q.Name, uint16(100)))
 			extra = append(extra, serv.NewA(Domain(r.Node.Key), ip.To4()))
 		case ip.To4() == nil:
 			serv.Host = Domain(serv.key) // TODO(miek): ugly
-			records = append(records, serv.NewSRV(q.Name, weight))
+			records = append(records, serv.NewSRV(q.Name, uint16(100)))
 			extra = append(extra, serv.NewAAAA(Domain(r.Node.Key), ip.To16()))
 		}
 		return records, extra, nil
@@ -418,12 +417,32 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 	if len(sx) == 0 {
 		return nil, nil, nil
 	}
-	weight = uint16(math.Floor(float64(100 / len(sx))))
+	// Looping twice to get the right weight vs priority
+	w := make(map[int]int)
 	for _, serv := range sx {
+		weight := 100
+		if serv.Weight != 0 {
+			weight = serv.Weight
+		}
+		if _, ok := w[serv.Priority]; !ok {
+			w[serv.Priority] = weight
+			continue
+		}
+		w[serv.Priority] += weight
+	}
+	for _, serv := range sx {
+		w1 := 100.0 / float64(w[serv.Priority])
+		// adjust for a particular service
+		if serv.Weight == 0 {
+			w1 *= 100
+		} else {
+			w1 *= float64(serv.Weight)
+		}
+		weight := uint16(math.Floor(w1))
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
-			records = append(records, serv.NewSRV(q.Name, weight))
+			records = append(records, serv.NewSRV(q.Name,weight))
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key) // TODO(miek): ugly
 			records = append(records, serv.NewSRV(q.Name, weight))
