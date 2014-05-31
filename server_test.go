@@ -155,7 +155,6 @@ func TestDNSTtlRRset(t *testing.T) {
 
 	ttl := uint32(60)
 	for _, serv := range services {
-//		m := &Service{Host: serv.Host, Port: serv.Port, Priority: s}
 		addService(t, s, serv.key, uint64(ttl), serv)
 		defer delService(t, s, serv.key)
 		ttl += 60
@@ -185,7 +184,6 @@ func TestDNS(t *testing.T) {
 	defer s.Stop()
 
 	for _, serv := range services {
-//		m := &Service{Host: serv.Host, Port: serv.Port, Ttl: serv.Ttl}
 		addService(t, s, serv.key, 0, serv)
 		defer delService(t, s, serv.key)
 	}
@@ -333,6 +331,10 @@ var services = []*Service{
 	{Host: "3.cname.skydns.test", key: "4.cname.skydns.test."},
 	{Host: "10.0.0.2", key: "ttl.skydns.test.", Ttl: 360},
 	{Host: "reverse.example.com", key: "1.0.0.10.in-addr.arpa."},	// 10.0.0.1
+	{Host: "server1", Weight: 130, key: "100.server1.region5.skydns.test."},
+	{Host: "server2", Weight: 80, key: "101.server2.region5.skydns.test."},
+	{Host: "server3", Weight: 150, key: "103.server3.region5.skydns.test."},
+	{Host: "server4", Priority: 30, key: "104.server4.region5.skydns.test."},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -414,6 +416,14 @@ var dnsTestCases = []dnsTestCase{
 			newSRV("region1.skydns.test. 3600 SRV 10 33 0 104.server1.development.region1.skydns.test."),
 			newSRV("region1.skydns.test. 3600 SRV 10 33 80 server2")},
 		Extra: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
+	},
+	// Subdomain Weight Test
+	{
+		Qname: "region5.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{newSRV("region5.skydns.test. 3600 SRV 10 36 0 server1."),
+			newSRV("region5.skydns.test. 3600 SRV 10 22 0 server2."),
+			newSRV("region5.skydns.test. 3600 SRV 10 41 0 server3."),
+			newSRV("region5.skydns.test. 3600 SRV 30 100 0 server4.")},
 	},
 	// Wildcard Test
 	{

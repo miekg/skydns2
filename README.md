@@ -118,17 +118,17 @@ The Weight of a service is calculated as follows. We treat Weight as a percentag
 
 | Service | Weight  | SRV.Weight |
 | --------| ------- | ---------- |
-|    a    |   1     |    33      |
-|    b    |   1     |    33      |
-|    c    |   1     |    33      |
+|    a    |   100   |    33      |
+|    b    |   100   |    33      |
+|    c    |   100   |    33      |
 
-If we add some other weight to the equation some service got a higher Weight:
+If we add other weights to the equation some services will get a different Weight:
 
 | Service | Weight  | SRV.Weight |
 | --------| ------- | ---------- |
-|    a    |   1.2   |    34      |
-|    b    |   1     |    28      |
-|    c    |   1.3   |    37      |
+|    a    |   120   |    34      |
+|    b    |   100   |    28      |
+|    c    |   130   |    37      |
 
 Note, all calculations are rounded down, so the sum total might be lower than 100.
 
