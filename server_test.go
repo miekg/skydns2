@@ -30,6 +30,7 @@ func addService(t *testing.T, s *server, k string, ttl uint64, m *Service) {
 		t.Fatal(err)
 	}
 	path, _ := Path(k)
+	t.Logf("Adding path %s:", path)
 	_, err = s.client.Create(path, string(b), ttl)
 	if err != nil {
 		// TODO(miek): allow for existing keys...
@@ -331,8 +332,7 @@ var services = []*Service{
 	{Host: "4.cname.skydns.test", key: "3.cname.skydns.test."},
 	{Host: "3.cname.skydns.test", key: "4.cname.skydns.test."},
 	{Host: "10.0.0.2", key: "ttl.skydns.test.", Ttl: 360},
-	{Host: "reverse.example.com", key: "arpa.in-addr.10.0.0.1."},
-	{Host: "reverse6.example.com", key: "arpa.ip6.2.0.0.1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.0.0.0.8.0.0.0.8.0.0.0.8."},
+	{Host: "reverse.example.com", key: "1.0.0.10.in-addr.arpa."},	// 10.0.0.1
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -468,12 +468,10 @@ var dnsTestCases = []dnsTestCase{
 	// Reverse
 
 	// Reverse v4 local answer
-	/*
 	{
 		Qname: "1.0.0.10.in-addr.arpa.", Qtype: dns.TypePTR,
 		Answer: []dns.RR{newPTR("1.0.0.10.in-addr.arpa. 3600 PTR reverse.example.com.")},
 	},
-	*/
 	// Reverse v6 local answer
 	// Reverse forwarding answer
 	{

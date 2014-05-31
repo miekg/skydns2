@@ -270,23 +270,20 @@ So looking back at some of the services in the section [](#service-discovery-via
 we register these IP only ones:
 
     4.rails.staging.east.skydns.local. 10.0.1.125
-    6.rails.stating.east.skydns.local. 2003::8:1
 
 To add the reverse of these address you need to add the following names and values:
 
     125.1.0.10.in-addr.arpa. service1.example.com.
-    1.0.0.0.8.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.3.0.0.2.ip6.arpa. service1.example.com.
 
 These can be added with:
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/arpa/in-addr/10/0/1/125 \
         -d value='{"host":"service1.example.com}'
-    TODO(miek): ipv6 value here
 
-(Yes, the reverse of ip6 is not optimal.) If SkyDNS receives a PTR query it will check these paths and
-will return the contents. Note that these replies are sent with the AA (Authoritative Answer) bit *off*.
-If nothing is found locally the query is forwarded to the local recursor (if so configured), 
-otherwise SERVFAIL is returned.
+If SkyDNS receives a PTR query it will check these paths and will return the
+contents. Note that these replies are sent with the AA (Authoritative Answer)
+bit *off*. If nothing is found locally the query is forwarded to the local
+recursor (if so configured), otherwise SERVFAIL is returned.
 
 #### DNS Forwarding
 
