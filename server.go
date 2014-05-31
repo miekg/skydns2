@@ -125,8 +125,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				return
 			}
 		}
-		if q.Qtype == dns.TypeTXT && name == s.config.Domain {
-			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 0}
+		if q.Qclass == dns.ClassCHAOS && q.Qtype == dns.TypeTXT && name == s.config.Domain {
+			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
 			authors := []string{"Erik St. Martin", "Brian Ketelsen", "Miek Gieben", "Michael Crosby"}
 			for _, a := range authors {
 				m.Answer = append(m.Answer, &dns.TXT{Hdr: hdr, Txt: []string{a}})
