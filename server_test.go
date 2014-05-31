@@ -94,7 +94,7 @@ func TestDNSExpire(t *testing.T) {
 	defer s.Stop()
 
 	serv := services[0]
-	addService(t, s, serv.key, 1, &Service{Host: serv.Host, Port: serv.Port})
+	addService(t, s, serv.key, 1, serv)
 	// defer delService(t, s, serv.key) // It will delete itself...magically
 
 	c := new(dns.Client)
@@ -154,8 +154,8 @@ func TestDNSTtlRRset(t *testing.T) {
 
 	ttl := uint32(60)
 	for _, serv := range services {
-		m := &Service{Host: serv.Host, Port: serv.Port}
-		addService(t, s, serv.key, uint64(ttl), m)
+//		m := &Service{Host: serv.Host, Port: serv.Port, Priority: s}
+		addService(t, s, serv.key, uint64(ttl), serv)
 		defer delService(t, s, serv.key)
 		ttl += 60
 	}
@@ -184,8 +184,8 @@ func TestDNS(t *testing.T) {
 	defer s.Stop()
 
 	for _, serv := range services {
-		m := &Service{Host: serv.Host, Port: serv.Port, Ttl: serv.Ttl}
-		addService(t, s, serv.key, 0, m)
+//		m := &Service{Host: serv.Host, Port: serv.Port, Ttl: serv.Ttl}
+		addService(t, s, serv.key, 0, serv)
 		defer delService(t, s, serv.key)
 	}
 	c := new(dns.Client)
@@ -403,12 +403,10 @@ var dnsTestCases = []dnsTestCase{
 		Answer: []dns.RR{},
 	},
 	// Priority Test
-	/*
 	{
 		Qname: "region6.skydns.test.", Qtype: dns.TypeSRV,
 		Answer: []dns.RR{newSRV("region6.skydns.test. 3600 SRV 333 100 80 server4.")},
 	},
-	*/
 	// Subdomain Test
 	{
 		Qname: "region1.skydns.test.", Qtype: dns.TypeSRV,
@@ -501,7 +499,7 @@ func BenchmarkDNSSingle(b *testing.B) {
 	defer s.Stop()
 
 	serv := services[0]
-	addService(t, s, serv.key, 0, &Service{Host: serv.Host, Port: serv.Port})
+	addService(t, s, serv.key, 0, serv)
 	defer delService(t, s, serv.key)
 
 	c := new(dns.Client)
@@ -545,7 +543,7 @@ func BenchmarkDNSSECSingle(b *testing.B) {
 	defer s.Stop()
 
 	serv := services[0]
-	addService(t, s, serv.key, 0, &Service{Host: serv.Host, Port: serv.Port})
+	addService(t, s, serv.key, 0, serv)
 	defer delService(t, s, serv.key)
 
 	c := new(dns.Client)
