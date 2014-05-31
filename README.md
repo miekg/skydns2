@@ -1,266 +1,324 @@
-#SkyDNS [![Build Status](https://travis-ci.org/skynetservices/skydns.png)](https://travis-ci.org/skynetservices/skydns)
+# SkyDNS [![Build Status](https://travis-ci.org/skynetservices/skydns.png)](https://travis-ci.org/skynetservices/skydns)
 *Version 2.0.0*
 
-SkyDNS bla bla bla, uses Etcd and utilizes DNS queries. Bla bla bla.
+SkyDNS is a distributed service for announcement and discovery of services built on
+top of [etcd](https://github.com/coreos/etcd). It utilizes DNS queries
+to discover available services. This is done by leveraging SRV records in DNS,
+with special meaning given to subdomains, priorities and weights.
 
-This is the origingal [announcement blog post](http://blog.gopheracademy.com/skydns) for version 1, since then SkyDNS
-has seen some changes.
+This is the original [announcement blog post](http://blog.gopheracademy.com/skydns) for version 1. 
+Since then, SkyDNS has seen some changes, most notably the ability to use etcd as a backend.
 
-##Setup / Install
+# Changes since version 1
 
-Compile SkyDNS, and execute it
+SkyDNS2:
+
+* Does away with Raft and uses Etcd (which uses raft).
+* Makes is possible to query arbitrary domain names.
+* Is a thin layer above etcd, that translates etcd keys and values to the DNS.
+    In the near future, SkyDNS2 will possibly be upstreamed and incorperated directly in etcd.
+* Does DNSSEC with NSEC3 instead of NSEC (Work in progress).
+
+Note thats bugs in SkyDNS1 will still be fixed, but the main development effort will be focussed on version 2.
+[Version 1 of SkyDNS can be found here](https://github.com/skynetservices/skydns1).
+
+# Future ideas
+
+* Abstract away the backend in an interface, so different backends can be used.
+* Make SkyDNS a library and provide a small server.
+ 
+## Setup / Install
+Download/compile and run etcd. See the documentation for etcd at <https://github.com/coreos/etcd>.
+
+Then compile SkyDNS:
 
 `go get -d -v ./... && go build -v ./...`
 
-`./skydns`
+SkyDNS' configuration is stored *in* etcd: but there are also flags. To start SkyDNS, set the
+etcd machines with the environment variable ETCD_MACHINES:
 
-Which takes the following flags
-- -domain - This is the domain requests are anchored to and should be appended to all requests (Defaults to: skydns.local)
-- -dns - This is the ip:port to listen on for DNS requests (Defaults to: 127.0.0.1:53)
-- -etcd - url of etcd.
+    export ETCD_MACHINES='http://192.168.0.1:4001,http://192.168.0.2:4001'
+    ./skydns
 
+If `ETCD_MACHINES` is not set, SkyDNS will default to using `http://127.0.0.1:4001` to connect to etcd.
+Or you can use the flag `-machines`.
 
-##API
-### Service Announcements
-You announce your service by submitting JSON over HTTP to SkyDNS with information about your service.
-This information will then be available for queries either via DNS or HTTP.
+## Configuration
+SkyDNS' configuration is stored in etcd as a JSON object under the key `/skydns/config`. The following parameters
+may be set:
 
-When providing information you will need to fill out the following values. Note you are free to use
-whatever you like, so take the following list as a guide only.
+* `dns_addr`: IP:port on which SkyDNS should listen, defaults to `127.0.0.1:53`.
+* `domain`: domain for which SkyDNS is authoritative, defaults to `skydns.local.`.
+* `dnssec`: enable DNSSEC (broken at the moment).
+* `round_robin`: enable round-robin sorting for A and AAAA responses, defaults to true.
+* `nameservers`: forward DNS requests to these nameservers (array of IP:port combination), when not
+    authoritative for a domain.
+* `read_timeout`: network read timeout, for DNS and talking with etcd.
+* `ttl`: default TTL in seconds to use on replies when none is set in etcd, defaults to 3600.
+* `min_ttl`: minimum TTL in seconds to use on NXDOMAIN, defaults to 30.
 
-* Name - The name of your service, e.g., "rails", "web" or anything else you like
-* Version - A version string, note the dots in this string are translated to hyphens when
-    querying via the DNS
-* Environment - Can be something as "production" or "testing"
-* Region - Where do these hosts live, e.g. "east", "west" or even "test"
-* Host, Port and TTL - Denote the actuals hosts and how long (TTL) this information is valid.
+To set the configuration, use something like:
 
-When queried SkyDNS will return records containing these elements in the following
-order:
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/config \
+        -d value='{"dns_addr":"127.0.0.1:5354","ttl":3600, "nameservers": ["8.8.8.8:53","8.8.4.4:53"]}'
 
-    <uuid>.<host>.<region>.<version>.<service>.<environment>.skydns.local
+SkyDNS needs to be restarted for configuration changes to take effect. This might change, so that SkyDNS
+can re-read the config from Etcd after a HUP signal.
 
-Where `<uuid>` is the identifier used when registering this host and service. And also
-note the `<service>` corresponds with the Name given above.
+### Environment Variables
 
-Note some of these elements may contain a wildcard or be left out completely,
-see the section named "Wildcards" below for more information.
+SkyDNS uses these environment variables:
 
-#### Without Shared Secret 
-`curl -X PUT -L http://localhost:8080/skydns/services/1001 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"Test","Host":"web1.site.com","Port":9000,"TTL":10}'`
+* `ETCD_MACHINES` - list of etcd machines, "http://localhost:4001,http://etcd.example.com:4001".
+* `ETCD_TLSKEY` - TLS private key path.
+* `ETCD_TLSPEM` - X509 certificate path.
 
-#### With Shared Secret 
-You have the ability to use a shared secret with SkyDns. To take advantage of the shared secret you would start skydns with the -secret=<secretString> flag.
-`curl -X PUT -H "Authorization mysupersecretsharedsecret" -L http://localhost:8080/skydns/services/1001 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"Test","Host":"web1.site.com","Port":9000,"TTL":10}'`
+And these are used for statistics:
 
-If unsuccessful you should receive an HTTP status code of: **403 Forbidden**
+* `GRAPHITE_SERVER`
+* `STATHAT_USER`
+* `INFLUX_SERVER`
+* `INFLUX_DATABASE`
+* `INFLUX_USER`
+* `INFLUX_PASSWORD`
 
-#### Result 
+## Service Announcements
+Announce your service by submitting JSON over HTTP to etcd with information about your service.
+This information will then be available for queries via DNS.
+We use the directory `/skydns` to anchor all names.
 
-If successful you should receive an HTTP status code of: **201 Created**
+When providing information you will need to fill out (some of) the following values.
 
-If a service with this UUID already exists you will receive back an HTTP status
-code of: **409 Conflict**
+* Path - The path of the key in etcd, e.g. if the domain you want to register is "rails.production.east.skydns.local", you need to reverse it and replace the dots with slashes. So the name here becomes:
+    `local/skydns/east/production/rails`. 
+  Then prefix the `/skydns/` string too, so the final path becomes
+    `/v2/keys/skdydns/local/skydns/east/production/rails`
+* Host - The name of your service, e.g., `service5.mydomain.com`,  and IP address (either v4 or v6)
+* Port - the port where the service can be reached.
+* Priority - the priority of the service, the lower the value, the more preferred;
+* Weight - a weight factor that will be used for services with the same Priority.
+* TTL - the time-to-live of the service, overriding the default TTL. If the etcd key also has a TTL, the minimum of this value and the etcd TTL is used.
 
-SkyDNS will now have an entry for your service that will live for the number
-of seconds supplied in your TTL (10 seconds in our example), unless you send a
-heartbeat to update the TTL.
+Path and Host are mandatory.
 
-Note that instead of a hostname you can also use an IP address (IPv4 or IPV6),
-in that case SkyDNS will make up an hostname that is used in the SRV record
-(defaults to UUID.skydns.local) and adds the IP adress as an A or AAAAA record
-in the additional section for this hostname.
+Adding the service can thus be done with:
 
-### Heartbeat / Keep alive
-SkyDNS requires that services submit an HTTP request to update their TTL within
-the TTL they last supplied. If the service fails to do so within this timeframe
-SkyDNS will expire the service automatically. This will allow for nodes to fail
-and DNS to reflect this quickly.
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/production/rails \
+        -d value='{"host":"service5.example.com","priority":20}'
 
-You can update your TTL by sending an HTTP request to SkyDNS with an updated
-TTL, it can be the same as before to allow it to live for another 10s, or it can
-be adjusted to a shorter or longer duration.
+Or with [`etcdctl`](https://github.com/coreos/etcdctl):
 
-`curl -X PATCH -L http://localhost:8080/skydns/services/1001 -d '{"TTL":10}'`
+    etcdctl set /skydns/local/skydns/east/production/rails \
+        '{"host":"service5.example.com","priority":20}'
 
-### Service Removal
-If you wish to remove your service from SkyDNS for any reason without waiting for the TTL to expire, you simply send an HTTP DELETE.
+When querying the DNS for services you can use wildcards or query for subdomains. See the section named "Wildcards" below for more information.
 
-`curl -X DELETE -L http://localhost:8080/skydns/services/1001`
+The Weight of a service is calculated as follows. We treat Weight as a percentage, so if there are
+3 services, the weight is set to 33 for each:
 
-### Retrieve Service Info via API
-Currently you may only retrieve a service's info by UUID of the service, in the
-future we may implement querying of the services similar to the DNS interface.
+| Service | Weight  | SRV.Weight |
+| --------| ------- | ---------- |
+|    a    |   100   |    33      |
+|    b    |   100   |    33      |
+|    c    |   100   |    33      |
 
-`curl -X GET -L http://localhost:8080/skydns/services/1001`
+If we add other weights to the equation some services will get a different Weight:
 
-### Call backs
-Registering a call back is similar to registering a service. A service that
-registers a call back will receive an HTTP request. Every time something changes
-in the service: the callback is executed, currently they are called when the
-service is deleted.
+| Service | Weight  | SRV.Weight |
+| --------| ------- | ---------- |
+|    a    |   120   |    34      |
+|    b    |   100   |    28      |
+|    c    |   130   |    37      |
 
-`curl -X PUT -L http://localhost:8080/skydns/callbacks/1001 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"Test","Host":"web1.site.com",Reply:"web2.example.nl","Port":5441}'`
+Note, all calculations are rounded down, so the sum total might be lower than 100.
 
-This will result in the call back being sent to `web2.example.nl` on port 5441. The
-callback itself will be a HTTP DELETE:
+## Service Discovery via the DNS
 
-`curl -X DELETE -L http://web2.example.nl:5441/skydns/callbacks/1001 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"Test","Host":"web1.site.com"}'`
+You can find services by querying SkyDNS via any DNS client or utility. It uses a known domain syntax with subdomains to find matching services.
 
-##Discovery (DNS)
-You can find services by querying SkyDNS via any DNS client or utility. It uses a known domain syntax with wildcards to find matching services.
+For the purpose of this document, let's suppose we have added the following services to etcd:
 
-Priorities and Weights are based on the requested Region, as well as how many nodes are available matching the current request in the given region.
+* 1.rails.production.east.skydns.local, mapping to service1.example.com
+* 2.rails.production.west.skydns.local, mapping to service2.example.com
+* 4.rails.staging.east.skydns.local, mapping to 10.0.1.125
+* 6.rails.staging.east.skydns.local, mapping to 2003::8:1
 
-###Domain Format
-The domain syntax when querying follows a pattern where the right
-most positions are more generic, than the subdomains to their left:
-*\<uuid\>.\<host\>.\<region\>.\<version\>.\<service\>.\<environment\>.skydns.local*. 
-This allows for you to supply only the positions you care about:
+These names can be added with:
 
-- authservice.production.skydns.local - For instance would return all services with the name AuthService in the production environment, regardless of the Version, Region, or Host
-- 1-0-0.authservice.production.skydns.local - Is the same as above but restricting it to only version 1.0.0
-- east.1-0-0.authservice.production.skydns.local - Would add the restriction that the services must be running in the East region
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/production/rails/1 \
+        -d value='{"host":"service1.example.com","port":8080}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/west/production/rails/2 \
+        -d value='{"host":"service2.example.com","port":8080}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/staging/rails/4 \
+        -d value='{"host":"10.0.1.125","port":8080}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/staging/rails/6 \
+        -d value='{"host":"2003::8:1","port":8080}'
 
-#### Wildcards
+Testing one of the names with `dig`:
 
-In addition to only needing to specify as much of the domain as required for the granularity level you're looking for, you may also supply the wildcard `*` in any of the positions.
+    % dig @localhost SRV 1.rails.production.east.skydns.local
+    ;; QUESTION SECTION:
+    ;1.rails.production.east.skydns.local.	IN	SRV
 
-- east.*.*.production.skydns.local - Would return all services in the East region, that are a part of the production environment.
+    ;; ANSWER SECTION:
+    1.rails.production.east.skydns.local. 3600 IN SRV 10 0 8080 service1.example.com.
 
-###Examples
+### Wildcards
 
-Let's take a look at some results. First we need to add a few services so we have services to query against.
+Of course using the full names isn't *that* useful, so SkyDNS lets you query for subdomains, and returns responses based upon the amount of services matched by the subdomain or from the wildcard query.
 
-	// Service 1001 (East Region)
-	curl -X PUT -L http://localhost:8080/skydns/services/1001 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"East","Host":"web1.site.com","Port":80,"TTL":4000}'
-	
-	// Service 1002 (East Region)
-	curl -X PUT -L http://localhost:8080/skydns/services/1002 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"East","Host":"web2.site.com","Port":8080,"TTL":4000}'
-	
-	// Service 1003 (West Region)
-	curl -X PUT -L http://localhost:8080/skydns/services/1003 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"West","Host":"web3.site.com","Port":80,"TTL":4000}'
-	
-	// Service 1004 (West Region)
-	curl -X PUT -L http://localhost:8080/skydns/services/1004 -d '{"Name":"TestService","Version":"1.0.0","Environment":"Production","Region":"West","Host":"web4.site.com","Port":80,"TTL":4000}'
+If we are interested in all the servers in the `east` region, we simply omit the rightmost labels from our query:
+
+    % dig @localhost SRV east.skydns.local
+    ;; QUESTION SECTION
+    ; east.skydns.local.    IN      SRV
+
+    ;; ANSWER SECTION:
+    east.skydns.local.      3600    IN      SRV     10 20 8080 service1.example.com.
+    east.skydns.local.      3600    IN      SRV     10 20 8080 4.rails.staging.east.skydns.local.
+    east.skydns.local.      3600    IN      SRV     10 20 8080 6.rails.staging.east.skydns.local.
+
+    ;; ADDITIONAL SECTION:
+    4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
+    6.rails.staging.east.skydns.local. 3600 IN AAAA 2003::8:1
+
+Here all three entries of the `east` are returned. 
+
+There is one other feature at play here. The second and third names, `{4,6}.rails.staging.east.skydns.local`, only had an IP record configured. Here SkyDNS used the ectd path to construct a target name and then puts the actual IP address in the additional section. Directly querying for the A records of `4.rails.staging.east.skydns.local.` of course also works:
+
+    % dig @localhost -p 5354 +noall +answer A 4.rails.staging.east.skydns.local.
+    4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
+
+Another way to leads to the same result it to query for `*.east.skydns.local`, you even put the wildcard
+(the `*`) in the middle of a name `staging.*.skydns.local` is a valid query, which returns all name
+in staging, regardless of the region. Multiple wildcards per name are also permitted.
+
+### Examples
 
 Now we can try some of our example DNS lookups:
-#####All services in the Production Environment
-`dig @localhost production.skydns.local SRV`
 
-	;; QUESTION SECTION:
-	;production.skydns.local.			IN	SRV
+#### SRV Records
 
-	;; ANSWER SECTION:
-	production.skydns.local.		629		IN	SRV	10 20 80   web1.site.com.
-	production.skydns.local.		3979	IN	SRV	10 20 8080 web2.site.com.
-	production.skydns.local.		3629	IN	SRV	10 20 9000 server24.
-	production.skydns.local.		3985	IN	SRV	10 20 80   web3.site.com.
-	production.skydns.local.		3990	IN	SRV	10 20 80   web4.site.com.
+Get all Services in staging.east:
 
-#####All TestService instances in Production Environment
-`dig @localhost testservice.production.skydns.local SRV`
+    % dig @localhost staging.east.skydns.local. SRV
 
-	;; QUESTION SECTION:
-	;testservice.production.skydns.local.		IN	SRV
+    ;; QUESTION SECTION:
+    ;staging.east.skydns.local. IN  SRV
 
-	;; ANSWER SECTION:
-	testservice.production.skydns.local.	615		IN	SRV	10 20 80   web1.site.com.
-	testservice.production.skydns.local.	3966	IN	SRV	10 20 8080 web2.site.com.
-	testservice.production.skydns.local.	3615	IN	SRV	10 20 9000 server24.
-	testservice.production.skydns.local.	3972	IN	SRV	10 20 80   web3.site.com.
-	testservice.production.skydns.local.	3976	IN	SRV	10 20 80   web4.site.com.
+    ;; ANSWER SECTION:
+    staging.east.skydns.local. 3600 IN  SRV 10 50 8080 4.rails.staging.east.skydns.local.
+    staging.east.skydns.local. 3600 IN  SRV 10 50 8080 6.rails.staging.east.skydns.local.
 
-#####All TestService v1.0.0 Instances in Production Environment
-`dig @localhost 1-0-0.testservice.production.skydns.local SRV`
+    ;; ADDITIONAL SECTION:
+    4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
+    6.rails.staging.east.skydns.local. 3600 IN AAAA 2003::8:1
 
-	;; QUESTION SECTION:
-	;1-0-0.testservice.production.skydns.local.	IN	SRV
-
-	;; ANSWER SECTION:
-	1-0-0.testservice.production.skydns.local. 600  IN	SRV	10 20 80   web1.site.com.
-	1-0-0.testservice.production.skydns.local. 3950 IN	SRV	10 20 8080 web2.site.com.
-	1-0-0.testservice.production.skydns.local. 3600 IN	SRV	10 20 9000 server24.
-	1-0-0.testservice.production.skydns.local. 3956 IN	SRV	10 20 80   web3.site.com.
-	1-0-0.testservice.production.skydns.local. 3961 IN	SRV	10 20 80   web4.site.com.
-
-#####All TestService Instances at any version, within the East region
-`dig @localhost east.*.testservice.production.skydns.local SRV`
-
-This is where we've changed things up a bit, notice we used the "*" wildcard for
-version so we get any version, and because we've supplied an explicit region
-that we're looking for we get that as the highest DNS priority, with the weight
-being distributed evenly, then all of our West instances still show up for
-fail-over, but with a higher Priority.
-
-	;; QUESTION SECTION:
-	;east.*.testservice.production.skydns.local. IN	SRV
-
-	;; ANSWER SECTION:
-	east.*.testservice.production.skydns.local. 531  IN SRV	10 50 80   web1.site.com.
-	east.*.testservice.production.skydns.local. 3881 IN SRV	10 50 8080 web2.site.com.
-	east.*.testservice.production.skydns.local. 3531 IN SRV	20 33 9000 server24.
-	east.*.testservice.production.skydns.local. 3887 IN SRV	20 33 80   web3.site.com.
-	east.*.testservice.production.skydns.local. 3892 IN SRV	20 33 80   web4.site.com.
-
-
-####A Records
+#### A/AAAA Records
 To return A records, simply run a normal DNS query for a service matching the above patterns.
 
-Let's add some web servers to SkyDNS:
-
-	curl -X PUT -L http://localhost:8080/skydns/services/1011 -d '{"Name":"rails","Version":"1.0.0","Environment":"Production","Region":"East","Host":"127.0.0.10","Port":80,"TTL":400000}'
-	curl -X PUT -L http://localhost:8080/skydns/services/1012 -d '{"Name":"rails","Version":"1.0.0","Environment":"Production","Region":"East","Host":"127.0.0.11","Port":80,"TTL":400000}'
-	curl -X PUT -L http://localhost:8080/skydns/services/1013 -d '{"Name":"rails","Version":"1.0.0","Environment":"Production","Region":"West","Host":"127.0.0.12","Port":80,"TTL":400000}'
-	curl -X PUT -L http://localhost:8080/skydns/services/1014 -d '{"Name":"rails","Version":"1.0.0","Environment":"Production","Region":"West","Host":"127.0.0.13","Port":80,"TTL":400000}'
-
 Now do a normal DNS query:
-`dig rails.production.skydns.local`
 
-	;; QUESTION SECTION:
-	;rails.production.skydns.local.	IN	A
+    % dig @localhost staging.east.skydns.local. A
 
-	;; ANSWER SECTION:
-	rails.production.skydns.local. 399918 IN A	127.0.0.10
-	rails.production.skydns.local. 399918 IN A	127.0.0.11
-	rails.production.skydns.local. 399918 IN A	127.0.0.12
-	rails.production.skydns.local. 399919 IN A	127.0.0.13
+    ;; QUESTION SECTION:
+    ;staging.east.skydns.local. IN  A
 
-Now you have a list of all known IP Addresses registered running the `rails`
-service name. Because we're returning A records and not SRV records, there
-are no ports listed, so this is only useful when you're querying for services
-running on ports known to you in advance. Notice, we didn't specify version or
-region, but we could have.
+    ;; ANSWER SECTION:
+    staging.east.skydns.local. 3600 IN  A   10.0.1.125
 
-####DNS Forwarding
+Now you have a list of all known IP Addresses registered running in staging in
+the east area.
 
-By specifying `-nameserver="8.8.8.8:53,8.8.4.4:53` on the `skydns` command line,
-you create a DNS forwarding proxy. In this case it round robins between the two
-nameserver IPs mentioned on the command line.
+Because we're returning A records and not SRV records, there are no ports
+listed, so this is only useful when you're querying for services running on
+ports known to you in advance.
 
-Requests for which SkyDNS isn't authoritative
-will be forwarded and proxied back to the client. This means that you can set
-SkyDNS as the primary DNS server in `/etc/resolv.conf` and use it for both service
-discovery and normal DNS operations.
+#### CNAME Records
+If for an A or AAAA query the IP address can not be parsed, SkyDNS will try to see if there is
+a chain of names that will lead to an IP address. The chain can not be longer than 8. So for instance
+if the following services have been registered:
 
-*Please test this before relying on it in production, as there may be edge cases that don't work as planned.*
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/production/rails/1 \
+        -d value='{"host":"service1.skydns.local","port":8080}'
 
-####DNSSEC
+and
 
-SkyDNS support signing DNS answers (also know as DNSSEC). To use it you need to
-create a DNSSEC keypair and use that in SkyDNS. For instance if the domain for
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/service1 \
+        -d value='{"host":"10.0.2.15","port":8080}'
+
+We have created the following CNAME chain: `1.rails.production.east.skydns.local` -> `service1.skydns.local` ->
+`10.0.2.15`. If you then query for an A or AAAA for 1.rails.production.east.skydns.local SkyDNS returns:
+
+    1.rails.production.east.skydns.local. 3600  IN  CNAME   server1.skydns.local.
+    server1.skydns.local.                 3600  IN  A       10.0.2.15
+
+#### NS Records
+
+SkyDNS will internally synthesis name which will be used for NS records. The first
+nameserver used will be named `ns1.dns.skydns.local` in the default setup . Extra
+nameserver will be numbered ns2, ns3, etc. The subdomain `dns.skydns.local` will take
+precedence over services with a similar name.
+
+#### PTR Records: Reverse Addresses
+
+When registering a service with an IP address only, you might also want to register
+the reverse (the hostname the address points to). In the DNS these records are called
+PTR records.
+
+So looking back at some of the services in the section [](#service-discovery-via-the-dns),
+we register these IP only ones:
+
+    4.rails.staging.east.skydns.local. 10.0.1.125
+    6.rails.stating.east.skydns.local. 2003::8:1
+
+To add the reverse of these address you need to add the following names and values:
+
+    125.1.0.10.in-addr.arpa. service1.example.com.
+    1.0.0.0.8.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.3.0.0.2.ip6.arpa. service1.example.com.
+
+These can be added with:
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/arpa/in-addr/10/0/1/125 \
+        -d value='{"host":"service1.example.com}'
+    TODO(miek): ipv6 value here
+
+(Yes, the reverse of ip6 is not optimal.) If SkyDNS receives a PTR query it will check these paths and
+will return the contents. Note that these replies are sent with the AA (Authoritative Answer) bit *off*.
+If nothing is found locally the query is forwarded to the local recursor (if so configured), 
+otherwise SERVFAIL is returned.
+
+#### DNS Forwarding
+
+By specifying nameservers in SkyDNS's config, for instance `8.8.8.8:53,8.8.4.4:53`,
+you create a DNS forwarding proxy. In this case it round-robins between the two
+nameserver IPs mentioned.
+
+Requests for which SkyDNS isn't authoritative will be forwarded and proxied back to 
+the client. This means that you can set SkyDNS as the primary DNS server in 
+`/etc/resolv.conf` and use it for both service discovery and normal DNS operations.
+
+#### DNSSEC
+
+SkyDNS supports signing DNS answers, also known as DNSSEC. To use it, you need to
+create a DNSSEC keypair and use that in SkyDNS. For instance, if the domain for
 SkyDNS is `skydns.local`:
 
-    dnssec-keygen skydns.local
+    % dnssec-keygen skydns.local
     Generating key pair............++++++ ...................................++++++
     Kskydns.local.+005+49860
 
-This creates two files both with the basename `Kskydns.local.+005.49860`, one of the
+This creates two files with the basename `Kskydns.local.+005.49860`, one with the
 extension `.key` (this holds the public key) and one with the extension `.private` which
-hold the private key. The basename of this file should be given to SkyDNS's -dnssec
-option: `-dnssec=Kskydns.local.+005+49860`
+holds the private key. The basename of these files should be given to SkyDNS's DNSSEC configuration
+option like so (together with some other options):
 
-If you then query with `dig +dnssec` you will get signatures, keys and nsec records returned.
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/config -d \
+        value='{"dns_addr":"127.0.0.1:5354","dnssec":"Kskydns.local.+005+55656"}'
+
+If you then query with `dig +dnssec` you will get signatures, keys and NSEC3 records returned.
+Authenticated denial of existence is implemented using NSEC3 white lies, 
+see [RFC7129](http://tools.ietf.org/html/rfc7129), Appendix B.
 
 ## License
 The MIT License (MIT)

@@ -6,15 +6,20 @@ package main
 
 import (
 	"crypto/sha1"
-	"log"
+	"encoding/base32"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/miekg/dns"
 )
 
-const origTTL uint32 = 60
+// Do DNSSEC NXDOMAIN with NSEC3 whitelies: rfc 7129, appendix B.
+// The closest encloser will always be config.Domain and we
+// will deny the wildcard for *.config.Domain. This allows
+// use to pre-compute those records. We then only need to compute
+// the NSEC3 that covers the qname.
 
 var (
 	cache    *sigCache = newCache()
@@ -40,103 +45,67 @@ func ParseKeyFile(file string) (*dns.DNSKEY, dns.PrivateKey, error) {
 	if e != nil {
 		return nil, nil, e
 	}
-	k.Header().Ttl = origTTL
 	return k.(*dns.DNSKEY), p, nil
 }
 
-// nsec creates (if needed) NSEC records that are included in the reply.
-func (s *server) nsec(m *dns.Msg) {
+// Denial creates (if needed) NSEC3 records that are included in the reply.
+func (s *server) Denial(m *dns.Msg) {
 	if m.Rcode == dns.RcodeNameError {
-		// qname nsec
-		nsec1 := s.newNSEC(m.Question[0].Name)
-		m.Ns = append(m.Ns, nsec1)
-		// wildcard nsec
-		idx := dns.Split(m.Question[0].Name)
-		wildcard := "*." + m.Question[0].Name[idx[0]:]
-		nsec2 := s.newNSEC(wildcard)
-		if nsec1.Hdr.Name != nsec2.Hdr.Name || nsec1.NextDomain != nsec2.NextDomain {
-			// different NSEC, add it
-			m.Ns = append(m.Ns, nsec2)
+		// Deny Qname nsec3
+		nsec3 := s.NewNSEC3NameError(m.Question[0].Name)
+		m.Ns = append(m.Ns, nsec3)
+
+		if nsec3.Hdr.Name != s.config.ClosestEncloser.Hdr.Name {
+			m.Ns = append(m.Ns, s.config.ClosestEncloser)
+		}
+		if nsec3.Hdr.Name != s.config.DenyWildcard.Hdr.Name {
+			m.Ns = append(m.Ns, s.config.DenyWildcard)
 		}
 	}
 	if m.Rcode == dns.RcodeSuccess && len(m.Ns) == 1 {
+		// NODATA
 		if _, ok := m.Ns[0].(*dns.SOA); ok {
-			m.Ns = append(m.Ns, s.newNSEC(m.Question[0].Name))
+			m.Ns = append(m.Ns, s.NewNSEC3NoData(m.Question[0].Name))
 		}
 	}
 }
 
 // sign signs a message m, it takes care of negative or nodata responses as
-// well by synthesising NSEC records. It will also cache the signatures, using
+// well by synthesising NSEC3 records. It will also cache the signatures, using
 // a hash of the signed data as a key.
 // We also fake the origin TTL in the signature, because we don't want to
 // throw away signatures when services decide to have longer TTL. So we just
 // set the origTTL to 60.
+// TODO(miek): revisit origTTL
 func (s *server) sign(m *dns.Msg, bufsize uint16) {
 	now := time.Now().UTC()
-	incep := uint32(now.Add(-2 * time.Hour).Unix())     // 2 hours, be sure to catch daylight saving time and such
+	incep := uint32(now.Add(-3 * time.Hour).Unix())     // 2+1 hours, be sure to catch daylight saving time and such
 	expir := uint32(now.Add(7 * 24 * time.Hour).Unix()) // sign for a week
 
-	// TODO(miek): repeating this two times?
 	for _, r := range rrSets(m.Answer) {
 		if r[0].Header().Rrtype == dns.TypeRRSIG {
 			continue
 		}
-		key := cache.key(r)
-		if s := cache.search(key); s != nil {
-			if s.ValidityPeriod(now.Add(-24 * time.Hour)) {
-				m.Answer = append(m.Answer, s)
-				continue
-			}
-			cache.remove(key)
+		if sig, err := s.signSet(r, now, incep, expir); err == nil {
+			m.Answer = append(m.Answer, sig)
 		}
-		sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
-			sig1 := s.newRRSIG(incep, expir)
-			e := sig1.Sign(s.config.PrivKey, r)
-			if e != nil {
-				log.Printf("Failed to sign: %s\n", e.Error())
-			}
-			return sig1, e
-		})
-		if err != nil {
-			continue
-		}
-		if !shared {
-			// is it possible to miss this, due the the c.dups > 0 in Do()? TODO(miek)
-			cache.insert(key, sig)
-		}
-		m.Answer = append(m.Answer, dns.Copy(sig).(*dns.RRSIG))
 	}
 	for _, r := range rrSets(m.Ns) {
 		if r[0].Header().Rrtype == dns.TypeRRSIG {
 			continue
 		}
-		key := cache.key(r)
-		if s := cache.search(key); s != nil {
-			if s.ValidityPeriod(now.Add(-24 * time.Hour)) {
-				m.Ns = append(m.Ns, s)
-				continue
-			}
-			cache.remove(key)
+		if sig, err := s.signSet(r, now, incep, expir); err == nil {
+			m.Ns = append(m.Ns, sig)
 		}
-		sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
-			sig1 := s.newRRSIG(incep, expir)
-			e := sig1.Sign(s.config.PrivKey, r)
-			if e != nil {
-				log.Printf("Failed to sign: %s\n", e.Error())
-			}
-			return sig1, e
-		})
-		if err != nil {
+	}
+	for _, r := range rrSets(m.Extra) {
+		if r[0].Header().Rrtype == dns.TypeRRSIG {
 			continue
 		}
-		if !shared {
-			// is it possible to miss this, due the the c.dups > 0 in Do()? TODO(miek)
-			cache.insert(key, sig)
+		if sig, err := s.signSet(r, now, incep, expir); err == nil {
+			m.Extra = append(m.Extra, sig)
 		}
-		m.Ns = append(m.Ns, dns.Copy(sig).(*dns.RRSIG))
 	}
-	// TODO(miek): Forget the additional section for now
 	if bufsize >= 512 || bufsize <= 4096 {
 		m.Truncated = m.Len() > int(bufsize)
 	}
@@ -144,16 +113,48 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 	o.Hdr.Name = "."
 	o.Hdr.Rrtype = dns.TypeOPT
 	o.SetDo()
-	o.SetUDPSize(4096)
+	o.SetUDPSize(4096) // TODO(miek): echo client
 	m.Extra = append(m.Extra, o)
 	return
 }
 
-func (s *server) newRRSIG(incep, expir uint32) *dns.RRSIG {
+func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.RRSIG, error) {
+	key := cache.key(r)
+	if sig := cache.search(key); sig != nil {
+		// Is it still valid 24 hours from now?
+		if sig.ValidityPeriod(now.Add(+24 * time.Hour)) {
+			return sig, nil
+		}
+		cache.remove(key)
+	}
+	s.config.log.Infof("cache miss for %s type %d", r[0].Header().Name, r[0].Header().Rrtype)
+	StatsDnssecCacheMiss.Inc(1)
+	sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
+		sig1 := s.NewRRSIG(incep, expir)
+		sig1.Header().Ttl = r[0].Header().Ttl
+		if r[0].Header().Rrtype == dns.TypeTXT {
+			sig1.OrigTtl = 0
+		}
+		e := sig1.Sign(s.config.PrivKey, r)
+		if e != nil {
+			s.config.log.Errorf("failed to sign: %s", e.Error())
+		}
+		return sig1, e
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !shared {
+		cache.insert(key, sig)
+	}
+	return dns.Copy(sig).(*dns.RRSIG), nil
+}
+
+func (s *server) NewRRSIG(incep, expir uint32) *dns.RRSIG {
 	sig := new(dns.RRSIG)
 	sig.Hdr.Rrtype = dns.TypeRRSIG
-	sig.Hdr.Ttl = origTTL
-	sig.OrigTtl = origTTL
+	sig.Hdr.Ttl = s.config.Ttl
+	sig.OrigTtl = s.config.Ttl
 	sig.Algorithm = s.config.PubKey.Algorithm
 	sig.KeyTag = s.config.KeyTag
 	sig.Inception = incep
@@ -162,32 +163,117 @@ func (s *server) newRRSIG(incep, expir uint32) *dns.RRSIG {
 	return sig
 }
 
-// newNSEC returns the NSEC record need to denial qname, or gives back a NODATA NSEC.
-func (s *server) newNSEC(qname string) *dns.NSEC {
-	qlabels := dns.SplitDomainName(qname)
-	if len(qlabels) < s.domainLabels {
-		// TODO(miek): can not happen...?
+func packBase32(s string) []byte {
+	b32len := base32.HexEncoding.DecodedLen(len(s))
+	buf := make([]byte, b32len)
+	n, _ := base32.HexEncoding.Decode(buf, []byte(s))
+	buf = buf[:n]
+	return buf
+}
+
+func unpackBase32(b []byte) string {
+	b32 := make([]byte, base32.HexEncoding.EncodedLen(len(b)))
+	base32.HexEncoding.Encode(b32, b)
+	return string(b32)
+}
+
+// NewNSEC3 returns the NSEC3 record needed to denial qname.
+func (s *server) NewNSEC3NameError(qname string) *dns.NSEC3 {
+	n := new(dns.NSEC3)
+	n.Hdr.Class = dns.ClassINET
+	n.Hdr.Rrtype = dns.TypeNSEC3
+	n.Hdr.Ttl = s.config.MinTtl
+	n.Hash = dns.SHA1
+	n.Flags = 0
+	n.Salt = ""
+	n.TypeBitMap = []uint16{}
+
+	covername := dns.HashName(qname, dns.SHA1, 0, "")
+
+	buf := packBase32(covername)
+	byteArith(buf, false) // one before
+	n.Hdr.Name = strings.ToLower(unpackBase32(buf)) + "." + s.config.Domain
+	byteArith(buf, true) // one next
+	byteArith(buf, true) // and another one
+	n.NextDomain = unpackBase32(buf)
+	return n
+}
+
+// NewNSEC3 returns the NSEC3 record needed to denial the types
+func (s *server) NewNSEC3NoData(qname string) *dns.NSEC3 {
+	n := new(dns.NSEC3)
+	n.Hdr.Class = dns.ClassINET
+	n.Hdr.Rrtype = dns.TypeNSEC3
+	n.Hdr.Ttl = s.config.MinTtl
+	n.Hash = dns.SHA1
+	n.Flags = 0
+	n.Salt = ""
+	n.TypeBitMap = []uint16{}
+
+	n.Hdr.Name = dns.HashName(qname, dns.SHA1, 0, "")
+	buf := packBase32(n.Hdr.Name)
+	byteArith(buf, true) // one next
+	n.NextDomain = unpackBase32(buf)
+
+	n.Hdr.Name += "." + s.config.Domain
+	return n
+}
+
+// newNSEC3CEandWildcard returns the NSEC3 for the closest encloser
+// and the NSEC3 that denies that wildcard at that level.
+func newNSEC3CEandWildcard(apex, ce string, ttl uint32) (*dns.NSEC3, *dns.NSEC3) {
+	n1 := new(dns.NSEC3)
+	n1.Hdr.Class = dns.ClassINET
+	n1.Hdr.Rrtype = dns.TypeNSEC3
+	n1.Hdr.Ttl = ttl
+	n1.Hash = dns.SHA1
+	n1.Flags = 0
+	n1.Salt = ""
+	//n.TypeBitMap = []uint16{dns.TypeA, dns.TypeNS, dns.TypeSOA, dns.TypeAAAA, dns.TypeRRSIG, dns.TypeDNSKEY}
+	n1.TypeBitMap = []uint16{}
+	n1.Hdr.Name = dns.HashName(ce, dns.SHA1, 0, "") + "." + apex
+	buf := packBase32(n1.Hdr.Name)
+	byteArith(buf, true) // one next
+	n1.NextDomain = unpackBase32(buf)
+
+	n2 := new(dns.NSEC3)
+	n2.Hdr.Class = dns.ClassINET
+	n2.Hdr.Rrtype = dns.TypeNSEC3
+	n2.Hdr.Ttl = ttl
+	n2.Hash = dns.SHA1
+	n2.Flags = 0
+	n2.Salt = ""
+
+	buf = packBase32("*." + apex)
+	byteArith(buf, false) // one before
+	n2.Hdr.Name = strings.ToLower(unpackBase32(buf)) + "." + apex
+	byteArith(buf, true) // one next
+	byteArith(buf, true) // and another one
+	n2.NextDomain = unpackBase32(buf)
+
+	return n1, n2
+}
+
+// byteArith adds either 1 or -1 to b, there is no check for under- or overflow.
+func byteArith(b []byte, x bool) {
+	if x {
+		for i := len(b) - 1; i >= 0; i-- {
+			if b[i] == 255 {
+				b[i] = 0
+				continue
+			}
+			b[i] += 1
+			return
+		}
 	}
-	// Strip the last s.domainLabels, return up to 4 before
-	// that. Four labels is the maximum qname we can handle.
-	ls := len(qlabels) - s.domainLabels
-	ls4 := ls - 4
-	if ls4 < 0 {
-		ls4 = 0
+	for i := len(b) - 1; i >= 0; i-- {
+		if b[i] == 0 {
+			b[i] = 255
+			continue
+		}
+		b[i] -= 1
+		return
 	}
-	key := qlabels[ls4:ls]
-	key = key // TODO(miek)
-	// TODO etcd here
-	//	prev, next := s.registry.GetNSEC(strings.Join(key, "."))
-	prev, next := "", ""
-	nsec := &dns.NSEC{Hdr: dns.RR_Header{Name: prev + s.config.Domain + ".", Rrtype: dns.TypeNSEC, Class: dns.ClassINET, Ttl: 60},
-		NextDomain: next + s.config.Domain + "."}
-	if prev == "" {
-		nsec.TypeBitMap = []uint16{dns.TypeA, dns.TypeSOA, dns.TypeNS, dns.TypeAAAA, dns.TypeRRSIG, dns.TypeNSEC, dns.TypeDNSKEY}
-	} else {
-		nsec.TypeBitMap = []uint16{dns.TypeA, dns.TypeAAAA, dns.TypeSRV, dns.TypeRRSIG, dns.TypeNSEC}
-	}
-	return nsec
 }
 
 type rrset struct {
@@ -243,7 +329,6 @@ func (c *sigCache) search(s string) *dns.RRSIG {
 		// we want to return a copy here, because if we didn't the RRSIG
 		// could be removed by another goroutine before the packet containing
 		// this signature is send out.
-		log.Println("DNS Signature retrieved from cache")
 		return dns.Copy(s).(*dns.RRSIG)
 	}
 	return nil
@@ -258,8 +343,8 @@ func (c *sigCache) key(rrs []dns.RR) string {
 	for _, r := range rrs {
 		switch t := r.(type) { // we only do a few type, serialize these manually
 		case *dns.SOA:
+			// We only fiddle with the serial so store that.
 			i = append(i, packUint32(t.Serial)...)
-			// we only fiddle with the serial so store that
 		case *dns.SRV:
 			i = append(i, packUint16(t.Priority)...)
 			i = append(i, packUint16(t.Weight)...)
@@ -269,19 +354,17 @@ func (c *sigCache) key(rrs []dns.RR) string {
 			i = append(i, []byte(t.A)...)
 		case *dns.AAAA:
 			i = append(i, []byte(t.AAAA)...)
-		case *dns.DNSKEY:
-			// Need nothing more, the rdata stays the same during a run
-		case *dns.NSEC:
+		case *dns.NSEC3:
 			i = append(i, []byte(t.NextDomain)...)
-			// bitmap does not differentiate
-		default:
-			log.Printf("DNS Signature for unhandled type %T seen", t)
+			// Bitmap does not differentiate in SkyDNS.
+		case *dns.DNSKEY:
+		case *dns.NS:
+		case *dns.TXT:
 		}
 	}
 	return string(h.Sum(i))
 }
 
-// TODO(miek): prolly should use the stdlib ones
 func packUint16(i uint16) []byte { return []byte{byte(i >> 8), byte(i)} }
 func packUint32(i uint32) []byte { return []byte{byte(i >> 24), byte(i >> 16), byte(i >> 8), byte(i)} }
 
