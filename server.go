@@ -46,6 +46,7 @@ func (s *server) Run() error {
 
 // Stop stops a server.
 func (s *server) Stop() {
+	// TODO(miek)
 	//s.group.Add(-2)
 }
 
@@ -296,8 +297,8 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 		return nil, err
 	}
 	if !r.Node.Dir { // single element
-		var serv *Service
-		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
+		serv := new(Service)
+		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
 			s.config.log.Infof("failed to parse json: %s", err.Error())
 			return nil, err
 		}
@@ -383,8 +384,8 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 	}
 	weight := uint16(100)
 	if !r.Node.Dir { // single element
-		var serv *Service
-		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
+		serv := new(Service)
+		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
 			s.config.log.Infof("failed to parse json: %s", err.Error())
 			return nil, nil, err
 		}
@@ -444,8 +445,8 @@ func (s *server) CNAMERecords(q dns.Question) (records []dns.RR, err error) {
 		return nil, err
 	}
 	if !r.Node.Dir {
-		var serv *Service
-		if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
+		serv := new(Service)
+		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
 			s.config.log.Infof("failed to parse json: %s", err.Error())
 			return nil, err
 		}
@@ -474,8 +475,8 @@ func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
 	if r.Node.Dir {
 		return nil, fmt.Errorf("reverse should not be a directory")
 	}
-	var serv *Service
-	if err := json.Unmarshal([]byte(r.Node.Value), &serv); err != nil {
+	serv := new(Service)
+	if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
 		s.config.log.Infof("failed to parse json: %s", err.Error())
 		return nil, err
 	}
@@ -538,7 +539,7 @@ Nodes:
 			}
 		}
 		serv := new(Service)
-		if err := json.Unmarshal([]byte(n.Value), &serv); err != nil {
+		if err := json.Unmarshal([]byte(n.Value), serv); err != nil {
 			return nil, err
 		}
 		serv.Ttl = s.calculateTtl(n, serv)
