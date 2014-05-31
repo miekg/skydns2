@@ -322,6 +322,7 @@ type dnsTestCase struct {
 var services = []*Service{
 	{Host: "server1", Port: 8080, key: "100.server1.development.region1.skydns.test."},
 	{Host: "server2", Port: 80, key: "101.server2.production.region1.skydns.test."},
+	{Host: "server4", Port: 80, Priority: 333, key: "102.server4.development.region6.skydns.test."},
 	{Host: "server3", key: "103.server4.development.region2.skydns.test."},
 	{Host: "10.0.0.1", key: "104.server1.development.region1.skydns.test."},
 	{Host: "2001::8:8:8:8", key: "105.server3.production.region2.skydns.test."},
@@ -400,6 +401,11 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "3.cname.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{},
+	},
+	// Priority Test
+	{
+		Qname: "region6.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{newSRV("region6.skydns.test. 3600 SRV 333 100 80 server4.")},
 	},
 	// Subdomain Test
 	{
