@@ -1,4 +1,4 @@
-# SkyDNS [![Build Status](https://travis-ci.org/skynetservices/skydns.png)](https://travis-ci.org/skynetservices/skydns2)
+# SkyDNS [![Build Status](https://travis-ci.org/skynetservices/skydns.png)](https://travis-ci.org/skynetservices/skydns)
 *Version 2.0.0*
 
 SkyDNS is a distributed service for announcement and discovery of services built on
@@ -15,8 +15,8 @@ SkyDNS2:
 
 * Does away with Raft and uses Etcd (which uses raft).
 * Makes is possible to query arbitrary domain names.
-* Is a thin layer above etcd that translates etcd keys and values to the DNS.
-    In the near future, SkyDNS2 will possibly be upstreamed and incoperated directly in etcd.
+* Is a thin layer above etcd, that translates etcd keys and values to the DNS.
+    In the near future, SkyDNS2 will possibly be upstreamed and incorperated directly in etcd.
 * Does DNSSEC with NSEC3 instead of NSEC (Work in progress).
 
 Note thats bugs in SkyDNS1 will still be fixed, but the main development effort will be focussed on version 2.
@@ -25,7 +25,7 @@ Note thats bugs in SkyDNS1 will still be fixed, but the main development effort 
 # Future ideas
 
 * Abstract away the backend in an interface, so different backends can be used.
-* Make SkyDNS a full blown library and provide a small server.
+* Make SkyDNS a library and provide a small server.
  
 ## Setup / Install
 Download/compile and run etcd. See the documentation for etcd at <https://github.com/coreos/etcd>.
@@ -34,13 +34,14 @@ Then compile SkyDNS:
 
 `go get -d -v ./... && go build -v ./...`
 
-SkyDNS' configuration is stored *in* etcd: there are no flags. To start SkyDNS, set the
+SkyDNS' configuration is stored *in* etcd: but there are also flags. To start SkyDNS, set the
 etcd machines with the environment variable ETCD_MACHINES:
 
     export ETCD_MACHINES='http://192.168.0.1:4001,http://192.168.0.2:4001'
-    ./skydns2
+    ./skydns
 
 If `ETCD_MACHINES` is not set, SkyDNS will default to using `http://127.0.0.1:4001` to connect to etcd.
+Or you can use the flag `-machines`.
 
 ## Configuration
 SkyDNS' configuration is stored in etcd as a JSON object under the key `/skydns/config`. The following parameters
@@ -61,7 +62,8 @@ To set the configuration, use something like:
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/config \
         -d value='{"dns_addr":"127.0.0.1:5354","ttl":3600, "nameservers": ["8.8.8.8:53","8.8.4.4:53"]}'
 
-SkyDNS needs to be restarted for configuration changes to take effect.
+SkyDNS needs to be restarted for configuration changes to take effect. This might change, so that SkyDNS
+can re-read the config from Etcd after a HUP signal.
 
 ### Environment Variables
 
@@ -282,7 +284,7 @@ These can be added with:
     TODO(miek): ipv6 value here
 
 (Yes, the reverse of ip6 is not optimal.) If SkyDNS receives a PTR query it will check these paths and
-will return the contents. Note that these replies are sent with the AA (Authoritative Answer) bit off.
+will return the contents. Note that these replies are sent with the AA (Authoritative Answer) bit *off*.
 If nothing is found locally the query is forwarded to the local recursor (if so configured), 
 otherwise SERVFAIL is returned.
 
