@@ -468,10 +468,12 @@ var dnsTestCases = []dnsTestCase{
 	// Reverse
 
 	// Reverse v4 local answer
+	/*
 	{
 		Qname: "1.0.0.10.in-addr.arpa.", Qtype: dns.TypePTR,
 		Answer: []dns.RR{newPTR("1.0.0.10.in-addr.arpa. 3600 PTR reverse.example.com.")},
 	},
+	*/
 	// Reverse v6 local answer
 	// Reverse forwarding answer
 	{
