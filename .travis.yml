@@ -5,4 +5,5 @@ go:
 
 install:
   - go get github.com/coreos/go-etcd/etcd
+  - go get github.com/coreos/go-log/log
   - go get github.com/miekg/dns
