@@ -7,3 +7,6 @@ install:
   - go get github.com/coreos/go-etcd/etcd
   - go get github.com/coreos/go-log/log
   - go get github.com/miekg/dns
+  - go get github.com/rcrowley/go-metrics
+  - go get github.com/rcrowley/go-metrics/influxdb
+  - go get github.com/rcrowley/go-metrics/stathat
