@@ -4,6 +4,7 @@ go:
   - 1.2
 
 install:
+  - go get github.com/coreos/etcd
   - go get github.com/coreos/go-etcd/etcd
   - go get github.com/coreos/go-log/log
   - go get github.com/miekg/dns
@@ -12,5 +13,4 @@ install:
   - go get github.com/rcrowley/go-metrics/stathat
 
 before_script:
-  - go install github.com/coreos/etcd
   - etcd
