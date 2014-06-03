@@ -13,4 +13,5 @@ install:
   - go get github.com/rcrowley/go-metrics/stathat
 
 before_script:
+  - $HOME/gopath/src/github.com/coreos/etcd/build
   - $HOME/gopath/src/github.com/coreos/etcd/bin/etcd
