@@ -10,3 +10,7 @@ install:
   - go get github.com/rcrowley/go-metrics
   - go get github.com/rcrowley/go-metrics/influxdb
   - go get github.com/rcrowley/go-metrics/stathat
+
+before_script:
+  - go install github.com/coreos/etcd
+  - etcd
