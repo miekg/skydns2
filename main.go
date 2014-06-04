@@ -41,7 +41,7 @@ func init() {
 		}(), "ip:port to bind to (SKYDNS_ADDR)")
 
 	flag.StringVar(&nameserver, "nameserver", "", "nameserver address(es) to forward (non-local) queries to e.g. 8.8.8.8:53,8.8.4.4:53")
-	flag.StringVar(&machine, "machines", "http://127.0.0.1:4001", "machine address(es) running etcd")
+	flag.StringVar(&machine, "machines", "", "machine address(es) running etcd")
 	flag.StringVar(&config.DNSSEC, "dnssec", "", "basename of DNSSEC key file e.q. Kskydns.local.+005+38250")
 	flag.StringVar(&tlskey, "tls-key", "", "TLS Private Key path")
 	flag.StringVar(&tlspem, "tls-pem", "", "X509 Certificate")
@@ -53,12 +53,14 @@ func init() {
 }
 
 func newClient() (client *etcd.Client) {
+	// set default if not specified in env
 	if len(machines) == 1 && machines[0] == "" {
 		machines[0] = "http://127.0.0.1:4001"
-		// override if we have a commandline flag as well
-		if machine != "" {
-			strings.Split(machine, ",")	
-		}
+
+	}
+	// override if we have a commandline flag as well
+	if machine != "" {
+		machines = strings.Split(machine, ",")	
 	}
 	if strings.HasPrefix(machines[0], "https://") {
 		var err error
