@@ -19,7 +19,7 @@ SkyDNS2:
     In the near future, SkyDNS2 will possibly be upstreamed and incorporated directly in etcd.
 * Does DNSSEC with NSEC3 instead of NSEC (Work in progress).
 
-Note thats bugs in SkyDNS1 will still be fixed, but the main development effort will be focussed on version 2.
+Note that bugs in SkyDNS1 will still be fixed, but the main development effort will be focussed on version 2.
 [Version 1 of SkyDNS can be found here](https://github.com/skynetservices/skydns1).
 
 # Future ideas
