@@ -72,6 +72,8 @@ SkyDNS uses these environment variables:
 * `ETCD_MACHINES` - list of etcd machines, "http://localhost:4001,http://etcd.example.com:4001".
 * `ETCD_TLSKEY` - TLS private key path.
 * `ETCD_TLSPEM` - X509 certificate path.
+* `SKYDNS_ADDR` - Specify Bind Address
+* `SKYDNS_DOMAIN` - Set a default domain if not specified by etcd config
 
 And these are used for statistics:
 
