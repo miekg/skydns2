@@ -40,7 +40,7 @@ func init() {
 			return "127.0.0.1:53"
 		}(), "ip:port to bind to (SKYDNS_ADDR)")
 
-	flag.StringVar(&nameserver, "nameserver", "", "nameserver address(es) to forward (non-local) queries to e.g. 8.8.8.8:53,8.8.4.4:53")
+	flag.StringVar(&nameserver, "nameservers", "", "nameserver address(es) to forward (non-local) queries to e.g. 8.8.8.8:53,8.8.4.4:53")
 	flag.StringVar(&machine, "machines", "", "machine address(es) running etcd")
 	flag.StringVar(&config.DNSSEC, "dnssec", "", "basename of DNSSEC key file e.q. Kskydns.local.+005+38250")
 	flag.StringVar(&tlskey, "tls-key", "", "TLS Private Key path")
