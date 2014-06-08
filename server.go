@@ -41,7 +41,7 @@ func (s *server) Run() error {
 	if s.config.DNSSEC == "" {
 		s.config.log.Printf("ready for queries")
 	} else {
-		s.config.log.Printf("ready for queries, siging with %s", s.config.DNSSEC)
+		s.config.log.Printf("ready for queries, signing with %s", s.config.DNSSEC)
 	}
 
 	s.group.Wait()
