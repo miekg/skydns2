@@ -38,7 +38,7 @@ func (s *server) Run() error {
 	s.group.Add(2)
 	go runDNSServer(s.group, mux, "tcp", s.config.DnsAddr, s.config.ReadTimeout)
 	go runDNSServer(s.group, mux, "udp", s.config.DnsAddr, s.config.ReadTimeout)
-	s.config.log.Printf("connected to etcd cluster at %s", machines)
+	s.config.log.Printf("read for queries")
 
 	s.group.Wait()
 	return nil
