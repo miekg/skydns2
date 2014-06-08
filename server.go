@@ -25,7 +25,7 @@ type server struct {
 	group  *sync.WaitGroup
 }
 
-// Newserver returns a new server.
+// NewServer returns a new SkyDNS server.
 func NewServer(config *Config, client *etcd.Client) *server {
 	return &server{client: client, config: config, group: new(sync.WaitGroup)}
 }
@@ -586,19 +586,19 @@ func (s *server) isDuplicateCNAME(r *dns.CNAME, records []dns.RR) bool {
 // TTL. If neither of these are set (have a zero value), the server
 // default is used.
 func (s *server) calculateTtl(node *etcd.Node, serv *Service) uint32 {
-	etcd_ttl := uint32(node.TTL)
+	etcdTtl := uint32(node.TTL)
 
-	if etcd_ttl == 0 && serv.Ttl == 0 {
+	if etcdTtl == 0 && serv.Ttl == 0 {
 		return s.config.Ttl
 	}
-	if etcd_ttl == 0 {
+	if etcdTtl == 0 {
 		return serv.Ttl
 	}
 	if serv.Ttl == 0 {
-		return etcd_ttl
+		return etcdTtl
 	}
-	if etcd_ttl < serv.Ttl {
-		return etcd_ttl
+	if etcdTtl < serv.Ttl {
+		return etcdTtl
 	}
 	return serv.Ttl
 }
