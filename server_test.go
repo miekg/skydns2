@@ -277,7 +277,6 @@ func TestDNS(t *testing.T) {
 				}
 			}
 			for i, n := range resp.Ns {
-				i = i
 				switch x := n.(type) {
 				case *dns.SOA:
 					tt := tc.Answer[i].(*dns.SOA)
