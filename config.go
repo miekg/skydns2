@@ -49,7 +49,7 @@ type Config struct {
 	log *log.Logger `json:"-"`
 }
 
-func LoadConfig(client *etcd.Client, config *Config) (*Config, error) {
+func loadConfig(client *etcd.Client, config *Config) (*Config, error) {
 	config.log = log.New("skydns", false,
 		log.CombinedSink(os.Stderr, "[%s] %s %-9s | %s\n", []string{"prefix", "time", "priority", "message"}))
 
