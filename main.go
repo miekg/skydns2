@@ -80,7 +80,7 @@ func main() {
 	if nameserver != "" {
 		config.Nameservers = strings.Split(nameserver, ",")
 	}
-	config, err := LoadConfig(client, config)
+	config, err := loadConfig(client, config)
 	if err != nil {
 		log.Fatal(err)
 	}
