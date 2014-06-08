@@ -38,7 +38,11 @@ func (s *server) Run() error {
 	s.group.Add(2)
 	go runDNSServer(s.group, mux, "tcp", s.config.DnsAddr, s.config.ReadTimeout)
 	go runDNSServer(s.group, mux, "udp", s.config.DnsAddr, s.config.ReadTimeout)
-	s.config.log.Printf("read for queries")
+	if s.config.DNSSEC == "" {
+		s.config.log.Printf("ready for queries")
+	} else {
+		s.config.log.Printf("ready for queries, siging with %s", s.config.DNSSEC)
+	}
 
 	s.group.Wait()
 	return nil
@@ -442,7 +446,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
-			records = append(records, serv.NewSRV(q.Name,weight))
+			records = append(records, serv.NewSRV(q.Name, weight))
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key) // TODO(miek): ugly
 			records = append(records, serv.NewSRV(q.Name, weight))
