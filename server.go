@@ -172,6 +172,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 	}
 
+	// TODO(miek): get the nodes here, if none found NXDOMAIN, then loop through
+	// the different types, if nothing then return NODATA
+
 	if q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA {
 		records, err := s.AddressRecords(q, nil)
 		if err != nil {
