@@ -172,7 +172,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 	}
 
-	if q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA {
+	switch q.Qtype {
+	case dns.TypeA, dns.TypeAAAA:
 		records, err := s.AddressRecords(q, nil)
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
@@ -186,8 +187,23 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 		m.Answer = append(m.Answer, records...)
-	}
-	if q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY {
+	case dns.TypeCNAME:
+		records, err := s.CNAMERecords(q)
+		if err != nil {
+			if e, ok := err.(*etcd.EtcdError); ok {
+				if e.ErrorCode == 100 {
+					m.SetRcode(req, dns.RcodeNameError)
+					m.Ns = []dns.RR{s.NewSOA()}
+					m.Ns[0].Header().Ttl = s.config.MinTtl
+					StatsNameErrorCount.Inc(1)
+					return
+				}
+			}
+		}
+		m.Answer = append(m.Answer, records...)
+	default:
+		fallthrough // also catch other types, so that they return NXDOMAIN
+	case dns.TypeSRV, dns.TypeANY:
 		records, extra, err := s.SRVRecords(q)
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
@@ -208,24 +224,16 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				return
 			}
 		}
-		m.Answer = append(m.Answer, records...)
-		m.Extra = append(m.Extra, extra...)
-	}
-	if q.Qtype == dns.TypeCNAME {
-		records, err := s.CNAMERecords(q)
-		if err != nil {
-			if e, ok := err.(*etcd.EtcdError); ok {
-				if e.ErrorCode == 100 {
-					m.SetRcode(req, dns.RcodeNameError)
-					m.Ns = []dns.RR{s.NewSOA()}
-					m.Ns[0].Header().Ttl = s.config.MinTtl
-					StatsNameErrorCount.Inc(1)
-					return
-				}
-			}
+		// if we are here again, check the types, because an answer may only
+		// be given for SRV or ANY. All other types should return NODATA, the
+		// NXDOMAIN part is handled in the above code. TODO(miek): yes this
+		// can be done in a more elegant manor.
+		if q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY {
+			m.Answer = append(m.Answer, records...)
+			m.Extra = append(m.Extra, extra...)
 		}
-		m.Answer = append(m.Answer, records...)
 	}
+
 	if len(m.Answer) == 0 { // NODATA response
 		StatsNoDataCount.Inc(1)
 		m.Ns = []dns.RR{s.NewSOA()}
