@@ -177,7 +177,7 @@ func unpackBase32(b []byte) string {
 	return string(b32)
 }
 
-// NewNSEC3 returns the NSEC3 record needed to denal qname.
+// NewNSEC3 returns the NSEC3 record needed to denial qname.
 func (s *server) NewNSEC3NameError(qname string) *dns.NSEC3 {
 	n := new(dns.NSEC3)
 	n.Hdr.Class = dns.ClassINET
