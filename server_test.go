@@ -329,7 +329,7 @@ var services = []*Service{
 	{Host: "4.cname.skydns.test", key: "3.cname.skydns.test."},
 	{Host: "3.cname.skydns.test", key: "4.cname.skydns.test."},
 	{Host: "10.0.0.2", key: "ttl.skydns.test.", Ttl: 360},
-	{Host: "reverse.example.com", key: "1.0.0.10.in-addr.arpa."},	// 10.0.0.1
+	{Host: "reverse.example.com", key: "1.0.0.10.in-addr.arpa."}, // 10.0.0.1
 	{Host: "server1", Weight: 130, key: "100.server1.region5.skydns.test."},
 	{Host: "server2", Weight: 80, key: "101.server2.region5.skydns.test."},
 	{Host: "server3", Weight: 150, key: "103.server3.region5.skydns.test."},

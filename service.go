@@ -19,7 +19,7 @@ type Service struct {
 	Host     string `json:"host,omitempty"`
 	Port     int    `json:"port,omitempty"`
 	Priority int    `json:"priority,omitempty"`
-	Weight	 int `json:"weight,omitempty"`
+	Weight   int    `json:"weight,omitempty"`
 	Ttl      uint32 `json:"ttl,omitempty"`
 
 	key string

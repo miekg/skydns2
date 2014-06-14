@@ -60,7 +60,7 @@ func newClient() (client *etcd.Client) {
 	}
 	// override if we have a commandline flag as well
 	if machine != "" {
-		machines = strings.Split(machine, ",")	
+		machines = strings.Split(machine, ",")
 	}
 	if strings.HasPrefix(machines[0], "https://") {
 		var err error
