@@ -177,7 +177,7 @@ func unpackBase32(b []byte) string {
 	return string(b32)
 }
 
-// NewNSEC3 returns the NSEC3 record needed to denial qname.
+// NewNSEC3 returns the NSEC3 record needed to denal qname.
 func (s *server) NewNSEC3NameError(qname string) *dns.NSEC3 {
 	n := new(dns.NSEC3)
 	n.Hdr.Class = dns.ClassINET
@@ -228,11 +228,12 @@ func newNSEC3CEandWildcard(apex, ce string, ttl uint32) (*dns.NSEC3, *dns.NSEC3)
 	n1.Hdr.Ttl = ttl
 	n1.Hash = dns.SHA1
 	n1.Flags = 0
+	n1.Iterations = 0
 	n1.Salt = ""
-	//n.TypeBitMap = []uint16{dns.TypeA, dns.TypeNS, dns.TypeSOA, dns.TypeAAAA, dns.TypeRRSIG, dns.TypeDNSKEY}
-	n1.TypeBitMap = []uint16{}
-	n1.Hdr.Name = dns.HashName(ce, dns.SHA1, 0, "") + "." + apex
-	buf := packBase32(n1.Hdr.Name)
+	n1.TypeBitMap = []uint16{dns.TypeA, dns.TypeNS, dns.TypeSOA, dns.TypeAAAA, dns.TypeRRSIG, dns.TypeDNSKEY}
+	prev := dns.HashName(ce, dns.SHA1, n1.Iterations, n1.Salt)
+	n1.Hdr.Name = strings.ToLower(prev) + "." + apex
+	buf := packBase32(prev)
 	byteArith(buf, true) // one next
 	n1.NextDomain = unpackBase32(buf)
 
@@ -242,9 +243,11 @@ func newNSEC3CEandWildcard(apex, ce string, ttl uint32) (*dns.NSEC3, *dns.NSEC3)
 	n2.Hdr.Ttl = ttl
 	n2.Hash = dns.SHA1
 	n2.Flags = 0
+	n2.Iterations = 0
 	n2.Salt = ""
 
-	buf = packBase32("*." + apex)
+	prev = dns.HashName("*." + ce, dns.SHA1, n2.Iterations, n2.Salt)
+	buf = packBase32(prev)
 	byteArith(buf, false) // one before
 	n2.Hdr.Name = strings.ToLower(unpackBase32(buf)) + "." + apex
 	byteArith(buf, true) // one next
