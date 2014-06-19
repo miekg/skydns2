@@ -39,9 +39,9 @@ func (s *server) Run() error {
 	go runDNSServer(s.group, mux, "tcp", s.config.DnsAddr, s.config.ReadTimeout)
 	go runDNSServer(s.group, mux, "udp", s.config.DnsAddr, s.config.ReadTimeout)
 	if s.config.DNSSEC == "" {
-		s.config.log.Printf("ready for queries")
+		s.config.log.Printf("ready for queries on %s", s.config.DnsAddr)
 	} else {
-		s.config.log.Printf("ready for queries, signing with %s", s.config.DNSSEC)
+		s.config.log.Printf("ready for queries on %s, signing with %s", s.config.DnsAddr, s.config.DNSSEC)
 	}
 
 	s.group.Wait()
