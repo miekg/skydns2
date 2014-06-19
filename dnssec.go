@@ -86,6 +86,9 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 		if r[0].Header().Rrtype == dns.TypeRRSIG {
 			continue
 		}
+		if !dns.IsSubDomain(s.config.Domain, r[0].Header().Name) {
+			continue
+		}
 		if sig, err := s.signSet(r, now, incep, expir); err == nil {
 			m.Answer = append(m.Answer, sig)
 		}
@@ -94,12 +97,18 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 		if r[0].Header().Rrtype == dns.TypeRRSIG {
 			continue
 		}
+		if !dns.IsSubDomain(s.config.Domain, r[0].Header().Name) {
+			continue
+		}
 		if sig, err := s.signSet(r, now, incep, expir); err == nil {
 			m.Ns = append(m.Ns, sig)
 		}
 	}
 	for _, r := range rrSets(m.Extra) {
 		if r[0].Header().Rrtype == dns.TypeRRSIG {
+			continue
+		}
+		if !dns.IsSubDomain(s.config.Domain, r[0].Header().Name) {
 			continue
 		}
 		if sig, err := s.signSet(r, now, incep, expir); err == nil {
@@ -246,7 +255,7 @@ func newNSEC3CEandWildcard(apex, ce string, ttl uint32) (*dns.NSEC3, *dns.NSEC3)
 	n2.Iterations = 0
 	n2.Salt = ""
 
-	prev = dns.HashName("*." + ce, dns.SHA1, n2.Iterations, n2.Salt)
+	prev = dns.HashName("*."+ce, dns.SHA1, n2.Iterations, n2.Salt)
 	buf = packBase32(prev)
 	byteArith(buf, false) // one before
 	n2.Hdr.Name = strings.ToLower(unpackBase32(buf)) + "." + apex
