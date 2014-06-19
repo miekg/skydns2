@@ -186,6 +186,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				}
 			}
 			if err.Error() == "incomplete CNAME chain" {
+				// TODO(miek): the 3x of setting RcodeNameError could
+				// be done better.
+
 				// We can not complete the CNAME internally, *iff* there is a
 				// external name in the set, take it, and try to resolve it externally.
 				if len(records) == 0 {
@@ -211,9 +214,15 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					StatsNameErrorCount.Inc(1)
 					return
 				}
-				if m1, e1 := s.Lookup(target, req.Question[0].Qtype); e1 == nil {
-					records = append(records, m1.Answer...)
+				m1, e1 := s.Lookup(target, req.Question[0].Qtype)
+				if e1 != nil {
+					m.SetRcode(req, dns.RcodeNameError)
+					m.Ns = []dns.RR{s.NewSOA()}
+					m.Ns[0].Header().Ttl = s.config.MinTtl
+					StatsNameErrorCount.Inc(1)
+					return
 				}
+				records = append(records, m1.Answer...)
 			}
 		}
 		m.Answer = append(m.Answer, records...)

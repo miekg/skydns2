@@ -275,6 +275,11 @@ func TestDNS(t *testing.T) {
 				if x.Ptr != tt.Ptr {
 					t.Fatalf("PTR ptr should be %q, but is %q", x.Ptr, tt.Ptr)
 				}
+			case *dns.CNAME:
+				tt := tc.Answer[i].(*dns.CNAME)
+				if x.Target != tt.Target {
+					t.Fatalf("CNAME target should be %q, but is %q", x.Target, tt.Target)
+				}
 			}
 			for i, n := range resp.Ns {
 				switch x := n.(type) {
@@ -408,7 +413,11 @@ var dnsTestCases = []dnsTestCase{
 	// CNAME (resolvable external name)
 	{
 		Qname: "external1.cname.skydns.test.", Qtype: dns.TypeA,
-		Answer: []dns.RR{},
+		Answer: []dns.RR{
+			newCNAME("external1.cname.skydns.test. IN CNAME www.miek.nl."),
+			newCNAME("www.miek.nl. IN CNAME a.miek.nl."),
+			newA("a.miek.nl. IN A 176.58.119.54"),
+		},
 	},
 	// CNAME (unresolvable external name)
 	{
