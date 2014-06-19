@@ -185,6 +185,36 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
+			if err.Error() == "incomplete CNAME chain" {
+				// We can not complete the CNAME internally, *iff* there is a
+				// external name in the set, take it, and try to resolve it externally.
+				if len(records) == 0 {
+					m.SetRcode(req, dns.RcodeNameError)
+					m.Ns = []dns.RR{s.NewSOA()}
+					m.Ns[0].Header().Ttl = s.config.MinTtl
+					StatsNameErrorCount.Inc(1)
+					return
+				}
+				target := ""
+				for _, r := range records {
+					if v, ok := r.(*dns.CNAME); ok {
+						if !dns.IsSubDomain(s.config.Domain, v.Target) {
+							target = v.Target
+							break
+						}
+					}
+				}
+				if target == "" {
+					m.SetRcode(req, dns.RcodeNameError)
+					m.Ns = []dns.RR{s.NewSOA()}
+					m.Ns[0].Header().Ttl = s.config.MinTtl
+					StatsNameErrorCount.Inc(1)
+					return
+				}
+				if m1, e1 := s.Lookup(target, req.Question[0].Qtype); e1 == nil {
+					records = append(records, m1.Answer...)
+				}
+			}
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeCNAME:
@@ -215,14 +245,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
-			// Hack alert, TODO:(miek)
-			if err.Error() == "incomplete CNAME chain" {
-				m.SetRcode(req, dns.RcodeNameError)
-				m.Ns = []dns.RR{s.NewSOA()}
-				m.Ns[0].Header().Ttl = s.config.MinTtl
-				StatsNameErrorCount.Inc(1)
-				return
-			}
 		}
 		// if we are here again, check the types, because an answer may only
 		// be given for SRV or ANY. All other types should return NODATA, the
@@ -243,8 +265,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 
 // ServeDNSForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
-	StatsDnssecOkCount.Inc(1)
+	StatsForwardCount.Inc(1)
 	if len(s.config.Nameservers) == 0 {
+		// TODO(miek): log this too?
 		m := new(dns.Msg)
 		m.SetReply(req)
 		m.SetRcode(req, dns.RcodeServerFailure)
@@ -339,7 +362,7 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 				// We also don't want to return the CNAME, because of the
 				// no other data rule. So return nothing and let NODATA
 				// kick in (via a hack).
-				return nil, fmt.Errorf("incomplete CNAME chain")
+				return records, fmt.Errorf("incomplete CNAME chain")
 			}
 			records = append(records, nextRecords...)
 		case ip.To4() != nil && q.Qtype == dns.TypeA:

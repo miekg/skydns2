@@ -326,6 +326,8 @@ var services = []*Service{
 	{Host: "2001::8:8:8:8", key: "105.server3.production.region2.skydns.test."},
 	{Host: "104.server1.development.region1.skydns.test", key: "1.cname.skydns.test."},
 	{Host: "100.server1.development.region1.skydns.test", key: "2.cname.skydns.test."},
+	{Host: "www.miek.nl", key: "external1.cname.skydns.test."},
+	{Host: "wwwwwww.miek.nl", key: "external2.cname.skydns.test."},
 	{Host: "4.cname.skydns.test", key: "3.cname.skydns.test."},
 	{Host: "3.cname.skydns.test", key: "4.cname.skydns.test."},
 	{Host: "10.0.0.2", key: "ttl.skydns.test.", Ttl: 360},
@@ -393,7 +395,7 @@ var dnsTestCases = []dnsTestCase{
 			newCNAME("1.cname.skydns.test. 3600 CNAME 104.server1.development.region1.skydns.test."),
 		},
 	},
-	// CNAME (unresolvable)
+	// CNAME (unresolvable internal name)
 	{
 		Qname: "2.cname.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{},
@@ -401,6 +403,16 @@ var dnsTestCases = []dnsTestCase{
 	// CNAME loop detection
 	{
 		Qname: "3.cname.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{},
+	},
+	// CNAME (resolvable external name)
+	{
+		Qname: "external1.cname.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{},
+	},
+	// CNAME (unresolvable external name)
+	{
+		Qname: "external2.cname.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{},
 	},
 	// Priority Test
