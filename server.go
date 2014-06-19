@@ -614,3 +614,37 @@ func (s *server) calculateTtl(node *etcd.Node, serv *Service) uint32 {
 	}
 	return serv.Ttl
 }
+
+// Lookup looks up name,type using the recursive nameserver defines
+// in the server's config. If none defined it returns an error
+func (s *server) Lookup(n string, t uint16) (*dns.Msg, error) {
+	StatsLookupCount.Inc(1)
+	if len(s.config.Nameservers) == 0 {
+		return nil, fmt.Errorf("no nameservers configured can not lookup name")
+	}
+	m := new(dns.Msg)
+	m.SetQuestion(n, t)
+
+	// TODO(miek): fallback to TCP, but fallback to TCP will probably overflow
+	// the packet I'm sending back to the client, because it is likely that
+	// will have used UDP.
+	c := &dns.Client{Net: "udp", ReadTimeout: s.config.ReadTimeout}
+	nsid := int(m.Id) % len(s.config.Nameservers)
+	try := 0
+Redo:
+	r, _, err := c.Exchange(m, s.config.Nameservers[nsid])
+	if err == nil {
+		if r.Rcode != dns.RcodeSuccess {
+			return nil, fmt.Errorf("rcode is not equal to success")
+		}
+		return r, nil
+	}
+	// Seen an error, this can only mean, "server not reached", try again
+	// but only if we have not exausted our nameservers.
+	if try < len(s.config.Nameservers) {
+		try++
+		nsid = (nsid + 1) % len(s.config.Nameservers)
+		goto Redo
+	}
+	return nil, fmt.Errorf("failure to lookup name")
+}
