@@ -440,10 +440,12 @@ var dnsTestCases = []dnsTestCase{
 	// Subdomain Weight Test
 	{
 		Qname: "region5.skydns.test.", Qtype: dns.TypeSRV,
-		Answer: []dns.RR{newSRV("region5.skydns.test. 3600 SRV 10 36 0 server1."),
+		Answer: []dns.RR{
+			newSRV("region5.skydns.test. 3600 SRV 30 100 0 server4."),
 			newSRV("region5.skydns.test. 3600 SRV 10 22 0 server2."),
 			newSRV("region5.skydns.test. 3600 SRV 10 41 0 server3."),
-			newSRV("region5.skydns.test. 3600 SRV 30 100 0 server4.")},
+			newSRV("region5.skydns.test. 3600 SRV 10 36 0 server1.")},
+
 	},
 	// Wildcard Test
 	{
