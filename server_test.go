@@ -8,6 +8,7 @@ package main
 
 import (
 	"encoding/json"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -179,6 +180,12 @@ func TestDNSTtlRRset(t *testing.T) {
 	}
 }
 
+type rrSet []dns.RR
+
+func (p rrSet) Len() int           { return len(p) }
+func (p rrSet) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p rrSet) Less(i, j int) bool { return p[i].String() < p[j].String() }
+
 func TestDNS(t *testing.T) {
 	s := newTestServerDNSSEC(t)
 	defer s.Stop()
@@ -198,6 +205,9 @@ func TestDNS(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failing: %s: %s\n", m.String(), err.Error())
 		}
+		sort.Sort(rrSet(resp.Answer))
+		sort.Sort(rrSet(resp.Ns))
+		sort.Sort(rrSet(resp.Extra))
 		t.Logf("%s\n", resp)
 		if len(resp.Answer) != len(tc.Answer) {
 			t.Fatalf("response for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
@@ -414,9 +424,9 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "external1.cname.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{
+			newA("a.miek.nl. IN A 176.58.119.54"),
 			newCNAME("external1.cname.skydns.test. IN CNAME www.miek.nl."),
 			newCNAME("www.miek.nl. IN CNAME a.miek.nl."),
-			newA("a.miek.nl. IN A 176.58.119.54"),
 		},
 	},
 	// CNAME (unresolvable external name)
@@ -432,33 +442,36 @@ var dnsTestCases = []dnsTestCase{
 	// Subdomain Test
 	{
 		Qname: "region1.skydns.test.", Qtype: dns.TypeSRV,
-		Answer: []dns.RR{newSRV("region1.skydns.test. 3600 SRV 10 33 8080 server1."),
+		Answer: []dns.RR{
 			newSRV("region1.skydns.test. 3600 SRV 10 33 0 104.server1.development.region1.skydns.test."),
-			newSRV("region1.skydns.test. 3600 SRV 10 33 80 server2")},
+			newSRV("region1.skydns.test. 3600 SRV 10 33 80 server2"),
+			newSRV("region1.skydns.test. 3600 SRV 10 33 8080 server1.")},
 		Extra: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
 	},
 	// Subdomain Weight Test
 	{
 		Qname: "region5.skydns.test.", Qtype: dns.TypeSRV,
 		Answer: []dns.RR{
-			newSRV("region5.skydns.test. 3600 SRV 10 36 0 server1."),
 			newSRV("region5.skydns.test. 3600 SRV 10 22 0 server2."),
+			newSRV("region5.skydns.test. 3600 SRV 10 36 0 server1."),
 			newSRV("region5.skydns.test. 3600 SRV 10 41 0 server3."),
 			newSRV("region5.skydns.test. 3600 SRV 30 100 0 server4.")},
 	},
 	// Wildcard Test
 	{
 		Qname: "*.region1.skydns.test.", Qtype: dns.TypeSRV,
-		Answer: []dns.RR{newSRV("*.region1.skydns.test. 3600 SRV 10 33 8080 server1."),
+		Answer: []dns.RR{
 			newSRV("*.region1.skydns.test. 3600 SRV 10 33 0 104.server1.development.region1.skydns.test."),
-			newSRV("*.region1.skydns.test. 3600 SRV 10 33 80 server2")},
+			newSRV("*.region1.skydns.test. 3600 SRV 10 33 80 server2"),
+			newSRV("*.region1.skydns.test. 3600 SRV 10 33 8080 server1.")},
 		Extra: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
 	},
 	// Wildcard Test
 	{
 		Qname: "production.*.skydns.test.", Qtype: dns.TypeSRV,
-		Answer: []dns.RR{newSRV("production.*.skydns.test. 3600 IN SRV 10 50 80 server2."),
-			newSRV("production.*.skydns.test. 3600 IN SRV 10 50 0 105.server3.production.region2.skydns.test.")},
+		Answer: []dns.RR{
+			newSRV("production.*.skydns.test. 3600 IN SRV 10 50 0 105.server3.production.region2.skydns.test."),
+			newSRV("production.*.skydns.test. 3600 IN SRV 10 50 80 server2.")},
 		Extra: []dns.RR{newAAAA("105.server3.production.region2.skydns.test. 3600 IN AAAA 2001::8:8:8:8")},
 	},
 	// NXDOMAIN Test
@@ -478,17 +491,20 @@ var dnsTestCases = []dnsTestCase{
 	{
 		dnssec: true,
 		Qname:  "skydns.test.", Qtype: dns.TypeDNSKEY,
-		Answer: []dns.RR{newDNSKEY("skydns.test. 3600 DNSKEY 256 3 5 deadbeaf"),
+		Answer: []dns.RR{
+			newDNSKEY("skydns.test. 3600 DNSKEY 256 3 5 deadbeaf"),
 			newRRSIG("skydns.test. 3600 RRSIG DNSKEY 5 2 3600 0 0 51945 skydns.test. deadbeaf")},
 	},
 	// Signed Response Test
 	{
 		dnssec: true,
 		Qname:  "104.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
-		Answer: []dns.RR{newSRV("104.server1.development.region1.skydns.test. 3600 SRV 10 100 0 104.server1.development.region1.skydns.test."),
-			newRRSIG("104.server1.development.region1.skydns.test. 3600 RRSIG SRV 5 6 3600 0 0 51945 skydns.test. deadbeaf")},
-		Extra: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1"),
-			newRRSIG("104.server1.developmen.region1.skydns.test. 3600 RRSIG A 5 6 3600 0 0 51945 skydns.test. deadbeaf")},
+		Answer: []dns.RR{
+			newRRSIG("104.server1.development.region1.skydns.test. 3600 RRSIG SRV 5 6 3600 0 0 51945 skydns.test. deadbeaf"),
+			newSRV("104.server1.development.region1.skydns.test. 3600 SRV 10 100 0 104.server1.development.region1.skydns.test.")},
+		Extra: []dns.RR{
+			newRRSIG("104.server1.developmen.region1.skydns.test. 3600 RRSIG A 5 6 3600 0 0 51945 skydns.test. deadbeaf"),
+			newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
 	},
 	// NXDOMAIN Test
 
