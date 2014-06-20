@@ -209,6 +209,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				}
 				m1, e1 := s.Lookup(target, req.Question[0].Qtype)
 				if e1 != nil {
+					s.config.log.Errorf("failure to look name %q", err)
 					s.NameError(m, req)
 					return
 				}
@@ -646,7 +647,7 @@ func (s *server) Lookup(n string, t uint16) (*dns.Msg, error) {
 	// TODO(miek): fallback to TCP, but fallback to TCP will probably overflow
 	// the packet I'm sending back to the client, because it is likely that
 	// will have used UDP.
-	c := &dns.Client{Net: "udp", ReadTimeout: s.config.ReadTimeout}
+	c := &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout}
 	nsid := int(m.Id) % len(s.config.Nameservers)
 	try := 0
 Redo:
