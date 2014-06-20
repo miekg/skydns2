@@ -209,7 +209,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				}
 				m1, e1 := s.Lookup(target, req.Question[0].Qtype)
 				if e1 != nil {
-					s.config.log.Errorf("failure to look name %q", err)
+					s.config.log.Errorf("%q", err)
 					s.NameError(m, req)
 					return
 				}
