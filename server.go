@@ -111,7 +111,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				s.sign(m, opt.UDPSize())
 			}
 		}
-		w.WriteMsg(m)
+		if err := w.WriteMsg(m); err != nil {
+			s.config.log.Errorf("failure to return reply %q", err)
+		}
 	}()
 
 	if strings.HasSuffix(name, "dns."+s.config.Domain) || name == s.config.Domain {
@@ -309,7 +311,9 @@ func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) {
 	if m.Answer, err = s.PTRRecords(req.Question[0]); err == nil {
 		// TODO(miek): Reverse DNSSEC. We should sign this, but requires a key....and more
 		// Probably not worth the hassle?
-		w.WriteMsg(m)
+		if err := w.WriteMsg(m); err != nil {
+			s.config.log.Errorf("failure to return reply %q", err)
+		}
 	}
 	// Always forward if not found locally.
 	s.ServeDNSForward(w, req)
