@@ -178,10 +178,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
-					m.SetRcode(req, dns.RcodeNameError)
-					m.Ns = []dns.RR{s.NewSOA()}
-					m.Ns[0].Header().Ttl = s.config.MinTtl
-					StatsNameErrorCount.Inc(1)
+					s.NameError(m, req)
 					return
 				}
 			}
@@ -192,10 +189,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				// We can not complete the CNAME internally, *iff* there is a
 				// external name in the set, take it, and try to resolve it externally.
 				if len(records) == 0 {
-					m.SetRcode(req, dns.RcodeNameError)
-					m.Ns = []dns.RR{s.NewSOA()}
-					m.Ns[0].Header().Ttl = s.config.MinTtl
-					StatsNameErrorCount.Inc(1)
+					s.NameError(m, req)
 					return
 				}
 				target := ""
@@ -208,18 +202,12 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					}
 				}
 				if target == "" {
-					m.SetRcode(req, dns.RcodeNameError)
-					m.Ns = []dns.RR{s.NewSOA()}
-					m.Ns[0].Header().Ttl = s.config.MinTtl
-					StatsNameErrorCount.Inc(1)
+					s.NameError(m, req)
 					return
 				}
 				m1, e1 := s.Lookup(target, req.Question[0].Qtype)
 				if e1 != nil {
-					m.SetRcode(req, dns.RcodeNameError)
-					m.Ns = []dns.RR{s.NewSOA()}
-					m.Ns[0].Header().Ttl = s.config.MinTtl
-					StatsNameErrorCount.Inc(1)
+					s.NameError(m, req)
 					return
 				}
 				records = append(records, m1.Answer...)
@@ -231,10 +219,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
-					m.SetRcode(req, dns.RcodeNameError)
-					m.Ns = []dns.RR{s.NewSOA()}
-					m.Ns[0].Header().Ttl = s.config.MinTtl
-					StatsNameErrorCount.Inc(1)
+					s.NameError(m, req)
 					return
 				}
 			}
@@ -247,10 +232,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
-					m.SetRcode(req, dns.RcodeNameError)
-					m.Ns = []dns.RR{s.NewSOA()}
-					m.Ns[0].Header().Ttl = s.config.MinTtl
-					StatsNameErrorCount.Inc(1)
+					s.NameError(m, req)
 					return
 				}
 			}
@@ -679,4 +661,11 @@ Redo:
 		goto Redo
 	}
 	return nil, fmt.Errorf("failure to lookup name")
+}
+
+func (s *server) NameError(m, req *dns.Msg) {
+	m.SetRcode(req, dns.RcodeNameError)
+	m.Ns = []dns.RR{s.NewSOA()}
+	m.Ns[0].Header().Ttl = s.config.MinTtl
+	StatsNameErrorCount.Inc(1)
 }
