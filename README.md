@@ -255,6 +255,23 @@ We have created the following CNAME chain: `1.rails.production.east.skydns.local
     1.rails.production.east.skydns.local. 3600  IN  CNAME   server1.skydns.local.
     server1.skydns.local.                 3600  IN  A       10.0.2.15
 
+##### External Names
+
+If the CNAME chains leads to a name that falls outside of the domain (i.e. does not end with `skydns.local.`),
+a.k.a. an external name, SkyDNS will attempt to resolve that name using the supplied nameservers. If this succeeds
+the reply is concatenated to the current one and send to the client. So if we registrer this service:
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/production/rails/1 \
+        -d value='{"host":"www.miek.nl","port":8080}'
+
+Doing an A/AAAA query for this will lead to the following response:
+
+    1.rails.production.east.skydns.local. 3600 IN CNAME www.miek.nl.
+    www.miek.nl.            3600    IN      CNAME   a.miek.nl.
+    a.miek.nl.              3600    IN      A       176.58.119.54
+
+The first CNAME is generated from within SkyDNS, the other two are from the recursive server.
+
 #### NS Records
 
 SkyDNS will internally synthesis name which will be used for NS records. The first
