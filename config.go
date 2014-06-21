@@ -102,14 +102,14 @@ func setDefaults(config *Config) error {
 	if config.Priority == 0 {
 		config.Priority = 10
 	}
-	if config.RCache <= 0 {
-		config.RCache = RCacheCapacity
+	if config.RCache < 0 {
+		config.RCache = 0
+	}
+	if config.SCache < 0 {
+		config.SCache = 0
 	}
 	if config.RCacheTtl <= 0 {
 		config.RCacheTtl = RCacheTtl
-	}
-	if config.SCache <= 0 {
-		config.SCache = SCacheCapacity
 	}
 
 	if len(config.Nameservers) == 0 {

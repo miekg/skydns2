@@ -137,9 +137,8 @@ func QuestionKey(q dns.Question) string {
 	return string(h.Sum(i))
 }
 
-// key uses the name, type and rdata, which is serialized and then hashed as the
-// key for the lookup
-func (c *cache) Key(rrs []dns.RR) string {
+// Key uses the name, type and rdata, which is serialized and then hashed as the key for the lookup.
+func Key(rrs []dns.RR) string {
 	h := sha1.New()
 	i := []byte(rrs[0].Header().Name)
 	i = append(i, packUint16(rrs[0].Header().Rrtype)...)

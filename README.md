@@ -57,7 +57,7 @@ may be set:
 * `ttl`: default TTL in seconds to use on replies when none is set in etcd, defaults to 3600.
 * `min_ttl`: minimum TTL in seconds to use on NXDOMAIN, defaults to 30.
 * `scache`: the capacity of the signature cache, defaults to 10000 records if not set.
-* `rcache`: the capacity of the response cache, defaults to 100000 records if not set.
+* `rcache`: the capacity of the response cache, defaults to 0 records if not set.
 * `rcache-ttl`: the TTL of the response cache, defaults to 60 if not set.
 
 To set the configuration, use something like:

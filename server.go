@@ -44,9 +44,9 @@ func (s *server) Run() error {
 	go runDNSServer(s.group, mux, "tcp", s.config.DnsAddr, s.config.ReadTimeout)
 	go runDNSServer(s.group, mux, "udp", s.config.DnsAddr, s.config.ReadTimeout)
 	if s.config.DNSSEC == "" {
-		s.config.log.Printf("ready for queries on %s", s.config.DnsAddr)
+		s.config.log.Printf("ready for queries on %s [rcache %d]", s.config.DnsAddr, s.config.RCache)
 	} else {
-		s.config.log.Printf("ready for queries on %s, signing with %s", s.config.DnsAddr, s.config.DNSSEC)
+		s.config.log.Printf("ready for queries on %s [rcache %d], signing with %s [scache %d]", s.config.DnsAddr, s.config.RCache, s.config.DNSSEC, s.config.SCache)
 	}
 
 	s.group.Wait()
@@ -79,6 +79,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
 	StatsRequestCount.Inc(1)
+	cached := false
 
 	if q.Qtype == dns.TypePTR && strings.HasSuffix(name, ".in-addr.arpa.") || strings.HasSuffix(name, ".ip6.arpa.") {
 		s.ServeDNSReverse(w, req)
@@ -107,6 +108,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			for _, r := range m.Answer {
 				r.Header().Ttl = minttl
 			}
+		}
+		if ! cached {
+			s.rcache.InsertMsg(QuestionKey(req.Question[0]), m.Answer, m.Extra)
 		}
 		// Check if we need to do DNSSEC and sign the reply.
 		if opt := req.IsEdns0(); opt != nil && opt.Do() {
@@ -177,6 +181,19 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if len(m.Answer) > 0 {
 			return
 		}
+	}
+	key := QuestionKey(req.Question[0])
+	a1, e1, exp := s.rcache.Search(key)
+	if len(a1) > 0 {
+		// Cache hit! \o/
+		if time.Since(exp) < 0 {
+			m.Answer = a1
+			m.Extra = e1
+			cached = true
+			return
+		}
+		// Expired! /o\
+		s.rcache.Remove(key)
 	}
 
 	switch q.Qtype {

@@ -27,7 +27,7 @@ var (
 const (
 	SCacheCapacity = 10000
 	RCacheCapacity = 100000
-	RCacheTtl = 60
+	RCacheTtl      = 60
 )
 
 func init() {
@@ -57,7 +57,7 @@ func init() {
 	// Minttl
 	flag.StringVar(&config.Hostmaster, "hostmaster", "hostmaster@skydns.local.", "hostmaster email address to use")
 	flag.IntVar(&config.SCache, "scache", SCacheCapacity, "capacity of the signature cache")
-	flag.IntVar(&config.RCache, "rcache", RCacheCapacity, "capacity of the response cache")
+	flag.IntVar(&config.RCache, "rcache", 0, "capacity of the response cache") // default to 0 for now
 	flag.IntVar(&config.RCacheTtl, "rcache-ttl", RCacheTtl, "TTL of the response cache")
 }
 

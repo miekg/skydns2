@@ -46,7 +46,7 @@ func delService(t *testing.T, s *server, k string) {
 	}
 }
 
-func newTestServer(t *testing.T) *server {
+func newTestServer(t *testing.T, cache bool) *server {
 	Port += 10
 	StrPort = strconv.Itoa(Port)
 	s := new(server)
@@ -57,6 +57,9 @@ func newTestServer(t *testing.T) *server {
 	s.client = client
 	s.scache = NewCache(1000, 0)
 	s.rcache = NewCache(0, 0)
+	if cache {
+		s.rcache = NewCache(100, 60) // 100 items, 60s ttl
+	}
 	s.config = new(Config)
 	s.config.DnsAddr = "127.0.0.1:" + StrPort
 	s.config.Nameservers = []string{"8.8.4.4:53"}
@@ -70,9 +73,9 @@ func newTestServer(t *testing.T) *server {
 	return s
 }
 
-func newTestServerDNSSEC(t *testing.T) *server {
+func newTestServerDNSSEC(t *testing.T, cache bool) *server {
 	var err error
-	s := newTestServer(t)
+	s := newTestServer(t, cache)
 	s.config.PubKey = newDNSKEY("skydns.test. IN DNSKEY 256 3 5 AwEAAaXfO+DOBMJsQ5H4TfiabwSpqE4cGL0Qlvh5hrQumrjr9eNSdIOjIHJJKCe56qBU5mH+iBlXP29SVf6UiiMjIrAPDVhClLeWFe0PC+XlWseAyRgiLHdQ8r95+AfkhO5aZgnCwYf9FGGSaT0+CRYN+PyDbXBTLK5FN+j5b6bb7z+d")
 	s.config.KeyTag = s.config.PubKey.KeyTag()
 	s.config.PrivKey, err = s.config.PubKey.ReadPrivateKey(strings.NewReader(`Private-key-format: v1.3
@@ -93,7 +96,7 @@ Coefficient: mMFr4+rDY5V24HZU3Oa5NEb55iQ56ZNa182GnNhWqX7UqWjcUUGjnkCy40BqeFAQ7lp
 }
 
 func TestDNSForward(t *testing.T) {
-	s := newTestServer(t)
+	s := newTestServer(t, false)
 	defer s.Stop()
 
 	c := new(dns.Client)
@@ -117,7 +120,7 @@ func TestDNSForward(t *testing.T) {
 	}
 }
 func TestDNSTtlRRset(t *testing.T) {
-	s := newTestServerDNSSEC(t)
+	s := newTestServerDNSSEC(t, false)
 	defer s.Stop()
 
 	ttl := uint32(60)
@@ -153,7 +156,7 @@ func (p rrSet) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p rrSet) Less(i, j int) bool { return p[i].String() < p[j].String() }
 
 func TestDNS(t *testing.T) {
-	s := newTestServerDNSSEC(t)
+	s := newTestServerDNSSEC(t, false)
 	defer s.Stop()
 
 	for _, serv := range services {
@@ -508,7 +511,7 @@ func newPTR(rr string) *dns.PTR       { r, _ := dns.NewRR(rr); return r.(*dns.PT
 func BenchmarkDNSSingle(b *testing.B) {
 	b.StopTimer()
 	t := new(testing.T)
-	s := newTestServerDNSSEC(t)
+	s := newTestServerDNSSEC(t, true)
 	defer s.Stop()
 
 	serv := services[0]
@@ -529,7 +532,7 @@ func BenchmarkDNSSingle(b *testing.B) {
 func BenchmarkDNSWildcard(b *testing.B) {
 	b.StopTimer()
 	t := new(testing.T)
-	s := newTestServerDNSSEC(t)
+	s := newTestServerDNSSEC(t, true)
 	defer s.Stop()
 
 	for _, serv := range services {
@@ -552,7 +555,7 @@ func BenchmarkDNSWildcard(b *testing.B) {
 func BenchmarkDNSSECSingle(b *testing.B) {
 	b.StopTimer()
 	t := new(testing.T)
-	s := newTestServerDNSSEC(t)
+	s := newTestServerDNSSEC(t, true)
 	defer s.Stop()
 
 	serv := services[0]
