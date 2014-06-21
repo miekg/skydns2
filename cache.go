@@ -30,15 +30,17 @@ type cache struct {
 	m        map[string]*list.Element
 	capacity uint // number of RRs
 	size     uint // current size
+	ttl	 time.Duration  // ttl use the storing messages
 }
 
 // TODO(miek): add setCapacity so it can be set runtime.
 
-func NewCache(capacity int) *cache {
+func NewCache(capacity, ttl int) *cache {
 	c := new(cache)
 	c.l = list.New()
 	c.m = make(map[string]*list.Element)
 	c.capacity = uint(capacity)
+	c.ttl = time.Duration(ttl) * time.Second
 	return c
 }
 
@@ -70,14 +72,14 @@ func (c *cache) shrink() {
 
 // insertMsg inserts a message in the cache. We will cahce it for ttl seconds, which
 // should be a small (60...300) integer.
-func (c *cache) InsertMsg(s string, ttl uint, answer, extra []dns.RR) {
+func (c *cache) InsertMsg(s string, answer, extra []dns.RR) {
 	if c.capacity == 0 {
 		return
 	}
 	c.Lock()
 	defer c.Unlock()
 	if _, ok := c.m[s]; !ok {
-		e := c.l.PushFront(&Elem{s, time.Now().UTC().Add(time.Second * time.Duration(ttl)), answer, extra})
+		e := c.l.PushFront(&Elem{s, time.Now().UTC().Add(time.Second * c.ttl), answer, extra})
 		c.m[s] = e
 	}
 	c.size += uint(len(answer) + len(extra))

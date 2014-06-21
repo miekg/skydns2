@@ -30,8 +30,8 @@ type server struct {
 // NewServer returns a new SkyDNS server.
 func NewServer(config *Config, client *etcd.Client) *server {
 	return &server{client: client, config: config, group: new(sync.WaitGroup),
-		scache: NewCache(config.SCache),
-		rcache: NewCache(config.RCache),
+		scache: NewCache(config.SCache, 0),
+		rcache: NewCache(config.RCache, config.RCacheTtl),
 	}
 }
 
