@@ -28,9 +28,9 @@ type cache struct {
 	sync.RWMutex
 	l        *list.List
 	m        map[string]*list.Element
-	capacity uint // number of RRs
-	size     uint // current size
-	ttl	 time.Duration  // ttl use the storing messages
+	capacity uint          // number of RRs
+	size     uint          // current size
+	ttl      time.Duration // ttl use the storing messages
 }
 
 // TODO(miek): add setCapacity so it can be set runtime.
@@ -79,7 +79,7 @@ func (c *cache) InsertMsg(s string, answer, extra []dns.RR) {
 	c.Lock()
 	defer c.Unlock()
 	if _, ok := c.m[s]; !ok {
-		e := c.l.PushFront(&Elem{s, time.Now().UTC().Add(time.Second * c.ttl), answer, extra})
+		e := c.l.PushFront(&Elem{s, time.Now().UTC().Add(c.ttl), answer, extra})
 		c.m[s] = e
 	}
 	c.size += uint(len(answer) + len(extra))
@@ -94,17 +94,21 @@ func (c *cache) InsertSig(s string, sig *dns.RRSIG) {
 	c.Lock()
 	defer c.Unlock()
 	if _, ok := c.m[s]; !ok {
-		// TODO(miek): FIX expiration
-		e := c.l.PushFront(&Elem{s, time.Now().UTC().Add(time.Second * 5), []dns.RR{sig}, nil})
+		m := ((int64(sig.Expiration) - time.Now().Unix()) / (1 << 31)) - 1
+		if m < 0 {
+			m = 0
+		}
+		t := time.Unix(int64(sig.Expiration)-(m*(1<<31)), 0).UTC()
+		e := c.l.PushFront(&Elem{s, t, []dns.RR{sig}, nil})
 		c.m[s] = e
 	}
 	c.size += 1
 	c.shrink()
 }
 
-func (c *cache) Search(s string) ([]dns.RR, []dns.RR) {
+func (c *cache) Search(s string) ([]dns.RR, []dns.RR, time.Time) {
 	if c.capacity == 0 {
-		return nil, nil
+		return nil, nil, time.Time{}
 	}
 	c.RLock()
 	defer c.RUnlock()
@@ -122,9 +126,9 @@ func (c *cache) Search(s string) ([]dns.RR, []dns.RR) {
 		for i, r := range e.extra {
 			extra[i] = dns.Copy(r)
 		}
-		return answer, extra
+		return answer, extra, e.expiration
 	}
-	return nil, nil
+	return nil, nil, time.Time{}
 }
 
 func QuestionKey(q dns.Question) string {
@@ -132,7 +136,6 @@ func QuestionKey(q dns.Question) string {
 	i := append([]byte(q.Name), packUint16(q.Qtype)...)
 	return string(h.Sum(i))
 }
-
 
 // key uses the name, type and rdata, which is serialized and then hashed as the
 // key for the lookup
