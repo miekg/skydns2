@@ -32,11 +32,13 @@ type cache struct {
 	size     uint // current size
 }
 
-func NewCache(capacity uint) *cache {
+// TODO(miek): add setCapacity so it can be set runtime.
+
+func NewCache(capacity int) *cache {
 	c := new(cache)
 	c.l = list.New()
 	c.m = make(map[string]*list.Element)
-	c.capacity = capacity
+	c.capacity = uint(capacity)
 	return c
 }
 

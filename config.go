@@ -37,6 +37,10 @@ type Config struct {
 	Ttl uint32 `json:"ttl,omitempty"`
 	// Minimum TTL, in seconds, for NXDOMAIN responses. Defaults to 300.
 	MinTtl uint32 `json:"min_ttl,omitempty"`
+	// SCache, size of the signature cache in signatures stored.
+	SCache int `json:"scache"`
+	// RCache, size of response cache in resource records stored.
+	RCache int `josn:"rcache"`
 
 	// DNSSEC key material
 	PubKey          *dns.DNSKEY    `json:"-"`
@@ -95,6 +99,12 @@ func setDefaults(config *Config) error {
 	}
 	if config.Priority == 0 {
 		config.Priority = 10
+	}
+	if config.RCache <= 0 {
+		config.RCache = RCacheSize
+	}
+	if config.SCache <= 0 {
+		config.SCache = SCacheSize
 	}
 
 	if len(config.Nameservers) == 0 {

@@ -24,6 +24,11 @@ var (
 	machine     = ""
 )
 
+const (
+	SCacheSize = 10000
+	RCacheSize = 100000
+)
+
 func init() {
 	flag.StringVar(&config.Domain, "domain",
 		func() string {
@@ -50,6 +55,8 @@ func init() {
 	// TTl
 	// Minttl
 	flag.StringVar(&config.Hostmaster, "hostmaster", "hostmaster@skydns.local.", "hostmaster email address to use")
+	flag.IntVar(&config.SCache, "scache", SCacheSize, "size of the signature cache")
+	flag.IntVar(&config.RCache, "rcache", RCacheSize, "size of the response cache")
 }
 
 func newClient() (client *etcd.Client) {

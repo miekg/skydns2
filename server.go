@@ -23,11 +23,12 @@ type server struct {
 	client *etcd.Client
 	config *Config
 	group  *sync.WaitGroup
+	scache *cache
 }
 
 // NewServer returns a new SkyDNS server.
 func NewServer(config *Config, client *etcd.Client) *server {
-	return &server{client: client, config: config, group: new(sync.WaitGroup)}
+	return &server{client: client, config: config, group: new(sync.WaitGroup), scache: NewCache(config.SCache)}
 }
 
 // Run is a blocking operation that starts the server listening on the DNS ports.
