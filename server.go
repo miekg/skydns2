@@ -207,9 +207,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				}
 			}
 			if err.Error() == "incomplete CNAME chain" {
-				// TODO(miek): the 3x of setting RcodeNameError could
-				// be done better.
-
 				// We can not complete the CNAME internally, *iff* there is a
 				// external name in the set, take it, and try to resolve it externally.
 				if len(records) == 0 {
@@ -283,7 +280,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	StatsForwardCount.Inc(1)
 	if len(s.config.Nameservers) == 0 {
-		// TODO(miek): log this too?
+		s.config.log.Infof("no nameservers defined, can not forward")
 		m := new(dns.Msg)
 		m.SetReply(req)
 		m.SetRcode(req, dns.RcodeServerFailure)
@@ -452,11 +449,11 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		case ip == nil:
 			records = append(records, serv.NewSRV(q.Name, uint16(100)))
 		case ip.To4() != nil:
-			serv.Host = Domain(serv.key) // TODO(miek): ugly
+			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewSRV(q.Name, uint16(100)))
 			extra = append(extra, serv.NewA(Domain(r.Node.Key), ip.To4()))
 		case ip.To4() == nil:
-			serv.Host = Domain(serv.key) // TODO(miek): ugly
+			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewSRV(q.Name, uint16(100)))
 			extra = append(extra, serv.NewAAAA(Domain(r.Node.Key), ip.To16()))
 		}
@@ -497,7 +494,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		case ip == nil:
 			records = append(records, serv.NewSRV(q.Name, weight))
 		case ip.To4() != nil:
-			serv.Host = Domain(serv.key) // TODO(miek): ugly
+			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewSRV(q.Name, weight))
 			extra = append(extra, serv.NewA(Domain(serv.key), ip.To4()))
 		case ip.To4() == nil:
