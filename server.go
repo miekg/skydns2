@@ -109,7 +109,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				r.Header().Ttl = minttl
 			}
 		}
-		if ! cached {
+		if !cached {
 			s.rcache.InsertMsg(QuestionKey(req.Question[0]), m.Answer, m.Extra)
 		}
 		// Check if we need to do DNSSEC and sign the reply.

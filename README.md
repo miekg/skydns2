@@ -56,7 +56,7 @@ may be set:
 * `read_timeout`: network read timeout, for DNS and talking with etcd.
 * `ttl`: default TTL in seconds to use on replies when none is set in etcd, defaults to 3600.
 * `min_ttl`: minimum TTL in seconds to use on NXDOMAIN, defaults to 30.
-* `scache`: the capacity of the signature cache, defaults to 10000 records if not set.
+* `scache`: the capacity of the DNSSEC signature cache, defaults to 10000 records if not set.
 * `rcache`: the capacity of the response cache, defaults to 0 records if not set.
 * `rcache-ttl`: the TTL of the response cache, defaults to 60 if not set.
 
@@ -68,7 +68,7 @@ To set the configuration, use something like:
 SkyDNS needs to be restarted for configuration changes to take effect. This might change, so that SkyDNS
 can re-read the config from Etcd after a HUP signal.
 
-You can also use the commandline option, however the settings in etcd take precedence.
+You can also use the command line options, however the settings in etcd take precedence.
 
 ### Environment Variables
 
