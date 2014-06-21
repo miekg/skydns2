@@ -679,6 +679,8 @@ func (s *server) calculateTtl(node *etcd.Node, serv *Service) uint32 {
 }
 
 // TODO(miek): if DNSSEC is requested we should use it here too.
+// Probably best to require all subfunctions to lookup at the
+// request packet so we can look at opt records and the size.
 
 // Lookup looks up name,type using the recursive nameserver defines
 // in the server's config. If none defined it returns an error
