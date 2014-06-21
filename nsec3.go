@@ -5,12 +5,8 @@
 package main
 
 import (
-	"crypto/sha1"
 	"encoding/base32"
-	"os"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/miekg/dns"
 )
