@@ -447,7 +447,19 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		serv.Ttl = ttl
 		switch {
 		case ip == nil:
-			records = append(records, serv.NewSRV(q.Name, uint16(100)))
+			srv := serv.NewSRV(q.Name, uint16(100))
+			records = append(records, srv)
+			if !dns.IsSubDomain(s.config.Domain, srv.Target) {
+				// TODO(miek): should be done in parallel
+				m1, e1 := s.Lookup(srv.Target, dns.TypeA)
+				if e1 == nil {
+					extra = append(extra, m1.Answer...)
+				}
+				m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA)
+				if e1 == nil {
+					extra = append(extra, m1.Answer...)
+				}
+			}
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewSRV(q.Name, uint16(100)))
@@ -480,6 +492,7 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		}
 		w[serv.Priority] += weight
 	}
+	lookup := make(map[string]bool)
 	for _, serv := range sx {
 		w1 := 100.0 / float64(w[serv.Priority])
 		// adjust for a particular service
@@ -492,7 +505,19 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
-			records = append(records, serv.NewSRV(q.Name, weight))
+			srv := serv.NewSRV(q.Name, weight)
+			records = append(records, srv)
+			if _, ok := lookup[srv.Target]; !ok {
+				m1, e1 := s.Lookup(srv.Target, dns.TypeA)
+				if e1 == nil {
+					extra = append(extra, m1.Answer...)
+				}
+				m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA)
+				if e1 == nil {
+					extra = append(extra, m1.Answer...)
+				}
+				lookup[srv.Target] = true
+			}
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewSRV(q.Name, weight))
@@ -652,6 +677,8 @@ func (s *server) calculateTtl(node *etcd.Node, serv *Service) uint32 {
 	}
 	return serv.Ttl
 }
+
+// TODO(miek): if DNSSEC is requested we should use it here too.
 
 // Lookup looks up name,type using the recursive nameserver defines
 // in the server's config. If none defined it returns an error
