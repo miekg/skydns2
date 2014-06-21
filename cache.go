@@ -71,6 +71,9 @@ func (c *cache) shrink() {
 // insertMsg inserts a message in the cache. We will cahce it for ttl seconds, which
 // should be a small (60...300) integer.
 func (c *cache) InsertMsg(s string, ttl uint, answer, extra []dns.RR) {
+	if c.capacity == 0 {
+		return
+	}
 	c.Lock()
 	defer c.Unlock()
 	if _, ok := c.m[s]; !ok {
@@ -83,6 +86,9 @@ func (c *cache) InsertMsg(s string, ttl uint, answer, extra []dns.RR) {
 
 // insertSig inserts a signature, the expiration time is used as the cache ttl.
 func (c *cache) InsertSig(s string, sig *dns.RRSIG) {
+	if c.capacity == 0 {
+		return
+	}
 	c.Lock()
 	defer c.Unlock()
 	if _, ok := c.m[s]; !ok {
@@ -95,6 +101,9 @@ func (c *cache) InsertSig(s string, sig *dns.RRSIG) {
 }
 
 func (c *cache) Search(s string) ([]dns.RR, []dns.RR) {
+	if c.capacity == 0 {
+		return nil, nil
+	}
 	c.RLock()
 	defer c.RUnlock()
 	if e, ok := c.m[s]; ok {
