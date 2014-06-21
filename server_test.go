@@ -57,6 +57,7 @@ func newTestServer(t *testing.T) *server {
 	s.group = new(sync.WaitGroup)
 	s.client = client
 	s.scache = NewCache(1000)
+	s.rcache = NewCache(0)
 	s.config = new(Config)
 	s.config.DnsAddr = "127.0.0.1:" + StrPort
 	s.config.Nameservers = []string{"8.8.4.4:53"}
