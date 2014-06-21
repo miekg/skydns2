@@ -13,7 +13,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/coreos/go-log/log"
@@ -91,41 +90,6 @@ Coefficient: mMFr4+rDY5V24HZU3Oa5NEb55iQ56ZNa182GnNhWqX7UqWjcUUGjnkCy40BqeFAQ7lp
 		t.Fatal(err)
 	}
 	return s
-}
-
-func TestDNSExpire(t *testing.T) {
-	s := newTestServerDNSSEC(t)
-	defer s.Stop()
-
-	serv := services[0]
-	addService(t, s, serv.key, 1, serv)
-	// defer delService(t, s, serv.key) // It will delete itself...magically
-
-	c := new(dns.Client)
-	tc := dnsTestCases[0]
-	m := new(dns.Msg)
-	m.SetQuestion(tc.Qname, tc.Qtype)
-	if tc.dnssec == true {
-		m.SetEdns0(4096, true)
-	}
-	resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
-	if err != nil {
-		t.Fatalf("failing: %s: %s\n", m.String(), err.Error())
-	}
-	if resp.Rcode != dns.RcodeSuccess {
-		t.Logf("%v\n", resp)
-		t.Fail()
-	}
-	// Sleep to let it expire.
-	time.Sleep(2 * time.Second)
-	resp, _, err = c.Exchange(m, "127.0.0.1:"+StrPort)
-	if err != nil {
-		t.Errorf("failing: %s\n", err.Error())
-	}
-	if resp.Rcode != dns.RcodeNameError {
-		t.Logf("%v\n", resp)
-		t.Fail()
-	}
 }
 
 func TestDNSForward(t *testing.T) {
