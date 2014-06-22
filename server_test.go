@@ -179,7 +179,7 @@ func TestDNS(t *testing.T) {
 		sort.Sort(rrSet(resp.Extra))
 		t.Logf("%s\n", resp)
 		if len(resp.Answer) != len(tc.Answer) {
-			t.Fatalf("response for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
+			t.Fatalf("answer for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
 		}
 		for i, a := range resp.Answer {
 			if a.Header().Name != tc.Answer[i].Header().Name {
@@ -276,6 +276,9 @@ func TestDNS(t *testing.T) {
 					// TODO(miek)
 				}
 			}
+			if len(resp.Extra) != len(tc.Extra) {
+				t.Fatalf("additional for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
+			}
 			for i, e := range resp.Extra {
 				switch x := e.(type) {
 				case *dns.A:
@@ -311,6 +314,8 @@ var services = []*Service{
 	{Host: "104.server1.development.region1.skydns.test", key: "1.cname.skydns.test."},
 	{Host: "100.server1.development.region1.skydns.test", key: "2.cname.skydns.test."},
 	{Host: "www.miek.nl", key: "external1.cname.skydns.test."},
+	{Host: "www.miek.nl", key: "ext1.cname2.skydns.test."},
+	{Host: "www.miek.nl", key: "ext2.cname2.skydns.test."},
 	{Host: "wwwwwww.miek.nl", key: "external2.cname.skydns.test."},
 	{Host: "4.cname.skydns.test", key: "3.cname.skydns.test."},
 	{Host: "3.cname.skydns.test", key: "4.cname.skydns.test."},
@@ -354,10 +359,17 @@ var dnsTestCases = []dnsTestCase{
 		Answer: []dns.RR{newSRV("104.server1.development.region1.skydns.test. 3600 SRV 10 100 0 104.server1.development.region1.skydns.test.")},
 		Extra:  []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
 	},
+	// Multi SRV with the same target, should be dedupped.
 	// AAAAA Record Test
 	{
-		Qname: "105.server3.production.region2.skydns.test.", Qtype: dns.TypeAAAA,
-		Answer: []dns.RR{newAAAA("105.server3.production.region2.skydns.test. 3600 AAAA 2001::8:8:8:8")},
+		Qname: "*.cname2.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{
+			newSRV("*.cname2.skydns.test. 3600 IN SRV 10 50 0 www.miek.nl."),
+		},
+		Extra: []dns.RR{
+			newA("a.miek.nl. 3600 IN A 176.58.119.54"),
+			newAAAA("a.miek.nl. 3600 IN AAAA 2a01:7e00::f03c:91ff:feae:e74c"),
+		},
 	},
 	// TTL Test
 	{

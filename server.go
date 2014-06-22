@@ -97,6 +97,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.RecursionAvailable = true
 	m.Answer = make([]dns.RR, 0, 10)
 	defer func() {
+		m = MsgDedup(m)
 		// Set TTL to the minimum of the RRset.
 		minttl := s.config.Ttl
 		if len(m.Answer) > 1 {
@@ -721,4 +722,11 @@ func (s *server) NameError(m, req *dns.Msg) {
 	m.Ns = []dns.RR{s.NewSOA()}
 	m.Ns[0].Header().Ttl = s.config.MinTtl
 	StatsNameErrorCount.Inc(1)
+}
+
+// MsgDedup will dedup duplicate RR from a message. A duplicate RR has the
+// same ownername and rdata is another one.
+func MsgDedup(m *dns.Msg) *dns.Msg {
+	// 
+	return m
 }
