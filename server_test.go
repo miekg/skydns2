@@ -67,6 +67,7 @@ func newTestServer(t *testing.T, cache bool) *server {
 	s.config.Hostmaster = "hostmaster.skydns.test."
 	s.config.DomainLabels = 2
 	s.config.Priority = 10
+	s.config.RCacheTtl = RCacheTtl
 	s.config.Ttl = 3600
 	s.config.log = log.New("skydns", false, log.NullSink())
 	go s.Run()
@@ -130,7 +131,8 @@ func TestDNSTtlRRset(t *testing.T) {
 		ttl += 60
 	}
 	c := new(dns.Client)
-	tc := dnsTestCases[10]
+	tc := dnsTestCases[8]
+	t.Logf("%v\n", tc)
 	m := new(dns.Msg)
 	m.SetQuestion(tc.Qname, tc.Qtype)
 	if tc.dnssec == true {
@@ -141,7 +143,7 @@ func TestDNSTtlRRset(t *testing.T) {
 		t.Fatalf("failing: %s: %s\n", m.String(), err.Error())
 	}
 	t.Logf("%s\n", resp)
-	ttl = 60
+	ttl = 360
 	for i, a := range resp.Answer {
 		if a.Header().Ttl != ttl {
 			t.Errorf("Answer %d should have a Header TTL of %d, but has %d", i, ttl, a.Header().Ttl)
@@ -277,7 +279,7 @@ func TestDNS(t *testing.T) {
 				}
 			}
 			if len(resp.Extra) != len(tc.Extra) {
-				t.Fatalf("additional for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
+				t.Fatalf("additional for %q contained %d results, %d expected", tc.Qname, len(resp.Extra), len(tc.Extra))
 			}
 			for i, e := range resp.Extra {
 				switch x := e.(type) {
@@ -288,6 +290,11 @@ func TestDNS(t *testing.T) {
 				case *dns.AAAA:
 					if x.AAAA.String() != tc.Extra[i].(*dns.AAAA).AAAA.String() {
 						t.Fatalf("extra %d should have a address of %q, but has %q", i, tc.Extra[i].(*dns.AAAA).AAAA.String(), x.AAAA.String())
+					}
+				case *dns.CNAME:
+					tt := tc.Extra[i].(*dns.CNAME)
+					if x.Target != tt.Target {
+						t.Fatalf("CNAME target should be %q, but is %q", x.Target, tt.Target)
 					}
 				}
 			}
@@ -359,8 +366,12 @@ var dnsTestCases = []dnsTestCase{
 		Answer: []dns.RR{newSRV("104.server1.development.region1.skydns.test. 3600 SRV 10 100 0 104.server1.development.region1.skydns.test.")},
 		Extra:  []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
 	},
-	// Multi SRV with the same target, should be dedupped.
 	// AAAAA Record Test
+	{
+		Qname: "105.server3.production.region2.skydns.test.", Qtype: dns.TypeAAAA,
+		Answer: []dns.RR{newAAAA("105.server3.production.region2.skydns.test. 3600 AAAA 2001::8:8:8:8")},
+	},
+	// Multi SRV with the same target, should be dedupped.
 	{
 		Qname: "*.cname2.skydns.test.", Qtype: dns.TypeSRV,
 		Answer: []dns.RR{
@@ -369,10 +380,12 @@ var dnsTestCases = []dnsTestCase{
 		Extra: []dns.RR{
 			newA("a.miek.nl. 3600 IN A 176.58.119.54"),
 			newAAAA("a.miek.nl. 3600 IN AAAA 2a01:7e00::f03c:91ff:feae:e74c"),
+			newCNAME("www.miek.nl. 3600 IN CNAME a.miek.nl."),
 		},
 	},
 	// TTL Test
 	{
+		// This test is referenced by number from DNSTtlRRset
 		Qname: "ttl.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{newA("ttl.skydns.test. 360 A 10.0.0.2")},
 	},
@@ -405,9 +418,9 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "external1.cname.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{
-			newA("a.miek.nl. IN A 176.58.119.54"),
-			newCNAME("external1.cname.skydns.test. IN CNAME www.miek.nl."),
-			newCNAME("www.miek.nl. IN CNAME a.miek.nl."),
+			newA("a.miek.nl. 60 IN A 176.58.119.54"),
+			newCNAME("external1.cname.skydns.test. 60 IN CNAME www.miek.nl."),
+			newCNAME("www.miek.nl. 60 IN CNAME a.miek.nl."),
 		},
 	},
 	// CNAME (unresolvable external name)
@@ -474,7 +487,9 @@ var dnsTestCases = []dnsTestCase{
 		Qname:  "skydns.test.", Qtype: dns.TypeDNSKEY,
 		Answer: []dns.RR{
 			newDNSKEY("skydns.test. 3600 DNSKEY 256 3 5 deadbeaf"),
-			newRRSIG("skydns.test. 3600 RRSIG DNSKEY 5 2 3600 0 0 51945 skydns.test. deadbeaf")},
+			newRRSIG("skydns.test. 3600 RRSIG DNSKEY 5 2 3600 0 0 51945 skydns.test. deadbeaf"),
+		},
+		Extra: []dns.RR{new(dns.OPT)},
 	},
 	// Signed Response Test
 	{
@@ -485,7 +500,9 @@ var dnsTestCases = []dnsTestCase{
 			newSRV("104.server1.development.region1.skydns.test. 3600 SRV 10 100 0 104.server1.development.region1.skydns.test.")},
 		Extra: []dns.RR{
 			newRRSIG("104.server1.developmen.region1.skydns.test. 3600 RRSIG A 5 6 3600 0 0 51945 skydns.test. deadbeaf"),
-			newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
+			newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1"),
+			new(dns.OPT),
+		},
 	},
 	// NXDOMAIN Test
 

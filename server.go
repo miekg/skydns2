@@ -705,6 +705,14 @@ Redo:
 		if r.Rcode != dns.RcodeSuccess {
 			return nil, fmt.Errorf("rcode is not equal to success")
 		}
+		// Reset TTLs to rcache TTL to make some of the other code
+		// and the tests not care about TTLs
+		for _, rr := range r.Answer {
+			rr.Header().Ttl = uint32(s.config.RCacheTtl)
+		}
+		for _, rr := range r.Extra {
+			rr.Header().Ttl = uint32(s.config.RCacheTtl)
+		}
 		return r, nil
 	}
 	// Seen an error, this can only mean, "server not reached", try again
@@ -724,9 +732,43 @@ func (s *server) NameError(m, req *dns.Msg) {
 	StatsNameErrorCount.Inc(1)
 }
 
-// MsgDedup will dedup duplicate RR from a message. A duplicate RR has the
-// same ownername and rdata is another one.
+// This function is a candidate for inclusion in Go DNS.
+
+// MsgDedup will dedup duplicate RRs from a message. A duplicate RR has the
+// same ownername and rdata as another one.
 func MsgDedup(m *dns.Msg) *dns.Msg {
-	// 
+	count := make(map[string]int)
+	a := make([]dns.RR, 0, 3)
+	ttl := uint32(0)
+	for _, r := range m.Answer {
+		ttl, r.Header().Ttl = r.Header().Ttl, 0
+		count[r.String()] += 1
+		if count[r.String()] == 1 {
+			r.Header().Ttl = ttl
+			a = append(a, r)
+		}
+	}
+	m.Answer = a
+	n := make([]dns.RR, 0, 2)
+	for _, r := range m.Ns {
+		ttl, r.Header().Ttl = r.Header().Ttl, 0
+		count[r.String()] += 1
+		if count[r.String()] == 1 {
+			r.Header().Ttl = ttl
+			n = append(n, r)
+		}
+	}
+	m.Ns = n
+	e := make([]dns.RR, 0, 3)
+	for _, r := range m.Extra {
+		ttl, r.Header().Ttl = r.Header().Ttl, 0
+		count[r.String()] += 1
+		if count[r.String()] == 1 {
+			r.Header().Ttl = ttl
+			e = append(e, r)
+		}
+	}
+	m.Extra = e
+
 	return m
 }
