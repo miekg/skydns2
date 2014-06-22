@@ -458,9 +458,13 @@ func (s *server) SRVRecords(q dns.Question, dnssec uint16) (records []dns.RR, ex
 			srv := serv.NewSRV(q.Name, uint16(100))
 			records = append(records, srv)
 			if !dns.IsSubDomain(s.config.Domain, srv.Target) {
-				a1, e1 := s.LookupAddresses(srv.Target, dnssec)
+				m1, e1 := s.Lookup(srv.Target, dns.TypeA, dnssec)
 				if e1 == nil {
-					extra = append(extra, a1...)
+					extra = append(extra, m1.Answer...)
+				}
+				m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA, dnssec)
+				if e1 == nil {
+					extra = append(extra, m1.Answer...)
 				}
 			}
 		case ip.To4() != nil:
@@ -512,9 +516,13 @@ func (s *server) SRVRecords(q dns.Question, dnssec uint16) (records []dns.RR, ex
 			records = append(records, srv)
 			if _, ok := lookup[srv.Target]; !ok {
 				if !dns.IsSubDomain(s.config.Domain, srv.Target) {
-					a1, e1 := s.LookupAddresses(srv.Target, dnssec)
+					m1, e1 := s.Lookup(srv.Target, dns.TypeA, dnssec)
 					if e1 == nil {
-						extra = append(extra, a1...)
+						extra = append(extra, m1.Answer...)
+					}
+					m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA, dnssec)
+					if e1 == nil {
+						extra = append(extra, m1.Answer...)
 					}
 				}
 			}
@@ -723,39 +731,6 @@ Redo:
 		goto Redo
 	}
 	return nil, fmt.Errorf("failure to lookup name")
-}
-
-// LookupAddresses will perform A and AAAA lookups in parallel.
-func (s *server) LookupAddresses(n string, dnssec uint16) (ret []dns.RR, err error) {
-	c := make(chan []dns.RR)
-	go func() {
-		d, e := s.Lookup(n, dns.TypeA, dnssec)
-		if e == nil && d.Rcode == dns.RcodeSuccess {
-			c <- d.Answer
-			return
-		}
-		c <- nil
-	}()
-	go func() {
-		d, e := s.Lookup(n, dns.TypeAAAA, dnssec)
-		if e == nil && d.Rcode == dns.RcodeSuccess {
-			c <- d.Answer
-			return
-		}
-		c <- nil
-	}()
-	a1 := <-c
-	a2 := <-c
-	if a1 == nil && a2 == nil {
-		return nil, fmt.Errorf("failure to lookup name")
-	}
-	if a1 != nil && a2 != nil {
-		return append(a1, a2...), nil
-	}
-	if a1 != nil {
-		return a1, nil
-	}
-	return a2, nil
 }
 
 func (s *server) NameError(m, req *dns.Msg) {
