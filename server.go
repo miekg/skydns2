@@ -81,9 +81,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	StatsRequestCount.Inc(1)
 	cached := false
 	dnssec := uint16(0)
-        if o := req.IsEdns0(); o != nil && o.Do() {
-                dnssec = o.UDPSize()
-        }
+	if o := req.IsEdns0(); o != nil && o.Do() {
+		dnssec = o.UDPSize()
+	}
 
 	if q.Qtype == dns.TypePTR && strings.HasSuffix(name, ".in-addr.arpa.") || strings.HasSuffix(name, ".ip6.arpa.") {
 		s.ServeDNSReverse(w, req)
@@ -232,7 +232,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					s.NameError(m, req)
 					return
 				}
-				m1, e1 := s.Lookup(target, req.Question[0].Qtype)
+				m1, e1 := s.Lookup(target, req.Question[0].Qtype, dnssec)
 				if e1 != nil {
 					s.config.log.Errorf("%q", err)
 					s.NameError(m, req)
@@ -256,7 +256,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	default:
 		fallthrough // also catch other types, so that they return NXDOMAIN
 	case dns.TypeSRV, dns.TypeANY:
-		records, extra, err := s.SRVRecords(q)
+		records, extra, err := s.SRVRecords(q, dnssec)
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
@@ -433,7 +433,7 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 
 // SRVRecords returns SRV records from etcd.
 // If the Target is not an name but an IP address, an name is created .
-func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, err error) {
+func (s *server) SRVRecords(q dns.Question, dnssec uint16) (records []dns.RR, extra []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
 	path, star := Path(name)
 	r, err := s.client.Get(path, false, true)
@@ -458,14 +458,9 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 			srv := serv.NewSRV(q.Name, uint16(100))
 			records = append(records, srv)
 			if !dns.IsSubDomain(s.config.Domain, srv.Target) {
-				// TODO(miek): should be done in parallel
-				m1, e1 := s.Lookup(srv.Target, dns.TypeA)
+				a1, e1 := s.LookupAddresses(srv.Target, dnssec)
 				if e1 == nil {
-					extra = append(extra, m1.Answer...)
-				}
-				m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA)
-				if e1 == nil {
-					extra = append(extra, m1.Answer...)
+					extra = append(extra, a1...)
 				}
 			}
 		case ip.To4() != nil:
@@ -516,16 +511,14 @@ func (s *server) SRVRecords(q dns.Question) (records []dns.RR, extra []dns.RR, e
 			srv := serv.NewSRV(q.Name, weight)
 			records = append(records, srv)
 			if _, ok := lookup[srv.Target]; !ok {
-				m1, e1 := s.Lookup(srv.Target, dns.TypeA)
-				if e1 == nil {
-					extra = append(extra, m1.Answer...)
+				if !dns.IsSubDomain(s.config.Domain, srv.Target) {
+					a1, e1 := s.LookupAddresses(srv.Target, dnssec)
+					if e1 == nil {
+						extra = append(extra, a1...)
+					}
 				}
-				m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA)
-				if e1 == nil {
-					extra = append(extra, m1.Answer...)
-				}
-				lookup[srv.Target] = true
 			}
+			lookup[srv.Target] = true
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewSRV(q.Name, weight))
@@ -692,17 +685,17 @@ func (s *server) calculateTtl(node *etcd.Node, serv *Service) uint32 {
 
 // Lookup looks up name,type using the recursive nameserver defines
 // in the server's config. If none defined it returns an error
-func (s *server) Lookup(n string, t uint16) (*dns.Msg, error) {
+func (s *server) Lookup(n string, t, dnssec uint16) (*dns.Msg, error) {
 	StatsLookupCount.Inc(1)
 	if len(s.config.Nameservers) == 0 {
 		return nil, fmt.Errorf("no nameservers configured can not lookup name")
 	}
 	m := new(dns.Msg)
 	m.SetQuestion(n, t)
+	if dnssec > 0 {
+		m.SetEdns0(dnssec, true)
+	}
 
-	// TODO(miek): fallback to TCP, but fallback to TCP will probably overflow
-	// the packet I'm sending back to the client, because it is likely that
-	// will have used UDP.
 	c := &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout}
 	nsid := int(m.Id) % len(s.config.Nameservers)
 	try := 0
@@ -730,6 +723,39 @@ Redo:
 		goto Redo
 	}
 	return nil, fmt.Errorf("failure to lookup name")
+}
+
+// LookupAddresses will perform A and AAAA lookups in parallel.
+func (s *server) LookupAddresses(n string, dnssec uint16) (ret []dns.RR, err error) {
+	c := make(chan []dns.RR)
+	go func() {
+		d, e := s.Lookup(n, dns.TypeA, dnssec)
+		if e == nil && d.Rcode == dns.RcodeSuccess {
+			c <- d.Answer
+			return
+		}
+		c <- nil
+	}()
+	go func() {
+		d, e := s.Lookup(n, dns.TypeAAAA, dnssec)
+		if e == nil && d.Rcode == dns.RcodeSuccess {
+			c <- d.Answer
+			return
+		}
+		c <- nil
+	}()
+	a1 := <-c
+	a2 := <-c
+	if a1 == nil && a2 == nil {
+		return nil, fmt.Errorf("failure to lookup name")
+	}
+	if a1 != nil && a2 != nil {
+		return append(a1, a2...), nil
+	}
+	if a1 != nil {
+		return a1, nil
+	}
+	return a2, nil
 }
 
 func (s *server) NameError(m, req *dns.Msg) {
