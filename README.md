@@ -6,7 +6,7 @@ top of [etcd](https://github.com/coreos/etcd). It utilizes DNS queries
 to discover available services. This is done by leveraging SRV records in DNS,
 with special meaning given to subdomains, priorities and weights.
 
-This is the original [announcement blog post](http://blog.gopheracademy.com/skydns) for version 1. 
+This is the original [announcement blog post](http://blog.gopheracademy.com/skydns) for version 1.
 Since then, SkyDNS has seen some changes, most notably the ability to use etcd as a backend.
 
 # Changes since version 1
@@ -26,7 +26,7 @@ Note that bugs in SkyDNS1 will still be fixed, but the main development effort w
 
 * Abstract away the backend in an interface, so different backends can be used.
 * Make SkyDNS a library and provide a small server.
- 
+
 ## Setup / Install
 Download/compile and run etcd. See the documentation for etcd at <https://github.com/coreos/etcd>.
 
@@ -41,7 +41,8 @@ etcd machines with the environment variable ETCD_MACHINES:
     ./skydns
 
 If `ETCD_MACHINES` is not set, SkyDNS will default to using `http://127.0.0.1:4001` to connect to etcd.
-Or you can use the flag `-machines`.
+Or you can use the flag `-machines`. Autodiscovering new machines added to the network can
+be enabled by enabling the flag `-discover`.
 
 ## Configuration
 SkyDNS' configuration is stored in etcd as a JSON object under the key `/skydns/config`. The following parameters
@@ -97,7 +98,7 @@ We use the directory `/skydns` to anchor all names.
 When providing information you will need to fill out (some of) the following values.
 
 * Path - The path of the key in etcd, e.g. if the domain you want to register is "rails.production.east.skydns.local", you need to reverse it and replace the dots with slashes. So the name here becomes:
-    `local/skydns/east/production/rails`. 
+    `local/skydns/east/production/rails`.
   Then prefix the `/skydns/` string too, so the final path becomes
     `/v2/keys/skdydns/local/skydns/east/production/rails`
 * Host - The name of your service, e.g., `service5.mydomain.com`,  and IP address (either v4 or v6)
@@ -189,7 +190,7 @@ If we are interested in all the servers in the `east` region, we simply omit the
     4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
     6.rails.staging.east.skydns.local. 3600 IN AAAA 2003::8:1
 
-Here all three entries of the `east` are returned. 
+Here all three entries of the `east` are returned.
 
 There is one other feature at play here. The second and third names, `{4,6}.rails.staging.east.skydns.local`, only had an IP record configured. Here SkyDNS used the ectd path to construct a target name and then puts the actual IP address in the additional section. Directly querying for the A records of `4.rails.staging.east.skydns.local.` of course also works:
 
@@ -315,8 +316,8 @@ By specifying nameservers in SkyDNS's config, for instance `8.8.8.8:53,8.8.4.4:5
 you create a DNS forwarding proxy. In this case it round-robins between the two
 nameserver IPs mentioned.
 
-Requests for which SkyDNS isn't authoritative will be forwarded and proxied back to 
-the client. This means that you can set SkyDNS as the primary DNS server in 
+Requests for which SkyDNS isn't authoritative will be forwarded and proxied back to
+the client. This means that you can set SkyDNS as the primary DNS server in
 `/etc/resolv.conf` and use it for both service discovery and normal DNS operations.
 
 #### DNSSEC
@@ -338,7 +339,7 @@ option like so (together with some other options):
         value='{"dns_addr":"127.0.0.1:5354","dnssec":"Kskydns.local.+005+55656"}'
 
 If you then query with `dig +dnssec` you will get signatures, keys and NSEC3 records returned.
-Authenticated denial of existence is implemented using NSEC3 white lies, 
+Authenticated denial of existence is implemented using NSEC3 white lies,
 see [RFC7129](http://tools.ietf.org/html/rfc7129), Appendix B.
 
 ## License

@@ -46,7 +46,7 @@ func (s *server) Run() error {
 	if s.config.DNSSEC == "" {
 		s.config.log.Printf("ready for queries on %s for %s [rcache %d]", s.config.Domain, s.config.DnsAddr, s.config.RCache)
 	} else {
-		s.config.log.Printf("ready for queries on %s for %s [rcache %d], s.config.Domain, signing with %s [scache %d]", s.config.DnsAddr, s.config.RCache, s.config.DNSSEC, s.config.SCache)
+		s.config.log.Printf("ready for queries on %s for %s [rcache %d], signing with %s [scache %d]", s.config.Domain, s.config.DnsAddr, s.config.RCache, s.config.DNSSEC, s.config.SCache)
 	}
 
 	s.group.Wait()

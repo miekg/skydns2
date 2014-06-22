@@ -22,6 +22,7 @@ var (
 	config      = &Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
 	nameserver  = ""
 	machine     = ""
+	discover    = false
 )
 
 const (
@@ -53,6 +54,8 @@ func init() {
 	flag.StringVar(&tlspem, "tls-pem", "", "X509 Certificate")
 	flag.DurationVar(&config.ReadTimeout, "rtimeout", 2*time.Second, "read timeout")
 	flag.BoolVar(&config.RoundRobin, "round-robin", true, "round robin A/AAAA replies")
+	flag.BoolVar(&discover, "discover", false, "discover new machines by watching /v2/_etcd/machines")
+
 	// TTl
 	// Minttl
 	flag.StringVar(&config.Hostmaster, "hostmaster", "hostmaster@skydns.local.", "hostmaster email address to use")
@@ -61,31 +64,9 @@ func init() {
 	flag.IntVar(&config.RCacheTtl, "rcache-ttl", RCacheTtl, "TTL of the response cache")
 }
 
-func newClient() (client *etcd.Client) {
-	// set default if not specified in env
-	if len(machines) == 1 && machines[0] == "" {
-		machines[0] = "http://127.0.0.1:4001"
-
-	}
-	// override if we have a commandline flag as well
-	if machine != "" {
-		machines = strings.Split(machine, ",")
-	}
-	if strings.HasPrefix(machines[0], "https://") {
-		var err error
-		if client, err = etcd.NewTLSClient(machines, tlspem, tlskey, ""); err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		client = etcd.NewClient(machines)
-	}
-	client.SyncCluster()
-	return client
-}
-
 func main() {
 	flag.Parse()
-	client := newClient()
+	client := NewClient(machines)
 	if nameserver != "" {
 		config.Nameservers = strings.Split(nameserver, ",")
 	}
@@ -94,6 +75,20 @@ func main() {
 		log.Fatal(err)
 	}
 	s := NewServer(config, client)
+
+	if discover {
+		recv := make(chan *etcd.Response)
+		go s.client.Watch("/_etcd/machines/", 0, true, recv, nil)
+		for {
+			select {
+			case n := <-recv:
+				// we can see an n == nil, probably when we can connect to etcd.
+				if n != nil {
+					s.UpdateClient(n)
+				}
+			}
+		}
+	}
 
 	statsCollect()
 
