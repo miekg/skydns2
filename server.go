@@ -44,9 +44,9 @@ func (s *server) Run() error {
 	go runDNSServer(s.group, mux, "tcp", s.config.DnsAddr, s.config.ReadTimeout)
 	go runDNSServer(s.group, mux, "udp", s.config.DnsAddr, s.config.ReadTimeout)
 	if s.config.DNSSEC == "" {
-		s.config.log.Printf("ready for queries on %s [rcache %d]", s.config.DnsAddr, s.config.RCache)
+		s.config.log.Printf("ready for queries on %s for %s [rcache %d]", s.config.Domain, s.config.DnsAddr, s.config.RCache)
 	} else {
-		s.config.log.Printf("ready for queries on %s [rcache %d], signing with %s [scache %d]", s.config.DnsAddr, s.config.RCache, s.config.DNSSEC, s.config.SCache)
+		s.config.log.Printf("ready for queries on %s for %s [rcache %d], s.config.Domain, signing with %s [scache %d]", s.config.DnsAddr, s.config.RCache, s.config.DNSSEC, s.config.SCache)
 	}
 
 	s.group.Wait()
@@ -254,7 +254,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 		m.Answer = append(m.Answer, records...)
 	default:
-		fallthrough // also catch other types, so that they return NXDOMAIN
+		fallthrough // also catch other types, so that they return NODATA
 	case dns.TypeSRV, dns.TypeANY:
 		records, extra, err := s.SRVRecords(q, dnssec)
 		if err != nil {
