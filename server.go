@@ -80,6 +80,10 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	name := strings.ToLower(q.Name)
 	StatsRequestCount.Inc(1)
 	cached := false
+	dnssec := uint16(0)
+        if o := req.IsEdns0(); o != nil && o.Do() {
+                dnssec = o.UDPSize()
+        }
 
 	if q.Qtype == dns.TypePTR && strings.HasSuffix(name, ".in-addr.arpa.") || strings.HasSuffix(name, ".ip6.arpa.") {
 		s.ServeDNSReverse(w, req)
@@ -95,6 +99,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.SetReply(req)
 	m.Authoritative = true
 	m.RecursionAvailable = true
+	m.Compress = true
 	m.Answer = make([]dns.RR, 0, 10)
 	defer func() {
 		m = MsgDedup(m)
@@ -114,11 +119,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			s.rcache.InsertMsg(QuestionKey(req.Question[0]), m.Answer, m.Extra)
 		}
 		// Check if we need to do DNSSEC and sign the reply.
-		if opt := req.IsEdns0(); opt != nil && opt.Do() {
+		if dnssec > 0 {
 			StatsDnssecOkCount.Inc(1)
 			if s.config.PubKey != nil {
 				s.Denial(m)
-				s.sign(m, opt.UDPSize())
+				s.sign(m, dnssec)
 			}
 		}
 		if err := w.WriteMsg(m); err != nil {
@@ -303,6 +308,7 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 Redo:
 	r, _, err := c.Exchange(req, s.config.Nameservers[nsid])
 	if err == nil {
+		r.Compress = true
 		w.WriteMsg(r)
 		return
 	}
@@ -326,6 +332,7 @@ Redo:
 func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) {
 	m := new(dns.Msg)
 	m.SetReply(req)
+	m.Compress = true
 	m.Authoritative = false // Set to false, because I don't know what to do wrt DNSSEC.
 	m.RecursionAvailable = true
 	var err error
