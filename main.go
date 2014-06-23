@@ -82,7 +82,7 @@ func main() {
 		for {
 			select {
 			case n := <-recv:
-				// we can see an n == nil, probably when we can connect to etcd.
+				// we can see an n == nil, probably when we can't connect to etcd.
 				if n != nil {
 					s.UpdateClient(n)
 				}
