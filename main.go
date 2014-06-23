@@ -77,17 +77,19 @@ func main() {
 	s := NewServer(config, client)
 
 	if discover {
-		recv := make(chan *etcd.Response)
-		go s.client.Watch("/_etcd/machines/", 0, true, recv, nil)
-		for {
-			select {
-			case n := <-recv:
-				// we can see an n == nil, probably when we can't connect to etcd.
-				if n != nil {
-					s.UpdateClient(n)
+		go func() {
+			recv := make(chan *etcd.Response)
+			go s.client.Watch("/_etcd/machines/", 0, true, recv, nil)
+			for {
+				select {
+				case n := <-recv:
+					// we can see an n == nil, probably when we can't connect to etcd.
+					if n != nil {
+						s.UpdateClient(n)
+					}
 				}
 			}
-		}
+		}()
 	}
 
 	statsCollect()
