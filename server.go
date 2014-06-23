@@ -118,7 +118,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if !cached {
 			s.rcache.InsertMsg(QuestionKey(req.Question[0]), m.Answer, m.Extra)
 		}
-		// Check if we need to do DNSSEC and sign the reply.
 		if dnssec > 0 {
 			StatsDnssecOkCount.Inc(1)
 			if s.config.PubKey != nil {
@@ -502,6 +501,8 @@ func (s *server) SRVRecords(q dns.Question, dnssec uint16) (records []dns.RR, ex
 	lookup := make(map[string]bool)
 	for _, serv := range sx {
 		w1 := 100.0 / float64(w[serv.Priority])
+		// TODO(miek:) we can have identical SRV records, we should adjust the
+		// weight for that too (i.e. don't count the identical one).
 		// adjust for a particular service
 		if serv.Weight == 0 {
 			w1 *= 100
