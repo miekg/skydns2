@@ -79,6 +79,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
 	StatsRequestCount.Inc(1)
+	if verbose {
+		s.config.log.Infof("received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
+	}
 	cached := false
 	dnssec := uint16(0)
 	if o := req.IsEdns0(); o != nil && o.Do() {
