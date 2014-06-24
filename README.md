@@ -50,7 +50,9 @@ may be set:
 
 * `dns_addr`: IP:port on which SkyDNS should listen, defaults to `127.0.0.1:53`.
 * `domain`: domain for which SkyDNS is authoritative, defaults to `skydns.local.`.
-* `dnssec`: enable DNSSEC (broken at the moment).
+* `dnssec`: enable DNSSEC
+* `hostmaster`: hostmaster email address to use.
+* `local`: optional unique value for this skydns instance.
 * `round_robin`: enable round-robin sorting for A and AAAA responses, defaults to true.
 * `nameservers`: forward DNS requests to these nameservers (array of IP:port combination), when not
     authoritative for a domain.
