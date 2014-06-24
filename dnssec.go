@@ -102,7 +102,7 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 		}
 		s.scache.Remove(key)
 	}
-	s.config.log.Infof("cache miss for %s type %d", r[0].Header().Name, r[0].Header().Rrtype)
+	s.config.log.Infof("scache miss for %s type %d", r[0].Header().Name, r[0].Header().Rrtype)
 	StatsDnssecCacheMiss.Inc(1)
 	sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
 		sig1 := s.NewRRSIG(incep, expir)
