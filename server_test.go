@@ -56,7 +56,7 @@ func newTestServer(t *testing.T, cache bool) *server {
 	s.group = new(sync.WaitGroup)
 	s.client = client
 	s.scache = NewCache(1000, 0)
-	s.rcache = NewCache(0, 0)
+	s.rcache = NewCache(1000, 60)
 	if cache {
 		s.rcache = NewCache(100, 60) // 100 items, 60s ttl
 	}

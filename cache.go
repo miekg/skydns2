@@ -25,7 +25,7 @@ type Elem struct {
 }
 
 type cache struct {
-	sync.RWMutex
+	sync.Mutex
 	l        *list.List
 	m        map[string]*list.Element
 	capacity uint          // number of RRs
@@ -110,17 +110,17 @@ func (c *cache) Search(s string) ([]dns.RR, []dns.RR, time.Time) {
 	if c.capacity == 0 {
 		return nil, nil, time.Time{}
 	}
-	c.RLock()
-	defer c.RUnlock()
+	c.Lock()
+	defer c.Unlock()
 	if e, ok := c.m[s]; ok {
-		// we want to return a copy here, because if we didn't the RRSIG
-		// could be removed by another goroutine before the packet containing
-		// this signature is send out.
 		c.l.MoveToFront(e)
 		e := e.Value.(*Elem)
 		answer := make([]dns.RR, len(e.answer))
 		extra := make([]dns.RR, len(e.extra))
 		for i, r := range e.answer {
+			// we want to return a copy here, because if we didn't the RRSIG
+			// could be removed by another goroutine before the packet containing
+			// this signature is send out.
 			answer[i] = dns.Copy(r)
 		}
 		for i, r := range e.extra {
