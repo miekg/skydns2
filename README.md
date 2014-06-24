@@ -81,7 +81,9 @@ You can also use the command line options, however the settings in etcd take pre
             -d value='{"host":"10.1.1.16"}'
 
     To register the local IP address. Now when SkyDNS receives a query for local.dns.skydns.local it will fetch the above
-    key and returns that one service.
+    key and returns that one service. In other words skydns will substitute `e2016c14-fbba-11e3-ae08-10604b7efbe2.dockerhosts.skydns.local`
+    for `local.dns.skydns.local`.
+
 
 ### Environment Variables
 
