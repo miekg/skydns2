@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/miekg/dns"
 )
 
 var (
@@ -78,6 +79,9 @@ func main() {
 		log.Fatal(err)
 	}
 	s := NewServer(config, client)
+	if s.config.Local != "" {
+		s.config.Local = dns.Fqdn(s.config.Local)
+	}
 
 	if discover {
 		go func() {

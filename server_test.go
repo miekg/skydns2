@@ -66,6 +66,7 @@ func newTestServer(t *testing.T, cache bool) *server {
 	s.config.Domain = "skydns.test."
 	s.config.Hostmaster = "hostmaster.skydns.test."
 	s.config.DomainLabels = 2
+	s.config.Local = "104.server1.development.region1.skydns.test."
 	s.config.Priority = 10
 	s.config.RCacheTtl = RCacheTtl
 	s.config.Ttl = 3600
@@ -524,6 +525,12 @@ var dnsTestCases = []dnsTestCase{
 		Ns: []dns.RR{newSOA("10.in-addr.arpa. 10800 SOA localhost. nobody.invalid. 1 0 0 0 0")},
 	},
 	// Reverse no answer
+
+	// Local data query
+	{
+		Qname: "local.dns.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
+	},
 }
 
 func newA(rr string) *dns.A           { r, _ := dns.NewRR(rr); return r.(*dns.A) }

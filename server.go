@@ -82,6 +82,10 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	if verbose {
 		s.config.log.Infof("received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 	}
+	// If the qname is local.dns.skydns.local. and s.config.Local != "", substitute that name.
+	if s.config.Local != "" && name == "local.dns." + s.config.Domain {
+		name = s.config.Local
+	}
 	cached := false
 	dnssec := uint16(0)
 	if o := req.IsEdns0(); o != nil && o.Do() {
