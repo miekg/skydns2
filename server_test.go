@@ -56,7 +56,7 @@ func newTestServer(t *testing.T, cache bool) *server {
 	s.group = new(sync.WaitGroup)
 	s.client = client
 	s.scache = NewCache(1000, 0)
-	s.rcache = NewCache(1000, 60)
+	s.rcache = NewCache(0, 0)
 	if cache {
 		s.rcache = NewCache(100, 60) // 100 items, 60s ttl
 	}
@@ -544,7 +544,7 @@ func newRRSIG(rr string) *dns.RRSIG   { r, _ := dns.NewRR(rr); return r.(*dns.RR
 func newNNSEC3(rr string) *dns.NSEC3  { r, _ := dns.NewRR(rr); return r.(*dns.NSEC3) }
 func newPTR(rr string) *dns.PTR       { r, _ := dns.NewRR(rr); return r.(*dns.PTR) }
 
-func BenchmarkDNSSingle(b *testing.B) {
+func BenchmarkDNSSingleCache(b *testing.B) {
 	b.StopTimer()
 	t := new(testing.T)
 	s := newTestServerDNSSEC(t, true)
@@ -565,7 +565,7 @@ func BenchmarkDNSSingle(b *testing.B) {
 	}
 }
 
-func BenchmarkDNSWildcard(b *testing.B) {
+func BenchmarkDNSWildcardCache(b *testing.B) {
 	b.StopTimer()
 	t := new(testing.T)
 	s := newTestServerDNSSEC(t, true)
@@ -588,7 +588,7 @@ func BenchmarkDNSWildcard(b *testing.B) {
 	}
 }
 
-func BenchmarkDNSSECSingle(b *testing.B) {
+func BenchmarkDNSSECSingleCache(b *testing.B) {
 	b.StopTimer()
 	t := new(testing.T)
 	s := newTestServerDNSSEC(t, true)
@@ -610,4 +610,68 @@ func BenchmarkDNSSECSingle(b *testing.B) {
 	}
 }
 
-// BenchmarkDNSSECError(b *testing.B) {}
+func BenchmarkDNSSingleNoCache(b *testing.B) {
+	b.StopTimer()
+	t := new(testing.T)
+	s := newTestServerDNSSEC(t, false)
+	defer s.Stop()
+
+	serv := services[0]
+	addService(t, s, serv.key, 0, serv)
+	defer delService(t, s, serv.key)
+
+	c := new(dns.Client)
+	tc := dnsTestCases[0]
+	m := new(dns.Msg)
+	m.SetQuestion(tc.Qname, tc.Qtype)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		c.Exchange(m, "127.0.0.1:"+StrPort)
+	}
+}
+
+func BenchmarkDNSWildcardNoCache(b *testing.B) {
+	b.StopTimer()
+	t := new(testing.T)
+	s := newTestServerDNSSEC(t, false)
+	defer s.Stop()
+
+	for _, serv := range services {
+		m := &Service{Host: serv.Host, Port: serv.Port}
+		addService(t, s, serv.key, 0, m)
+		defer delService(t, s, serv.key)
+	}
+
+	c := new(dns.Client)
+	tc := dnsTestCases[8] // Wildcard Test
+	m := new(dns.Msg)
+	m.SetQuestion(tc.Qname, tc.Qtype)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		c.Exchange(m, "127.0.0.1:"+StrPort)
+	}
+}
+
+func BenchmarkDNSSECSingleNoCache(b *testing.B) {
+	b.StopTimer()
+	t := new(testing.T)
+	s := newTestServerDNSSEC(t, false)
+	defer s.Stop()
+
+	serv := services[0]
+	addService(t, s, serv.key, 0, serv)
+	defer delService(t, s, serv.key)
+
+	c := new(dns.Client)
+	tc := dnsTestCases[0]
+	m := new(dns.Msg)
+	m.SetQuestion(tc.Qname, tc.Qtype)
+	m.SetEdns0(4096, true)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		c.Exchange(m, "127.0.0.1:"+StrPort)
+	}
+}

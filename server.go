@@ -745,7 +745,8 @@ func (s *server) NameError(m, req *dns.Msg) {
 	StatsNameErrorCount.Inc(1)
 }
 
-// This function is a candidate for inclusion in Go DNS.
+// This function is a candidate for inclusion in Go DNS, but should work without
+// the .String() conversion.
 
 // MsgDedup will dedup duplicate RRs from a message. A duplicate RR has the
 // same ownername and rdata as another one.
