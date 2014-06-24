@@ -529,7 +529,7 @@ var dnsTestCases = []dnsTestCase{
 	// Local data query
 	{
 		Qname: "local.dns.skydns.test.", Qtype: dns.TypeA,
-		Answer: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
+		Answer: []dns.RR{newA("local.dns.skydns.test. 3600 A 10.0.0.1")},
 	},
 }
 

@@ -210,7 +210,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 
 	switch q.Qtype {
 	case dns.TypeA, dns.TypeAAAA:
-		records, err := s.AddressRecords(q, nil)
+		records, err := s.AddressRecords(q, name, nil)
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
@@ -249,7 +249,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeCNAME:
-		records, err := s.CNAMERecords(q)
+		records, err := s.CNAMERecords(q, name)
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
@@ -262,7 +262,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	default:
 		fallthrough // also catch other types, so that they return NODATA
 	case dns.TypeSRV, dns.TypeANY:
-		records, extra, err := s.SRVRecords(q, dnssec)
+		records, extra, err := s.SRVRecords(q, name, dnssec)
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
@@ -353,8 +353,7 @@ func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) {
 	s.ServeDNSForward(w, req)
 }
 
-func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (records []dns.RR, err error) {
-	name := strings.ToLower(q.Name)
+func (s *server) AddressRecords(q dns.Question, name string, previousRecords []dns.RR) (records []dns.RR, err error) {
 	path, star := Path(name)
 	r, err := s.client.Get(path, false, true)
 	if err != nil {
@@ -384,7 +383,7 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 			}
 
 			records = append(records, newRecord)
-			nextRecords, err := s.AddressRecords(dns.Question{Name: dns.Fqdn(serv.Host), Qtype: q.Qtype, Qclass: q.Qclass}, append(previousRecords, newRecord))
+			nextRecords, err := s.AddressRecords(dns.Question{Name: dns.Fqdn(serv.Host), Qtype: q.Qtype, Qclass: q.Qclass}, strings.ToLower(dns.Fqdn(serv.Host)), append(previousRecords, newRecord))
 			if err != nil {
 				// This means we can not complete the CNAME, this is OK, but
 				// if we return an error this will trigger an NXDOMAIN.
@@ -439,8 +438,7 @@ func (s *server) AddressRecords(q dns.Question, previousRecords []dns.RR) (recor
 
 // SRVRecords returns SRV records from etcd.
 // If the Target is not an name but an IP address, an name is created .
-func (s *server) SRVRecords(q dns.Question, dnssec uint16) (records []dns.RR, extra []dns.RR, err error) {
-	name := strings.ToLower(q.Name)
+func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records []dns.RR, extra []dns.RR, err error) {
 	path, star := Path(name)
 	r, err := s.client.Get(path, false, true)
 	if err != nil {
@@ -548,8 +546,7 @@ func (s *server) SRVRecords(q dns.Question, dnssec uint16) (records []dns.RR, ex
 	return records, extra, nil
 }
 
-func (s *server) CNAMERecords(q dns.Question) (records []dns.RR, err error) {
-	name := strings.ToLower(q.Name)
+func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, err error) {
 	path, _ := Path(name) // no wildcards here
 	r, err := s.client.Get(path, false, true)
 	if err != nil {
