@@ -51,6 +51,7 @@ func init() {
 	flag.StringVar(&nameserver, "nameservers", "", "nameserver address(es) to forward (non-local) queries to e.g. 8.8.8.8:53,8.8.4.4:53")
 	flag.StringVar(&machine, "machines", "", "machine address(es) running etcd")
 	flag.StringVar(&config.DNSSEC, "dnssec", "", "basename of DNSSEC key file e.q. Kskydns.local.+005+38250")
+	flag.StringVar(&config.Local, "local", "", "optional unique value for this skydns instance")
 	flag.StringVar(&tlskey, "tls-key", "", "TLS Private Key path")
 	flag.StringVar(&tlspem, "tls-pem", "", "X509 Certificate")
 	flag.DurationVar(&config.ReadTimeout, "rtimeout", 2*time.Second, "read timeout")

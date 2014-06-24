@@ -23,6 +23,9 @@ type Config struct {
 	DnsAddr string `json:"dns_addr,omitempty"`
 	// The domain SkyDNS is authoritative for, defaults to skydns.local.
 	Domain string `json:"domain,omitempty"`
+	// Domain pointing to a key where service info is stored when being queried
+	// for local.dns.skydns.local.
+	Local string `json:"local,omitempty"`
 	// The hostmaster responsible for this domain, defaults to hostmaster.<Domain>.
 	Hostmaster string `json:"hostmaster,omitempty"`
 	DNSSEC     string `json:"dnssec,omitempty"`

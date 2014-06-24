@@ -71,6 +71,18 @@ can re-read the config from Etcd after a HUP signal.
 
 You can also use the command line options, however the settings in etcd take precedence.
 
+### Commandline flags
+
+* `-local`: used to specify a unique service for this SkyDNs instance. This should point to a (unique) domain into Etcd, when
+    SkyDNS receives a query for the name `local.dns.skydns.local` it will fetch this service and return it.
+    For instance: `-local e2016c14-fbba-11e3-ae08-10604b7efbe2.dockerhosts.skydns.local` and then 
+
+        curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dockerhosts/2016c14-fbba-11e3-ae08-10604b7efbe2 \
+            -d value='{"host":"10.1.1.16"}'
+
+    To register the local IP address. Now when SkyDNS receives a query for local.dns.skydns.local it will fetch the above
+    key and returns that one service.
+
 ### Environment Variables
 
 SkyDNS uses these environment variables:
