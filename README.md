@@ -52,7 +52,8 @@ may be set:
 * `domain`: domain for which SkyDNS is authoritative, defaults to `skydns.local.`.
 * `dnssec`: enable DNSSEC
 * `hostmaster`: hostmaster email address to use.
-* `local`: optional unique value for this skydns instance.
+* `local`: optional unique value for this skydns instance, default is none. This is returned
+    when queried for `local.dns.skydns.local`.
 * `round_robin`: enable round-robin sorting for A and AAAA responses, defaults to true.
 * `nameservers`: forward DNS requests to these nameservers (array of IP:port combination), when not
     authoritative for a domain.
@@ -84,8 +85,10 @@ You can also use the command line options, however the settings in etcd take pre
 
     To register the local IP address. Now when SkyDNS receives a query for local.dns.skydns.local it will fetch the above
     key and returns that one service. In other words skydns will substitute `e2016c14-fbba-11e3-ae08-10604b7efbe2.dockerhosts.skydns.local`
-    for `local.dns.skydns.local`.
+    for `local.dns.skydns.local`. This follows the same rules as the other services, so it can also be an external names, which
+    will be resolved.
 
+    Also see the section Host Local Values.
 
 ### Environment Variables
 
@@ -357,6 +360,32 @@ option like so (together with some other options):
 If you then query with `dig +dnssec` you will get signatures, keys and NSEC3 records returned.
 Authenticated denial of existence is implemented using NSEC3 white lies,
 see [RFC7129](http://tools.ietf.org/html/rfc7129), Appendix B.
+
+#### Host Local Values
+
+SkyDNS supports storing values which are specific for that instance of SkyDNS.
+
+This can be useful when you have SkyDNS running on each host and want to store values that are specific
+for host. For example the public IP-address of the host or the IP-address on the tenant network.
+
+To do that you need to specify a unique value for that host with `-local`. A good unique value for that
+would be to use a tool like `uuidgen` to generate an UUID.
+
+That unique value is used to store the values seperately from the normal values. It is still stored
+in the etcd backend so a restart of SkyDNS with the same unique value will give it access to the old data.
+
+    % skydns -local public.addresses.skydns.local
+
+    % curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/local/addresses/public \
+        -d value='{"host":"192.0.2.1"}'
+
+    % dig @127.0.0.1 local.dns.skydns.local. A
+
+    ;; QUESTION SECTION:
+    ;local.dns.skydns.local. IN  A
+
+    ;; ANSWER SECTION:
+    local.dns.skydns.local. 3600 IN  A   192.0.2.1
 
 ## License
 The MIT License (MIT)
