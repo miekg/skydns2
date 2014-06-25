@@ -400,7 +400,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 		}
 		return records, nil
 	}
-	nodes, err := s.loopNodes(&r.Node.Nodes, strings.Split(PathNoWildcard(name), "/"), star)
+	nodes, err := s.loopNodes(&r.Node.Nodes, strings.Split(PathNoWildcard(name), "/"), star, nil)
 	if err != nil {
 		s.config.log.Infof("failed to parse json: %s", err.Error())
 		return nil, err
@@ -483,7 +483,7 @@ func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records
 		return records, extra, nil
 	}
 
-	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(PathNoWildcard(name), "/"), star)
+	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(PathNoWildcard(name), "/"), star, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -612,6 +612,14 @@ func (s *server) NewSOA() dns.RR {
 	}
 }
 
+
+type bareService struct {
+	Host  string
+	Port int
+	Priority int
+	Weight int
+}
+
 // skydns/local/skydns/east/staging/web
 // skydns/local/skydns/west/production/web
 //
@@ -620,11 +628,14 @@ func (s *server) NewSOA() dns.RR {
 
 // loopNodes recursively loops through the nodes and returns all the values. The nodes' keyname
 // will be match against any wildcards when star is true.
-func (s *server) loopNodes(n *etcd.Nodes, nameParts []string, star bool) (sx []*Service, err error) {
+func (s *server) loopNodes(n *etcd.Nodes, nameParts []string, star bool, bx map[bareService]bool) (sx []*Service, err error) {
+	if bx == nil {
+		bx = make(map[bareService]bool)
+	}
 Nodes:
 	for _, n := range *n {
 		if n.Dir {
-			nodes, err := s.loopNodes(&n.Nodes, nameParts, star)
+			nodes, err := s.loopNodes(&n.Nodes, nameParts, star, bx)
 			if err != nil {
 				return nil, err
 			}
@@ -650,6 +661,10 @@ Nodes:
 		if err := json.Unmarshal([]byte(n.Value), serv); err != nil {
 			return nil, err
 		}
+		if _, ok := bx[bareService{serv.Host,serv.Port,serv.Priority,serv.Weight}]; ok {
+			continue
+		}
+		bx[bareService{serv.Host,serv.Port,serv.Priority,serv.Weight}]= true
 		serv.Ttl = s.calculateTtl(n, serv)
 		if serv.Priority == 0 {
 			serv.Priority = int(s.config.Priority)
@@ -751,6 +766,7 @@ func (s *server) NameError(m, req *dns.Msg) {
 // MsgDedup will dedup duplicate RRs from a message. A duplicate RR has the
 // same ownername and rdata as another one.
 func MsgDedup(m *dns.Msg) *dns.Msg {
+	return m
 	count := make(map[string]int)
 	a := make([]dns.RR, 0, 3)
 	ttl := uint32(0)
