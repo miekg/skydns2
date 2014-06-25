@@ -376,7 +376,7 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "*.cname2.skydns.test.", Qtype: dns.TypeSRV,
 		Answer: []dns.RR{
-			newSRV("*.cname2.skydns.test. 3600 IN SRV 10 50 0 www.miek.nl."),
+			newSRV("*.cname2.skydns.test. 3600 IN SRV 10 100 0 www.miek.nl."),
 		},
 		Extra: []dns.RR{
 			newA("a.miek.nl. 3600 IN A 176.58.119.54"),

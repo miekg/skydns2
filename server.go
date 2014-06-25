@@ -83,7 +83,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.config.log.Infof("received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 	}
 	// If the qname is local.dns.skydns.local. and s.config.Local != "", substitute that name.
-	if s.config.Local != "" && name == "local.dns." + s.config.Domain {
+	if s.config.Local != "" && name == "local.dns."+s.config.Domain {
 		name = s.config.Local
 	}
 	cached := false
@@ -468,7 +468,12 @@ func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records
 				}
 				m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA, dnssec)
 				if e1 == nil {
-					extra = append(extra, m1.Answer...)
+					// If we have seen CNAME's we *assume* that they already added.
+					for _, a := range m1.Answer {
+						if _, ok := a.(*dns.CNAME); !ok {
+							extra = append(extra, a)
+						}
+					}
 				}
 			}
 		case ip.To4() != nil:
@@ -528,7 +533,12 @@ func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records
 					}
 					m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA, dnssec)
 					if e1 == nil {
-						extra = append(extra, m1.Answer...)
+						// If we have seen CNAME's we *assume* that they already added.
+						for _, a := range m1.Answer {
+							if _, ok := a.(*dns.CNAME); !ok {
+								extra = append(extra, a)
+							}
+						}
 					}
 				}
 			}
@@ -612,12 +622,11 @@ func (s *server) NewSOA() dns.RR {
 	}
 }
 
-
 type bareService struct {
-	Host  string
-	Port int
+	Host     string
+	Port     int
 	Priority int
-	Weight int
+	Weight   int
 }
 
 // skydns/local/skydns/east/staging/web
@@ -661,10 +670,10 @@ Nodes:
 		if err := json.Unmarshal([]byte(n.Value), serv); err != nil {
 			return nil, err
 		}
-		if _, ok := bx[bareService{serv.Host,serv.Port,serv.Priority,serv.Weight}]; ok {
+		if _, ok := bx[bareService{serv.Host, serv.Port, serv.Priority, serv.Weight}]; ok {
 			continue
 		}
-		bx[bareService{serv.Host,serv.Port,serv.Priority,serv.Weight}]= true
+		bx[bareService{serv.Host, serv.Port, serv.Priority, serv.Weight}] = true
 		serv.Ttl = s.calculateTtl(n, serv)
 		if serv.Priority == 0 {
 			serv.Priority = int(s.config.Priority)
