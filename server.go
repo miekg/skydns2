@@ -109,7 +109,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.Compress = true
 	m.Answer = make([]dns.RR, 0, 10)
 	defer func() {
-		m = MsgDedup(m)
 		// Set TTL to the minimum of the RRset.
 		minttl := s.config.Ttl
 		if len(m.Answer) > 1 {
