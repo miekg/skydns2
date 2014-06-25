@@ -52,7 +52,7 @@ may be set:
 * `domain`: domain for which SkyDNS is authoritative, defaults to `skydns.local.`.
 * `dnssec`: enable DNSSEC
 * `hostmaster`: hostmaster email address to use.
-* `local`: optional unique value for this skydns instance, default is none. This returned
+* `local`: optional unique value for this skydns instance, default is none. This is returned
     when queried for `local.dns.skydns.local`.
 * `round_robin`: enable round-robin sorting for A and AAAA responses, defaults to true.
 * `nameservers`: forward DNS requests to these nameservers (array of IP:port combination), when not
