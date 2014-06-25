@@ -52,7 +52,8 @@ may be set:
 * `domain`: domain for which SkyDNS is authoritative, defaults to `skydns.local.`.
 * `dnssec`: enable DNSSEC
 * `hostmaster`: hostmaster email address to use.
-* `local`: optional unique value for this skydns instance.
+* `local`: optional unique value for this skydns instance, default is none. This returned
+    when queried for `local.dns.skydns.local`.
 * `round_robin`: enable round-robin sorting for A and AAAA responses, defaults to true.
 * `nameservers`: forward DNS requests to these nameservers (array of IP:port combination), when not
     authoritative for a domain.
@@ -84,7 +85,8 @@ You can also use the command line options, however the settings in etcd take pre
 
     To register the local IP address. Now when SkyDNS receives a query for local.dns.skydns.local it will fetch the above
     key and returns that one service. In other words skydns will substitute `e2016c14-fbba-11e3-ae08-10604b7efbe2.dockerhosts.skydns.local`
-    for `local.dns.skydns.local`.
+    for `local.dns.skydns.local`. This follows the same rules as the other services, so it can also be an external names, which
+    will be resolved.
 
 
 ### Environment Variables
