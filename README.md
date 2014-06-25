@@ -63,7 +63,6 @@ may be set:
 * `scache`: the capacity of the DNSSEC signature cache, defaults to 10000 records if not set.
 * `rcache`: the capacity of the response cache, defaults to 0 records if not set.
 * `rcache-ttl`: the TTL of the response cache, defaults to 60 if not set.
-* `local`: the optional unique value for this skydns instance.
 
 To set the configuration, use something like:
 
@@ -89,6 +88,7 @@ You can also use the command line options, however the settings in etcd take pre
     for `local.dns.skydns.local`. This follows the same rules as the other services, so it can also be an external names, which
     will be resolved.
 
+    Also see the section Host Local Values.
 
 ### Environment Variables
 
@@ -361,29 +361,31 @@ If you then query with `dig +dnssec` you will get signatures, keys and NSEC3 rec
 Authenticated denial of existence is implemented using NSEC3 white lies,
 see [RFC7129](http://tools.ietf.org/html/rfc7129), Appendix B.
 
-#### Host local values
+#### Host Local Values
 
 SkyDNS supports storing values which are specific for that instance of SkyDNS.
 
 This can be useful when you have SkyDNS running on each host and want to store values that are specific
 for host. For example the public IP-address of the host or the IP-address on the tenant network.
 
-To do that you need to specify a unique value for that host with -local. A good unique value for that
-would be to use a tool like uuidgen to generate a UUID.
+To do that you need to specify a unique value for that host with `-local`. A good unique value for that
+would be to use a tool like `uuidgen` to generate an UUID.
 
 That unique value is used to store the values seperately from the normal values. It is still stored
 in the etcd backend so a restart of SkyDNS with the same unique value will give it access to the old data.
 
-    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/local/addresses/public \
+    % skydns -local public.addresses.skydns.local
+
+    % curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/local/addresses/public \
         -d value='{"host":"192.0.2.1"}'
 
-    % dig @127.0.0.1 public.addresses.local.dns.skydns.local. A
+    % dig @127.0.0.1 local.dns.skydns.local. A
 
     ;; QUESTION SECTION:
-    ;public.addresses.local.dns.skydns.local. IN  A
+    ;local.dns.skydns.local. IN  A
 
     ;; ANSWER SECTION:
-    public.addresses.local.dns.skydns.local. 3600 IN  A   192.0.2.1
+    local.dns.skydns.local. 3600 IN  A   192.0.2.1
 
 ## License
 The MIT License (MIT)
