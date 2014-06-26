@@ -488,11 +488,8 @@ func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records
 	}
 
 	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(PathNoWildcard(name), "/"), star, nil)
-	if err != nil {
+	if err != nil || len(sx) == 0 {
 		return nil, nil, err
-	}
-	if len(sx) == 0 {
-		return nil, nil, nil
 	}
 	// Looping twice to get the right weight vs priority
 	w := make(map[int]int)
@@ -542,11 +539,11 @@ func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewSRV(q.Name, weight))
-			extra = append(extra, serv.NewA(Domain(serv.key), ip.To4()))
+			extra = append(extra, serv.NewA(serv.Host, ip.To4()))
 		case ip.To4() == nil:
 			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewSRV(q.Name, weight))
-			extra = append(extra, serv.NewAAAA(Domain(serv.key), ip.To16()))
+			extra = append(extra, serv.NewAAAA(serv.Host, ip.To16()))
 		}
 	}
 	return records, extra, nil
