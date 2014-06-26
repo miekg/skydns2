@@ -510,9 +510,6 @@ func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records
 	lookup := make(map[string]bool)
 	for _, serv := range sx {
 		w1 := 100.0 / float64(w[serv.Priority])
-		// TODO(miek:) we can have identical SRV records, we should adjust the
-		// weight for that too (i.e. don't count the identical one).
-		// adjust for a particular service
 		if serv.Weight == 0 {
 			w1 *= 100
 		} else {
@@ -532,7 +529,7 @@ func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records
 					}
 					m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA, dnssec)
 					if e1 == nil {
-						// If we have seen CNAME's we *assume* that they already added.
+						// If we have seen CNAME's we *assume* that they are already added.
 						for _, a := range m1.Answer {
 							if _, ok := a.(*dns.CNAME); !ok {
 								extra = append(extra, a)
@@ -714,10 +711,6 @@ func (s *server) calculateTtl(node *etcd.Node, serv *Service) uint32 {
 	}
 	return serv.Ttl
 }
-
-// TODO(miek): if DNSSEC is requested we should use it here too.
-// Probably best to require all subfunctions to lookup at the
-// request packet so we can look at opt records and the size.
 
 // Lookup looks up name,type using the recursive nameserver defines
 // in the server's config. If none defined it returns an error
