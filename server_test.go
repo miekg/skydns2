@@ -61,11 +61,11 @@ func newTestServer(t *testing.T, cache bool) *server {
 		s.rcache = NewCache(100, 60) // 100 items, 60s ttl
 	}
 	s.config = new(Config)
+	s.config.Domain = "skydns.test."
+	s.config.DomainLabels = 2
 	s.config.DnsAddr = "127.0.0.1:" + StrPort
 	s.config.Nameservers = []string{"8.8.4.4:53"}
-	s.config.Domain = "skydns.test."
-	s.config.Hostmaster = "hostmaster.skydns.test."
-	s.config.DomainLabels = 2
+	setDefaults(s.config)
 	s.config.Local = "104.server1.development.region1.skydns.test."
 	s.config.Priority = 10
 	s.config.RCacheTtl = RCacheTtl
@@ -132,7 +132,7 @@ func TestDNSTtlRRset(t *testing.T) {
 		ttl += 60
 	}
 	c := new(dns.Client)
-	tc := dnsTestCases[8]
+	tc := dnsTestCases[9]
 	t.Logf("%v\n", tc)
 	m := new(dns.Msg)
 	m.SetQuestion(tc.Qname, tc.Qtype)
@@ -170,8 +170,11 @@ func TestDNS(t *testing.T) {
 	for _, tc := range dnsTestCases {
 		m := new(dns.Msg)
 		m.SetQuestion(tc.Qname, tc.Qtype)
-		if tc.dnssec == true {
+		if tc.dnssec {
 			m.SetEdns0(4096, true)
+		}
+		if tc.chaos {
+			m.Question[0].Qclass = dns.ClassCHAOS
 		}
 		resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
 		if err != nil {
@@ -307,6 +310,7 @@ type dnsTestCase struct {
 	Qname  string
 	Qtype  uint16
 	dnssec bool
+	chaos  bool
 	Answer []dns.RR
 	Ns     []dns.RR
 	Extra  []dns.RR
@@ -317,6 +321,8 @@ var services = []*Service{
 	{Host: "server2", Port: 80, key: "101.server2.production.region1.skydns.test."},
 	{Host: "server4", Port: 80, Priority: 333, key: "102.server4.development.region6.skydns.test."},
 	{Host: "server3", key: "103.server4.development.region2.skydns.test."},
+	{Host: "172.16.1.1", key: "a.ipaddr.skydns.test."},
+	{Host: "172.16.1.2", key: "b.ipaddr.skydns.test."},
 	{Host: "10.0.0.1", key: "104.server1.development.region1.skydns.test."},
 	{Host: "2001::8:8:8:8", key: "105.server3.production.region2.skydns.test."},
 	{Host: "104.server1.development.region1.skydns.test", key: "1.cname.skydns.test."},
@@ -360,6 +366,14 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "104.server1.development.region1.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
+	},
+	// Multiplee A Record Test
+	{
+		Qname: "ipaddr.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{
+			newA("ipaddr.skydns.test. 3600 A 172.16.1.1"),
+			newA("ipaddr.skydns.test. 3600 A 172.16.1.2"),
+		},
 	},
 	// A Record Test with SRV
 	{
@@ -531,6 +545,17 @@ var dnsTestCases = []dnsTestCase{
 		Qname: "local.dns.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{newA("local.dns.skydns.test. 3600 A 10.0.0.1")},
 	},
+	// Author test
+	{
+		Qname: "skydns.test.", Qtype: dns.TypeTXT,
+		chaos: true,
+		Answer: []dns.RR{
+			newTXT("skydns.test. 0 TXT \"Brian Ketelsen\""),
+			newTXT("skydns.test. 0 TXT \"Erik St. Martin\""),
+			newTXT("skydns.test. 0 TXT \"Michael Crosby\""),
+			newTXT("skydns.test. 0 TXT \"Miek Gieben\""),
+		},
+	},
 }
 
 func newA(rr string) *dns.A           { r, _ := dns.NewRR(rr); return r.(*dns.A) }
@@ -543,6 +568,7 @@ func newDNSKEY(rr string) *dns.DNSKEY { r, _ := dns.NewRR(rr); return r.(*dns.DN
 func newRRSIG(rr string) *dns.RRSIG   { r, _ := dns.NewRR(rr); return r.(*dns.RRSIG) }
 func newNNSEC3(rr string) *dns.NSEC3  { r, _ := dns.NewRR(rr); return r.(*dns.NSEC3) }
 func newPTR(rr string) *dns.PTR       { r, _ := dns.NewRR(rr); return r.(*dns.PTR) }
+func newTXT(rr string) *dns.TXT       { r, _ := dns.NewRR(rr); return r.(*dns.TXT) }
 
 func BenchmarkDNSSingleCache(b *testing.B) {
 	b.StopTimer()

@@ -56,6 +56,10 @@ type Config struct {
 	DenyWildcard    *dns.NSEC3     `json:"-"`
 
 	log *log.Logger `json:"-"`
+
+	// some predefined string "constants"
+	localDomain string // "local.dns." + config.Domain
+	dnsDomain   string // "dns". + config.Domain
 }
 
 func loadConfig(client *etcd.Client, config *Config) (*Config, error) {
@@ -142,5 +146,7 @@ func setDefaults(config *Config) error {
 		config.PrivKey = p
 		config.ClosestEncloser, config.DenyWildcard = newNSEC3CEandWildcard(config.Domain, config.Domain, config.MinTtl)
 	}
+	config.localDomain = "local.dns." + config.Domain
+	config.dnsDomain = "dns." + config.Domain
 	return nil
 }

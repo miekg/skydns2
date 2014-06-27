@@ -83,7 +83,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.config.log.Infof("received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 	}
 	// If the qname is local.dns.skydns.local. and s.config.Local != "", substitute that name.
-	if s.config.Local != "" && name == "local.dns."+s.config.Domain {
+	if s.config.Local != "" && name == s.config.localDomain {
 		name = s.config.Local
 	}
 	cached := false
@@ -107,7 +107,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.Authoritative = true
 	m.RecursionAvailable = true
 	m.Compress = true
-	m.Answer = make([]dns.RR, 0, 10)
+	m.Answer = make([]dns.RR, 0, 5)
 	defer func() {
 		// Set TTL to the minimum of the RRset.
 		minttl := s.config.Ttl
@@ -136,9 +136,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 	}()
 
-	if strings.HasSuffix(name, "dns."+s.config.Domain) || name == s.config.Domain {
+	if strings.HasSuffix(name, s.config.dnsDomain) || name == s.config.Domain {
 		// As we hijack dns.skydns.local we need to return NODATA for that name.
-		if name == "dns."+s.config.Domain {
+		if name == s.config.dnsDomain {
 			m.Ns = []dns.RR{s.NewSOA()}
 			return
 		}
@@ -663,10 +663,11 @@ Nodes:
 		if err := json.Unmarshal([]byte(n.Value), serv); err != nil {
 			return nil, err
 		}
-		if _, ok := bx[bareService{serv.Host, serv.Port, serv.Priority, serv.Weight}]; ok {
+		b := bareService{serv.Host, serv.Port, serv.Priority, serv.Weight}
+		if _, ok := bx[b]; ok {
 			continue
 		}
-		bx[bareService{serv.Host, serv.Port, serv.Priority, serv.Weight}] = true
+		bx[b] = true
 		serv.Ttl = s.calculateTtl(n, serv)
 		if serv.Priority == 0 {
 			serv.Priority = int(s.config.Priority)
