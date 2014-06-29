@@ -299,10 +299,8 @@ The first CNAME is generated from within SkyDNS, the other two are from the recu
 
 #### NS Records
 
-SkyDNS will internally synthesis name which will be used for NS records. The first
-nameserver used will be named `ns1.dns.skydns.local` in the default setup . Extra
-nameserver will be numbered ns2, ns3, etc. The subdomain `dns.skydns.local` will take
-precedence over services with a similar name.
+SkyDNS will report a nameserver for the address it is listening on. The name 
+of this nameserver is `ns.dns.skydns.local` in the default setup.
 
 #### PTR Records: Reverse Addresses
 
