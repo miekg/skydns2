@@ -452,7 +452,7 @@ func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra
 		serv.Ttl = ttl
 		switch {
 		case ip == nil:
-			// Must be an IP address, this is an error
+			return nil, nil, fmt.Errorf("NS record must be an IP address")
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewNS(q.Name, serv.Host))
@@ -473,7 +473,7 @@ func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
-			// Must be an IP address, this is an error
+			return nil, nil, fmt.Errorf("NS record must be an IP address")
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewNS(q.Name, serv.Host))
@@ -530,11 +530,11 @@ func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records
 		case ip.To4() != nil:
 			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewSRV(q.Name, uint16(100)))
-			extra = append(extra, serv.NewA(Domain(r.Node.Key), ip.To4()))
+			extra = append(extra, serv.NewA(serv.Host, ip.To4()))
 		case ip.To4() == nil:
 			serv.Host = Domain(serv.key)
 			records = append(records, serv.NewSRV(q.Name, uint16(100)))
-			extra = append(extra, serv.NewAAAA(Domain(r.Node.Key), ip.To16()))
+			extra = append(extra, serv.NewAAAA(serv.Host, ip.To16()))
 		}
 		return records, extra, nil
 	}
