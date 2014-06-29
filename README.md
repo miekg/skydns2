@@ -44,7 +44,10 @@ If `ETCD_MACHINES` is not set, SkyDNS will default to using `http://127.0.0.1:40
 Or you can use the flag `-machines`. Autodiscovering new machines added to the network can
 be enabled by enabling the flag `-discover`.
 
-TODO(miek): add some nameservers
+Optionally give it a nameserver:
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dns/ns \
+        -d value='{"host":"192.168.0.1"}'
 
 ## Configuration
 SkyDNS' configuration is stored in etcd as a JSON object under the key `/skydns/config`. The following parameters
@@ -311,7 +314,7 @@ services MUST use IP address, using names will not work. For instance:
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dns/ns \
         -d value='{"host":"172.16.0.1"}'
 
-Registers `ns1.dns.skydns.local` as a nameserver with ip address 172.16.0.1:
+Registers `ns.dns.skydns.local` as a nameserver with ip address 172.16.0.1:
 
     % dig @localhost NS skydns.local
 
@@ -323,6 +326,8 @@ Registers `ns1.dns.skydns.local` as a nameserver with ip address 172.16.0.1:
 
     ;; ADDITIONAL SECTION:
     ns.dns.skydns.local.    3600    IN  A   172.16.0.1
+
+The first nameserver should have the hostname `ns`.
 
 #### PTR Records: Reverse Addresses
 
