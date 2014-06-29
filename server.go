@@ -107,7 +107,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.Authoritative = true
 	m.RecursionAvailable = true
 	m.Compress = true
-	m.Answer = make([]dns.RR, 0, 5)
 	defer func() {
 		// Set TTL to the minimum of the RRset.
 		minttl := s.config.Ttl
@@ -221,6 +220,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.rcache.Remove(key)
 	}
 
+//	m.Answer = make([]dns.RR, 0, 5)
 	switch q.Qtype {
 	case dns.TypeA, dns.TypeAAAA:
 		records, err := s.AddressRecords(q, name, nil)
