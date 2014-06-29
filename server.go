@@ -172,7 +172,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
 				m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"SkyDNS 2.0.0"}}}
 				return
-			}
 			case "id.server.":
 				// TODO(miek): machinename to return
 				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
