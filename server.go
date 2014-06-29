@@ -10,7 +10,6 @@ import (
 	"log"
 	"math"
 	"net"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -180,29 +179,23 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 
 		}
-		for i, c := range s.client.GetCluster() {
-			u, e := url.Parse(c)
-			if e != nil {
-				continue
-			}
-			h, _, e := net.SplitHostPort(u.Host)
-			if e != nil {
-				continue
-			}
+		h, _, e := net.SplitHostPort(s.config.DnsAddr)
+		if e == nil {
 			ip := net.ParseIP(h)
 			serv := new(Service)
 			serv.Ttl = s.config.Ttl
+			// TODO(miek): should loop interfaces...?
 			switch {
 			case name == s.config.Domain && q.Qtype == dns.TypeNS:
-				m.Answer = append(m.Answer, serv.NewNS(s.config.Domain, fmt.Sprintf("ns%d.dns.%s", i+1, s.config.Domain)))
-			case ip.To4() != nil && q.Qtype == dns.TypeA && q.Name == fmt.Sprintf("ns%d.dns.%s", i+1, s.config.Domain):
-				m.Answer = append(m.Answer, serv.NewA(q.Name, ip.To4()))
-			case ip.To4() == nil && q.Qtype == dns.TypeAAAA && q.Name == fmt.Sprintf("ns%d.dns.%s", i+1, s.config.Domain):
-				m.Answer = append(m.Answer, serv.NewAAAA(q.Name, ip.To16()))
+				m.Answer = []dns.RR{serv.NewNS(s.config.Domain, "ns.dns."+s.config.Domain)}
+			case ip.To4() != nil && q.Qtype == dns.TypeA && q.Name == "ns.dns."+s.config.Domain:
+				m.Answer = []dns.RR{serv.NewA(q.Name, ip.To4())}
+			case ip.To4() == nil && q.Qtype == dns.TypeAAAA && q.Name == "ns.dns."+s.config.Domain:
+				m.Answer = []dns.RR{serv.NewAAAA(q.Name, ip.To16())}
 			}
-		}
-		if len(m.Answer) > 0 {
-			return
+			if len(m.Answer) > 0 {
+				return
+			}
 		}
 	}
 	key := QuestionKey(req.Question[0])
@@ -219,7 +212,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.rcache.Remove(key)
 	}
 
-//	m.Answer = make([]dns.RR, 0, 5)
+	//	m.Answer = make([]dns.RR, 0, 5)
 	switch q.Qtype {
 	case dns.TypeA, dns.TypeAAAA:
 		records, err := s.AddressRecords(q, name, nil)
@@ -618,7 +611,7 @@ func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
 // SOA returns a SOA record for this SkyDNS instance.
 func (s *server) NewSOA() dns.RR {
 	return &dns.SOA{Hdr: dns.RR_Header{Name: s.config.Domain, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: s.config.Ttl},
-		Ns:      "ns1.dns." + s.config.Domain,
+		Ns:      "ns.dns." + s.config.Domain,
 		Mbox:    s.config.Hostmaster,
 		Serial:  uint32(time.Now().Truncate(time.Hour).Unix()),
 		Refresh: 28800,

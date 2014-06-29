@@ -350,17 +350,17 @@ var dnsTestCases = []dnsTestCase{
 	// SOA Record Test
 	{
 		Qname: "skydns.test.", Qtype: dns.TypeSOA,
-		Answer: []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+		Answer: []dns.RR{newSOA("skydns.test. 3600 SOA ns.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
 	},
 	// NS Record Test
 	{
 		Qname: "skydns.test.", Qtype: dns.TypeNS,
-		Answer: []dns.RR{newNS("skydns.test. 3600 NS ns1.dns.skydns.test.")},
+		Answer: []dns.RR{newNS("skydns.test. 3600 NS ns.dns.skydns.test.")},
 	},
 	// A Record For NS Record Test
 	{
-		Qname: "ns1.dns.skydns.test.", Qtype: dns.TypeA,
-		Answer: []dns.RR{newA("ns1.dns.skydns.test. 3600 A 127.0.0.1")},
+		Qname: "ns.dns.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{newA("ns.dns.skydns.test. 3600 A 127.0.0.1")},
 	},
 	// A Record Test
 	{
