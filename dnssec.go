@@ -71,7 +71,7 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 		}
 	}
 	for _, r := range rrSets(m.Extra) {
-		if r[0].Header().Rrtype == dns.TypeRRSIG {
+		if r[0].Header().Rrtype == dns.TypeRRSIG || r[0].Header().Rrtype == dns.TypeOPT {
 			continue
 		}
 		if !dns.IsSubDomain(s.config.Domain, r[0].Header().Name) {
