@@ -339,6 +339,9 @@ var services = []*Service{
 	{Host: "server2", Weight: 80, key: "101.server2.region5.skydns.test."},
 	{Host: "server3", Weight: 150, key: "103.server3.region5.skydns.test."},
 	{Host: "server4", Priority: 30, key: "104.server4.region5.skydns.test."},
+	// nameserver
+	{Host: "10.0.0.2", key: "ns.dns.skydns.test."},
+	{Host: "10.0.0.3", key: "ns2.dns.skydns.test."},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -355,12 +358,19 @@ var dnsTestCases = []dnsTestCase{
 	// NS Record Test
 	{
 		Qname: "skydns.test.", Qtype: dns.TypeNS,
-		Answer: []dns.RR{newNS("skydns.test. 3600 NS ns.dns.skydns.test.")},
+		Answer: []dns.RR{
+			newNS("skydns.test. 3600 NS ns1.dns.skydns.test."),
+			newNS("skydns.test. 3600 NS ns2.dns.skydns.test."),
+		},
+		Extra: []dns.RR{
+			newA("ns.dns.skydns.test. 3600 A 10.0.0.2"),
+			newA("ns2.dns.skydns.test. 3600 A 10.0.0.3"),
+		},
 	},
 	// A Record For NS Record Test
 	{
 		Qname: "ns.dns.skydns.test.", Qtype: dns.TypeA,
-		Answer: []dns.RR{newA("ns.dns.skydns.test. 3600 A 127.0.0.1")},
+		Answer: []dns.RR{newA("ns.dns.skydns.test. 3600 A 10.0.0.2")},
 	},
 	// A Record Test
 	{

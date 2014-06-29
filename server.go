@@ -134,69 +134,46 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 	}()
 
-	if strings.HasSuffix(name, s.config.dnsDomain) || name == s.config.Domain {
-		// As we hijack dns.skydns.local we need to return NODATA for that name.
-		if name == s.config.dnsDomain {
-			m.Ns = []dns.RR{s.NewSOA()}
-			return
-		}
-		if q.Qtype == dns.TypeSOA && name == s.config.Domain {
+	if name == s.config.Domain {
+		if q.Qtype == dns.TypeSOA {
 			m.Answer = []dns.RR{s.NewSOA()}
 			return
 		}
-		if q.Qtype == dns.TypeDNSKEY && name == s.config.Domain {
+		if q.Qtype == dns.TypeDNSKEY {
 			if s.config.PubKey != nil {
 				m.Answer = []dns.RR{s.config.PubKey}
 				return
 			}
 		}
-		if q.Qclass == dns.ClassCHAOS && q.Qtype == dns.TypeTXT {
-			switch name {
-			case s.config.Domain:
-				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
-				authors := []string{"Erik St. Martin", "Brian Ketelsen", "Miek Gieben", "Michael Crosby"}
-				for _, a := range authors {
-					m.Answer = append(m.Answer, &dns.TXT{Hdr: hdr, Txt: []string{a}})
-				}
-				for j := 0; j < len(authors)*(int(dns.Id())%4+1); j++ {
-					q := int(dns.Id()) % len(authors)
-					p := int(dns.Id()) % len(authors)
-					if q == p {
-						p = (p + 1) % len(authors)
-					}
-					m.Answer[q], m.Answer[p] = m.Answer[p], m.Answer[q]
-				}
-				return
-			case "version.server.":
-				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
-				m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"SkyDNS 2.0.0"}}}
-				return
-			case "id.server.":
-				// TODO(miek): machine name to return
-				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
-				m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"localhost"}}}
-				return
+	}
+	if q.Qclass == dns.ClassCHAOS && q.Qtype == dns.TypeTXT {
+		switch name {
+		case s.config.Domain:
+			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
+			authors := []string{"Erik St. Martin", "Brian Ketelsen", "Miek Gieben", "Michael Crosby"}
+			for _, a := range authors {
+				m.Answer = append(m.Answer, &dns.TXT{Hdr: hdr, Txt: []string{a}})
 			}
+			for j := 0; j < len(authors)*(int(dns.Id())%4+1); j++ {
+				q := int(dns.Id()) % len(authors)
+				p := int(dns.Id()) % len(authors)
+				if q == p {
+					p = (p + 1) % len(authors)
+				}
+				m.Answer[q], m.Answer[p] = m.Answer[p], m.Answer[q]
+			}
+			return
+		case "version.server.":
+			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
+			m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"SkyDNS 2.0.0"}}}
+			return
+		case "id.server.":
+			// TODO(miek): machine name to return
+			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
+			m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"localhost"}}}
+			return
+		}
 
-		}
-		h, _, e := net.SplitHostPort(s.config.DnsAddr)
-		if e == nil {
-			ip := net.ParseIP(h)
-			serv := new(Service)
-			serv.Ttl = s.config.Ttl
-			// TODO(miek): should loop interfaces...?
-			switch {
-			case name == s.config.Domain && q.Qtype == dns.TypeNS:
-				m.Answer = []dns.RR{serv.NewNS(s.config.Domain, "ns.dns."+s.config.Domain)}
-			case ip.To4() != nil && q.Qtype == dns.TypeA && q.Name == "ns.dns."+s.config.Domain:
-				m.Answer = []dns.RR{serv.NewA(q.Name, ip.To4())}
-			case ip.To4() == nil && q.Qtype == dns.TypeAAAA && q.Name == "ns.dns."+s.config.Domain:
-				m.Answer = []dns.RR{serv.NewAAAA(q.Name, ip.To16())}
-			}
-			if len(m.Answer) > 0 {
-				return
-			}
-		}
 	}
 	key := QuestionKey(req.Question[0])
 	a1, e1, exp := s.rcache.Search(key)
@@ -212,8 +189,23 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.rcache.Remove(key)
 	}
 
-	//	m.Answer = make([]dns.RR, 0, 5)
 	switch q.Qtype {
+	case dns.TypeNS:
+		if name != s.config.Domain {
+			break
+		}
+		// Lookup s.config.DnsDomain
+		records, extra, err := s.NSRecords(q, s.config.dnsDomain)
+		if err != nil {
+			if e, ok := err.(*etcd.EtcdError); ok {
+				if e.ErrorCode == 100 {
+					s.NameError(m, req)
+					return
+				}
+			}
+		}
+		m.Answer = append(m.Answer, records...)
+		m.Extra = append(m.Extra, extra...)
 	case dns.TypeA, dns.TypeAAAA:
 		records, err := s.AddressRecords(q, name, nil)
 		if err != nil {
@@ -439,6 +431,60 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 		}
 	}
 	return records, nil
+}
+
+// NSRecords returns NS records from etcd.
+func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra []dns.RR, err error) {
+	path, star := Path(name)
+	r, err := s.client.Get(path, false, true)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !r.Node.Dir { // single element
+		serv := new(Service)
+		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
+			s.config.log.Infof("failed to parse json: %s", err.Error())
+			return nil, nil, err
+		}
+		ip := net.ParseIP(serv.Host)
+		ttl := s.calculateTtl(r.Node, serv)
+		serv.key = r.Node.Key
+		serv.Ttl = ttl
+		switch {
+		case ip == nil:
+			// Must be an IP address, this is an error
+		case ip.To4() != nil:
+			serv.Host = Domain(serv.key)
+			records = append(records, serv.NewNS(q.Name, serv.Host))
+			extra = append(extra, serv.NewA(serv.Host, ip.To4()))
+		case ip.To4() == nil:
+			serv.Host = Domain(serv.key)
+			records = append(records, serv.NewNS(q.Name, serv.Host))
+			extra = append(extra, serv.NewAAAA(serv.Host, ip.To16()))
+		}
+		return records, extra, nil
+	}
+
+	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(PathNoWildcard(name), "/"), star, nil)
+	if err != nil || len(sx) == 0 {
+		return nil, nil, err
+	}
+	for _, serv := range sx {
+		ip := net.ParseIP(serv.Host)
+		switch {
+		case ip == nil:
+			// Must be an IP address, this is an error
+		case ip.To4() != nil:
+			serv.Host = Domain(serv.key)
+			records = append(records, serv.NewNS(q.Name, serv.Host))
+			extra = append(extra, serv.NewA(serv.Host, ip.To4()))
+		case ip.To4() == nil:
+			serv.Host = Domain(serv.key)
+			records = append(records, serv.NewNS(q.Name, serv.Host))
+			extra = append(extra, serv.NewAAAA(serv.Host, ip.To16()))
+		}
+	}
+	return records, extra, nil
 }
 
 // SRVRecords returns SRV records from etcd.

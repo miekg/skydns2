@@ -44,6 +44,8 @@ If `ETCD_MACHINES` is not set, SkyDNS will default to using `http://127.0.0.1:40
 Or you can use the flag `-machines`. Autodiscovering new machines added to the network can
 be enabled by enabling the flag `-discover`.
 
+TODO(miek): add some nameservers
+
 ## Configuration
 SkyDNS' configuration is stored in etcd as a JSON object under the key `/skydns/config`. The following parameters
 may be set:
@@ -184,6 +186,7 @@ These names can be added with:
 Testing one of the names with `dig`:
 
     % dig @localhost SRV 1.rails.production.east.skydns.local
+
     ;; QUESTION SECTION:
     ;1.rails.production.east.skydns.local.	IN	SRV
 
@@ -197,6 +200,7 @@ Of course using the full names isn't *that* useful, so SkyDNS lets you query for
 If we are interested in all the servers in the `east` region, we simply omit the rightmost labels from our query:
 
     % dig @localhost SRV east.skydns.local
+
     ;; QUESTION SECTION
     ; east.skydns.local.    IN      SRV
 
@@ -214,6 +218,7 @@ Here all three entries of the `east` are returned.
 There is one other feature at play here. The second and third names, `{4,6}.rails.staging.east.skydns.local`, only had an IP record configured. Here SkyDNS used the ectd path to construct a target name and then puts the actual IP address in the additional section. Directly querying for the A records of `4.rails.staging.east.skydns.local.` of course also works:
 
     % dig @localhost -p 5354 +noall +answer A 4.rails.staging.east.skydns.local.
+
     4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
 
 Another way to leads to the same result it to query for `*.east.skydns.local`, you even put the wildcard
@@ -299,8 +304,25 @@ The first CNAME is generated from within SkyDNS, the other two are from the recu
 
 #### NS Records
 
-SkyDNS will report a nameserver for the address it is listening on. The name 
-of this nameserver is `ns.dns.skydns.local` in the default setup.
+For DNS to work properly SkyDNS needs to tell peers its nameservers. This information is stored
+inside Etcd, in the key `local/skydns/dns/` in there multiple services maybe stored. Note these
+services MUST use IP address, using names will not work. For instance:
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dns/ns \
+        -d value='{"host":"172.16.0.1"}'
+
+Registers `ns1.dns.skydns.local` as a nameserver with ip address 172.16.0.1:
+
+    % dig @localhost NS skydns.local
+
+    ;; QUESTION SECTION:
+    ;skydns.local.          IN  NS
+
+    ;; ANSWER SECTION:
+    skydns.local.       3600    IN  NS  ns.dns.skydns.local.
+
+    ;; ADDITIONAL SECTION:
+    ns.dns.skydns.local.    3600    IN  A   172.16.0.1
 
 #### PTR Records: Reverse Addresses
 
