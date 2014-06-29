@@ -148,25 +148,39 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 		if q.Qtype == dns.TypeDNSKEY && name == s.config.Domain {
 			if s.config.PubKey != nil {
-				m.Answer = append(m.Answer, s.config.PubKey)
+				m.Answer = []dns.RR{s.config.PubKey}
 				return
 			}
 		}
-		if q.Qclass == dns.ClassCHAOS && q.Qtype == dns.TypeTXT && name == s.config.Domain {
-			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
-			authors := []string{"Erik St. Martin", "Brian Ketelsen", "Miek Gieben", "Michael Crosby"}
-			for _, a := range authors {
-				m.Answer = append(m.Answer, &dns.TXT{Hdr: hdr, Txt: []string{a}})
-			}
-			for j := 0; j < len(authors)*(int(dns.Id())%4+1); j++ {
-				q := int(dns.Id()) % len(authors)
-				p := int(dns.Id()) % len(authors)
-				if q == p {
-					p = (p + 1) % len(authors)
+		if q.Qclass == dns.ClassCHAOS && q.Qtype == dns.TypeTXT {
+			switch name {
+			case s.config.Domain:
+				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
+				authors := []string{"Erik St. Martin", "Brian Ketelsen", "Miek Gieben", "Michael Crosby"}
+				for _, a := range authors {
+					m.Answer = append(m.Answer, &dns.TXT{Hdr: hdr, Txt: []string{a}})
 				}
-				m.Answer[q], m.Answer[p] = m.Answer[p], m.Answer[q]
+				for j := 0; j < len(authors)*(int(dns.Id())%4+1); j++ {
+					q := int(dns.Id()) % len(authors)
+					p := int(dns.Id()) % len(authors)
+					if q == p {
+						p = (p + 1) % len(authors)
+					}
+					m.Answer[q], m.Answer[p] = m.Answer[p], m.Answer[q]
+				}
+				return
+			case "version.server.":
+				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
+				m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"SkyDNS 2.0.0"}}}
+				return
 			}
-			return
+			case "id.server.":
+				// TODO(miek): machinename to return
+				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
+				m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"localhost"}}}
+				return
+			}
+
 		}
 		for i, c := range s.client.GetCluster() {
 			u, e := url.Parse(c)
