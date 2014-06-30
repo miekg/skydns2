@@ -339,7 +339,7 @@ When registering a service with an IP address only, you might also want to regis
 the reverse (the hostname the address points to). In the DNS these records are called
 PTR records.
 
-So looking back at some of the services in the section [](#service-discovery-via-the-dns),
+So looking back at some of the services in the section "Service Discovery via the DNS",
 we register these IP only ones:
 
     4.rails.staging.east.skydns.local. 10.0.1.125
@@ -357,6 +357,8 @@ If SkyDNS receives a PTR query it will check these paths and will return the
 contents. Note that these replies are sent with the AA (Authoritative Answer)
 bit *off*. If nothing is found locally the query is forwarded to the local
 recursor (if so configured), otherwise SERVFAIL is returned.
+
+This also works for IPv6 addresses, except that the reverse path is quite long.
 
 #### DNS Forwarding
 
