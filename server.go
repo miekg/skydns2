@@ -96,7 +96,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 
-	if !strings.HasSuffix(name, s.config.Domain) {
+	if q.Qclass != dns.ClassCHAOS && !strings.HasSuffix(name, s.config.Domain) {
 		s.ServeDNSForward(w, req)
 		return
 	}
@@ -107,6 +107,12 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.RecursionAvailable = true
 	m.Compress = true
 	defer func() {
+		if m.Rcode == dns.RcodeServerFailure {
+			if err := w.WriteMsg(m); err != nil {
+				s.config.log.Errorf("failure to return reply %q", err)
+			}
+			return
+		}
 		// Set TTL to the minimum of the RRset.
 		minttl := s.config.Ttl
 		if len(m.Answer) > 1 {
@@ -146,34 +152,45 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 	}
-	if q.Qclass == dns.ClassCHAOS && q.Qtype == dns.TypeTXT {
-		switch name {
-		case s.config.Domain:
-			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
-			authors := []string{"Erik St. Martin", "Brian Ketelsen", "Miek Gieben", "Michael Crosby"}
-			for _, a := range authors {
-				m.Answer = append(m.Answer, &dns.TXT{Hdr: hdr, Txt: []string{a}})
-			}
-			for j := 0; j < len(authors)*(int(dns.Id())%4+1); j++ {
-				q := int(dns.Id()) % len(authors)
-				p := int(dns.Id()) % len(authors)
-				if q == p {
-					p = (p + 1) % len(authors)
+	if q.Qclass == dns.ClassCHAOS {
+		if q.Qtype == dns.TypeTXT {
+			switch name {
+			case "authors.bind.":
+				fallthrough
+			case s.config.Domain:
+				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
+				authors := []string{"Erik St. Martin", "Brian Ketelsen", "Miek Gieben", "Michael Crosby"}
+				for _, a := range authors {
+					m.Answer = append(m.Answer, &dns.TXT{Hdr: hdr, Txt: []string{a}})
 				}
-				m.Answer[q], m.Answer[p] = m.Answer[p], m.Answer[q]
+				for j := 0; j < len(authors)*(int(dns.Id())%4+1); j++ {
+					q := int(dns.Id()) % len(authors)
+					p := int(dns.Id()) % len(authors)
+					if q == p {
+						p = (p + 1) % len(authors)
+					}
+					m.Answer[q], m.Answer[p] = m.Answer[p], m.Answer[q]
+				}
+				return
+			case "version.bind.":
+				fallthrough
+			case "version.server.":
+				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
+				m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"SkyDNS 2.0.0"}}}
+				return
+			case "hostname.bind.":
+				fallthrough
+			case "id.server.":
+				// TODO(miek): machine name to return
+				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
+				m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"localhost"}}}
+				return
 			}
-			return
-		case "version.server.":
-			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
-			m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"SkyDNS 2.0.0"}}}
-			return
-		case "id.server.":
-			// TODO(miek): machine name to return
-			hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
-			m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"localhost"}}}
-			return
 		}
-
+		// still here, fail
+		m.SetReply(req)
+		m.SetRcode(req, dns.RcodeServerFailure)
+		return
 	}
 	key := QuestionKey(req.Question[0])
 	a1, e1, exp := s.rcache.Search(key)

@@ -566,6 +566,22 @@ var dnsTestCases = []dnsTestCase{
 			newTXT("skydns.test. 0 TXT \"Miek Gieben\""),
 		},
 	},
+	// Author test 2
+	{
+		Qname: "authors.bind.", Qtype: dns.TypeTXT,
+		chaos: true,
+		Answer: []dns.RR{
+			newTXT("authors.bind. 0 TXT \"Brian Ketelsen\""),
+			newTXT("authors.bind. 0 TXT \"Erik St. Martin\""),
+			newTXT("authors.bind. 0 TXT \"Michael Crosby\""),
+			newTXT("authors.bind. 0 TXT \"Miek Gieben\""),
+		},
+	},
+	// Author test 2
+	{
+		Qname: "local.dns.skydns.test.", Qtype: dns.TypeA,
+		chaos: true,
+	},
 }
 
 func newA(rr string) *dns.A           { r, _ := dns.NewRR(rr); return r.(*dns.A) }
