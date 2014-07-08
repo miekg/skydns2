@@ -20,6 +20,7 @@ var (
 	nameservers = strings.Split(os.Getenv("SKYDNS_NAMESERVERS"), ",") // list of nameservers
 	tlskey      = os.Getenv("ETCD_TLSKEY")                            // TLS private key path
 	tlspem      = os.Getenv("ETCD_TLSPEM")                            // X509 certificate
+	cafile      = os.Getenv("ETCD_CAFILE")                            // root CA
 	config      = &Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
 	nameserver  = ""
 	machine     = ""
@@ -55,6 +56,7 @@ func init() {
 	flag.StringVar(&config.Local, "local", "", "optional unique value for this skydns instance")
 	flag.StringVar(&tlskey, "tls-key", "", "TLS Private Key path")
 	flag.StringVar(&tlspem, "tls-pem", "", "X509 Certificate")
+	flag.StringVar(&cafile, "ca-file", "", "CA Certificate")
 	flag.DurationVar(&config.ReadTimeout, "rtimeout", 2*time.Second, "read timeout")
 	flag.BoolVar(&config.RoundRobin, "round-robin", true, "round robin A/AAAA replies")
 	flag.BoolVar(&discover, "discover", false, "discover new machines by watching /v2/_etcd/machines")

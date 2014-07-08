@@ -24,7 +24,7 @@ func NewClient(machines []string) (client *etcd.Client) {
 	}
 	if strings.HasPrefix(machines[0], "https://") {
 		var err error
-		if client, err = etcd.NewTLSClient(machines, tlspem, tlskey, ""); err != nil {
+		if client, err = etcd.NewTLSClient(machines, tlspem, tlskey, cafile); err != nil {
 			log.Printf("failure to connect: %s\n", err)
 		}
 	} else {
