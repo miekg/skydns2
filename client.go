@@ -26,11 +26,13 @@ func NewClient(machines []string) (client *etcd.Client) {
 		var err error
 		if client, err = etcd.NewTLSClient(machines, tlspem, tlskey, cacert); err != nil {
 			log.Printf("failure to connect: %s\n", err)
+		} else {
+			client.SyncCluster()
 		}
 	} else {
 		client = etcd.NewClient(machines)
+		client.SyncCluster()
 	}
-	client.SyncCluster()
 	return client
 }
 
@@ -55,7 +57,6 @@ func (s *server) UpdateClient(resp *etcd.Response) {
 	}
 	s.config.log.Infof("setting new etcd cluster to %v", machines)
 	c := NewClient(machines)
-	c.SyncCluster()
 	// This is our RCU, switch the pointer, old readers get the old
 	// one, new reader get the new one.
 	s.client = c
