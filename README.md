@@ -106,6 +106,7 @@ SkyDNS uses these environment variables:
 * `ETCD_TLSPEM` - X509 certificate path.
 * `SKYDNS_ADDR` - specify address to bind to
 * `SKYDNS_DOMAIN` - set a default domain if not specified by etcd config
+* `SKYDNS_NAMESERVERS` - set a list of nameservers to forward DNS requests to when not authoritative for a domain, "8.8.8.8:53,8.8.4.4:53".
 
 And these are used for statistics:
 
