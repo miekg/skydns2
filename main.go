@@ -48,7 +48,7 @@ func init() {
 	flag.StringVar(&config.Local, "local", "", "optional unique value for this skydns instance")
 	flag.StringVar(&tlskey, "tls-key", env("ETCD_TLSKEY", ""), "TLS Private Key path")
 	flag.StringVar(&tlspem, "tls-pem", env("ETCD_TLSPEM", ""), "X509 Certificate")
-	flag.StringVar(&cacert, "ca-cert", env("ECTD_CACERT", "") , "CA Certificate")
+	flag.StringVar(&cacert, "ca-cert", env("ECTD_CACERT", ""), "CA Certificate")
 	flag.DurationVar(&config.ReadTimeout, "rtimeout", 2*time.Second, "read timeout")
 	flag.BoolVar(&config.RoundRobin, "round-robin", true, "round robin A/AAAA replies")
 	flag.BoolVar(&discover, "discover", false, "discover new machines by watching /v2/_etcd/machines")
