@@ -34,8 +34,8 @@ Then compile SkyDNS:
 
 `go get -d -v ./... && go build -v ./...`
 
-SkyDNS' configuration is stored *in* etcd: but there are also flags. To start SkyDNS, set the
-etcd machines with the environment variable ETCD_MACHINES:
+SkyDNS' configuration is stored *in* etcd: but there are also flags and environment variabes
+you can set. To start SkyDNS, set the etcd machines with the environment variable ETCD_MACHINES:
 
     export ETCD_MACHINES='http://192.168.0.1:4001,http://192.168.0.2:4001'
     ./skydns
