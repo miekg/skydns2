@@ -23,6 +23,7 @@ var (
 
 	influxConfig   *influxdb.Config
 	graphiteServer = os.Getenv("GRAPHITE_SERVER")
+	graphitePrefix = os.Getenv("GRAPHITE_PREFIX")
 	stathatUser    = os.Getenv("STATHAT_USER")
 	influxServer   = os.Getenv("INFLUX_SERVER")
 	influxDatabase = os.Getenv("INFLUX_DATABASE")
@@ -36,6 +37,10 @@ func init() {
 	influxConfig.Database = influxDatabase
 	influxConfig.Username = influxUser
 	influxConfig.Password = influxPassword
+
+	if graphitePrefix == "" {
+			graphitePrefix = "skydns"
+	}
 
 	StatsForwardCount = metrics.NewCounter()
 	metrics.Register("skydns-forward-requests", StatsForwardCount)
@@ -61,11 +66,10 @@ func init() {
 
 func statsCollect() {
 	if graphiteServer != "" {
-		addr, err := net.ResolveTCPAddr("tcp", graphiteServer)
-		if err != nil {
-			go metrics.Graphite(metrics.DefaultRegistry, 10e9, "skydns", addr)
-		}
+		addr, _ := net.ResolveTCPAddr("tcp", graphiteServer)
+		go metrics.Graphite(metrics.DefaultRegistry, 10e9, graphitePrefix, addr)
 	}
+
 	if stathatUser != "" {
 		go stathat.Stathat(metrics.DefaultRegistry, 10e9, stathatUser)
 	}
