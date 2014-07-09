@@ -66,8 +66,10 @@ func init() {
 
 func statsCollect() {
 	if graphiteServer != "" {
-		addr, _ := net.ResolveTCPAddr("tcp", graphiteServer)
-		go metrics.Graphite(metrics.DefaultRegistry, 10e9, graphitePrefix, addr)
+		addr, err := net.ResolveTCPAddr("tcp", graphiteServer)
+		if err == nil {
+			go metrics.Graphite(metrics.DefaultRegistry, 10e9, graphitePrefix, addr)
+		}
 	}
 
 	if stathatUser != "" {
