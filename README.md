@@ -102,8 +102,9 @@ You can also use the command line options, however the settings in etcd take pre
 SkyDNS uses these environment variables:
 
 * `ETCD_MACHINES` - list of etcd machines, "http://localhost:4001,http://etcd.example.com:4001".
-* `ETCD_TLSKEY` - TLS private key path.
-* `ETCD_TLSPEM` - X509 certificate path.
+* `ETCD_TLSKEY` - path of TLS client certificate - private key.
+* `ETCD_TLSPEM` - path of TLS client certificate - public key.
+* `ETCD_CACERT` - path of TLS certificate authority public key
 * `SKYDNS_ADDR` - specify address to bind to
 * `SKYDNS_DOMAIN` - set a default domain if not specified by etcd config
 * `SKYDNS_NAMESERVERS` - set a list of nameservers to forward DNS requests to when not authoritative for a domain, "8.8.8.8:53,8.8.4.4:53".
@@ -116,6 +117,14 @@ And these are used for statistics:
 * `INFLUX_DATABASE`
 * `INFLUX_USER`
 * `INFLUX_PASSWORD`
+
+### SSL Usage and Authentication with Client Certificates
+
+In order to connect to an SSL-secured etcd, you will at least need to set ETCD_CACERT to be the public key
+of the Certificate Authority which signed the server certificate.
+
+If the SSL-secured etcd expects client certificates to authorize connections, you also need to set ETCD_TLSKEY
+to the *private* key of the client, and ETCD_TLSPEM to the *public* key of the client.
 
 ## Service Announcements
 Announce your service by submitting JSON over HTTP to etcd with information about your service.
