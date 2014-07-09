@@ -39,7 +39,7 @@ func init() {
 	influxConfig.Password = influxPassword
 
 	if graphitePrefix == "" {
-			graphitePrefix = "skydns"
+		graphitePrefix = "skydns"
 	}
 
 	StatsForwardCount = metrics.NewCounter()
