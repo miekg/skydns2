@@ -16,11 +16,6 @@ func NewClient(machines []string) (client *etcd.Client) {
 	// set default if not specified in env
 	if len(machines) == 1 && machines[0] == "" {
 		machines[0] = "http://127.0.0.1:4001"
-
-	}
-	// override if we have a commandline flag as well
-	if machine != "" {
-		machines = strings.Split(machine, ",")
 	}
 	if strings.HasPrefix(machines[0], "https://") {
 		var err error
