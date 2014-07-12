@@ -107,7 +107,11 @@ func TestDNSForward(t *testing.T) {
 	m.SetQuestion("www.example.com.", dns.TypeA)
 	resp, _, err := c.Exchange(m, "localhost:"+StrPort)
 	if err != nil {
-		t.Fatal(err)
+		// try twice
+		resp, _, err = c.Exchange(m, "localhost:"+StrPort)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	if len(resp.Answer) == 0 || resp.Rcode != dns.RcodeSuccess {
 		t.Fatal("Answer expected to have A records or rcode not equal to RcodeSuccess")
@@ -179,7 +183,12 @@ func TestDNS(t *testing.T) {
 		}
 		resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
 		if err != nil {
-			t.Fatalf("failing: %s: %s\n", m.String(), err.Error())
+			// try twice, be more resilent against remote lookups
+			// timing out.
+			resp, _, err = c.Exchange(m, "localhost:"+StrPort)
+			if err != nil {
+				t.Fatalf("failing: %s: %s\n", m.String(), err.Error())
+			}
 		}
 		sort.Sort(rrSet(resp.Answer))
 		sort.Sort(rrSet(resp.Ns))

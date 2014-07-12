@@ -787,13 +787,16 @@ func (s *server) Lookup(n string, t, dnssec uint16) (*dns.Msg, error) {
 	if len(s.config.Nameservers) == 0 {
 		return nil, fmt.Errorf("no nameservers configured can not lookup name")
 	}
+	if dns.CountLabel(n) < 3 {
+		return nil, fmt.Errorf("name has fewer than three labels")
+	}
 	m := new(dns.Msg)
 	m.SetQuestion(n, t)
 	if dnssec > 0 {
 		m.SetEdns0(dnssec, true)
 	}
 
-	c := &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout}
+	c := &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout}
 	nsid := int(m.Id) % len(s.config.Nameservers)
 	try := 0
 Redo:
