@@ -56,13 +56,12 @@ func (s *Service) NewPTR(name string, ttl uint32) *dns.PTR {
 	return &dns.PTR{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: ttl}, Ptr: dns.Fqdn(s.Host)}
 }
 
-// Path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
-// the resulting key will be /skydns/local/skydns/staging/service .
-// If a name contains wildcards (*), the name will be chopped of before the (first) wildcard, and
+// As Path, but
+// if a name contains wildcards (*), the name will be chopped of before the (first) wildcard, and
 // we do a highler evel search and later find the matching names in loopNodes.
 // So service.*.skydns.local, will look for all servics under skydns.local and will later check
 // for names that match service.*.skydns.local.  If a wildcard is found the bool is true.
-func Path(s string) (string, bool) {
+func PathWithWildcard(s string) (string, bool) {
 	l := dns.SplitDomainName(s)
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
 		l[i], l[j] = l[j], l[i]
@@ -75,7 +74,9 @@ func Path(s string) (string, bool) {
 	return path.Join(append([]string{"/skydns/"}, l...)...), false
 }
 
-func PathNoWildcard(s string) string {
+// Path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
+// the resulting key will be /skydns/local/skydns/staging/service .
+func Path(s string) string {
 	l := dns.SplitDomainName(s)
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
 		l[i], l[j] = l[j], l[i]

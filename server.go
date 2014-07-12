@@ -369,7 +369,7 @@ func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) {
 }
 
 func (s *server) AddressRecords(q dns.Question, name string, previousRecords []dns.RR) (records []dns.RR, err error) {
-	path, star := msg.Path(name)
+	path, star := msg.PathWithWildcard(name)
 	r, err := s.client.Get(path, false, true)
 	if err != nil {
 		return nil, err
@@ -415,7 +415,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 		}
 		return records, nil
 	}
-	nodes, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.PathNoWildcard(name), "/"), star, nil)
+	nodes, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.Path(name), "/"), star, nil)
 	if err != nil {
 		s.config.log.Infof("failed to parse json: %s", err.Error())
 		return nil, err
@@ -453,7 +453,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 
 // NSRecords returns NS records from etcd.
 func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra []dns.RR, err error) {
-	path, star := msg.Path(name)
+	path, star := msg.PathWithWildcard(name)
 	r, err := s.client.Get(path, false, true)
 	if err != nil {
 		return nil, nil, err
@@ -483,7 +483,7 @@ func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra
 		return records, extra, nil
 	}
 
-	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.PathNoWildcard(name), "/"), star, nil)
+	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.Path(name), "/"), star, nil)
 	if err != nil || len(sx) == 0 {
 		return nil, nil, err
 	}
@@ -508,7 +508,7 @@ func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra
 // SRVRecords returns SRV records from etcd.
 // If the Target is not an name but an IP address, an name is created .
 func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records []dns.RR, extra []dns.RR, err error) {
-	path, star := msg.Path(name)
+	path, star := msg.PathWithWildcard(name)
 	r, err := s.client.Get(path, false, true)
 	if err != nil {
 		return nil, nil, err
@@ -557,7 +557,7 @@ func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records
 		return records, extra, nil
 	}
 
-	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.PathNoWildcard(name), "/"), star, nil)
+	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.Path(name), "/"), star, nil)
 	if err != nil || len(sx) == 0 {
 		return nil, nil, err
 	}
@@ -620,7 +620,7 @@ func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records
 }
 
 func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, err error) {
-	path, _ := msg.Path(name) // no wildcards here
+	path, _ := msg.PathWithWildcard(name) // no wildcards here
 	r, err := s.client.Get(path, false, true)
 	if err != nil {
 		return nil, err
@@ -644,7 +644,7 @@ func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, er
 
 func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
-	path, star := msg.Path(name)
+	path, star := msg.PathWithWildcard(name)
 	if star {
 		return nil, fmt.Errorf("reverse can not contain wildcards")
 	}

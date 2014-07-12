@@ -16,6 +16,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/coreos/go-log/log"
+	"github.com/skynetservices/skydns/msg"
 	"github.com/miekg/dns"
 )
 
@@ -24,12 +25,12 @@ import (
 var Port = 9400
 var StrPort = "9400" // string equivalent of Port
 
-func addService(t *testing.T, s *server, k string, ttl uint64, m *Service) {
+func addService(t *testing.T, s *server, k string, ttl uint64, m *msg.Service) {
 	b, err := json.Marshal(m)
 	if err != nil {
 		t.Fatal(err)
 	}
-	path, _ := Path(k)
+	path, _ := msg.PathWithWildcard(k)
 	t.Logf("Adding path %s:", path)
 	_, err = s.client.Create(path, string(b), ttl)
 	if err != nil {
@@ -39,7 +40,7 @@ func addService(t *testing.T, s *server, k string, ttl uint64, m *Service) {
 }
 
 func delService(t *testing.T, s *server, k string) {
-	path, _ := Path(k)
+	path, _ := msg.PathWithWildcard(k)
 	_, err := s.client.Delete(path, false)
 	if err != nil {
 		t.Fatal(err)
@@ -127,8 +128,8 @@ func TestDNSTtlRRset(t *testing.T) {
 
 	ttl := uint32(60)
 	for _, serv := range services {
-		addService(t, s, serv.key, uint64(ttl), serv)
-		defer delService(t, s, serv.key)
+		addService(t, s, serv.Key, uint64(ttl), serv)
+		defer delService(t, s, serv.Key)
 		ttl += 60
 	}
 	c := new(dns.Client)
@@ -163,8 +164,8 @@ func TestDNS(t *testing.T) {
 	defer s.Stop()
 
 	for _, serv := range services {
-		addService(t, s, serv.key, 0, serv)
-		defer delService(t, s, serv.key)
+		addService(t, s, serv.Key, 0, serv)
+		defer delService(t, s, serv.Key)
 	}
 	c := new(dns.Client)
 	for _, tc := range dnsTestCases {
@@ -316,32 +317,32 @@ type dnsTestCase struct {
 	Extra  []dns.RR
 }
 
-var services = []*Service{
-	{Host: "server1", Port: 8080, key: "100.server1.development.region1.skydns.test."},
-	{Host: "server2", Port: 80, key: "101.server2.production.region1.skydns.test."},
-	{Host: "server4", Port: 80, Priority: 333, key: "102.server4.development.region6.skydns.test."},
-	{Host: "server3", key: "103.server4.development.region2.skydns.test."},
-	{Host: "172.16.1.1", key: "a.ipaddr.skydns.test."},
-	{Host: "172.16.1.2", key: "b.ipaddr.skydns.test."},
-	{Host: "10.0.0.1", key: "104.server1.development.region1.skydns.test."},
-	{Host: "2001::8:8:8:8", key: "105.server3.production.region2.skydns.test."},
-	{Host: "104.server1.development.region1.skydns.test", key: "1.cname.skydns.test."},
-	{Host: "100.server1.development.region1.skydns.test", key: "2.cname.skydns.test."},
-	{Host: "www.miek.nl", key: "external1.cname.skydns.test."},
-	{Host: "www.miek.nl", key: "ext1.cname2.skydns.test."},
-	{Host: "www.miek.nl", key: "ext2.cname2.skydns.test."},
-	{Host: "wwwwwww.miek.nl", key: "external2.cname.skydns.test."},
-	{Host: "4.cname.skydns.test", key: "3.cname.skydns.test."},
-	{Host: "3.cname.skydns.test", key: "4.cname.skydns.test."},
-	{Host: "10.0.0.2", key: "ttl.skydns.test.", Ttl: 360},
-	{Host: "reverse.example.com", key: "1.0.0.10.in-addr.arpa."}, // 10.0.0.1
-	{Host: "server1", Weight: 130, key: "100.server1.region5.skydns.test."},
-	{Host: "server2", Weight: 80, key: "101.server2.region5.skydns.test."},
-	{Host: "server3", Weight: 150, key: "103.server3.region5.skydns.test."},
-	{Host: "server4", Priority: 30, key: "104.server4.region5.skydns.test."},
+var services = []*msg.Service{
+	{Host: "server1", Port: 8080, Key: "100.server1.development.region1.skydns.test."},
+	{Host: "server2", Port: 80, Key: "101.server2.production.region1.skydns.test."},
+	{Host: "server4", Port: 80, Priority: 333, Key: "102.server4.development.region6.skydns.test."},
+	{Host: "server3", Key: "103.server4.development.region2.skydns.test."},
+	{Host: "172.16.1.1", Key: "a.ipaddr.skydns.test."},
+	{Host: "172.16.1.2", Key: "b.ipaddr.skydns.test."},
+	{Host: "10.0.0.1", Key: "104.server1.development.region1.skydns.test."},
+	{Host: "2001::8:8:8:8", Key: "105.server3.production.region2.skydns.test."},
+	{Host: "104.server1.development.region1.skydns.test", Key: "1.cname.skydns.test."},
+	{Host: "100.server1.development.region1.skydns.test", Key: "2.cname.skydns.test."},
+	{Host: "www.miek.nl", Key: "external1.cname.skydns.test."},
+	{Host: "www.miek.nl", Key: "ext1.cname2.skydns.test."},
+	{Host: "www.miek.nl", Key: "ext2.cname2.skydns.test."},
+	{Host: "wwwwwww.miek.nl", Key: "external2.cname.skydns.test."},
+	{Host: "4.cname.skydns.test", Key: "3.cname.skydns.test."},
+	{Host: "3.cname.skydns.test", Key: "4.cname.skydns.test."},
+	{Host: "10.0.0.2", Key: "ttl.skydns.test.", Ttl: 360},
+	{Host: "reverse.example.com", Key: "1.0.0.10.in-addr.arpa."}, // 10.0.0.1
+	{Host: "server1", Weight: 130, Key: "100.server1.region5.skydns.test."},
+	{Host: "server2", Weight: 80, Key: "101.server2.region5.skydns.test."},
+	{Host: "server3", Weight: 150, Key: "103.server3.region5.skydns.test."},
+	{Host: "server4", Priority: 30, Key: "104.server4.region5.skydns.test."},
 	// nameserver
-	{Host: "10.0.0.2", key: "ns.dns.skydns.test."},
-	{Host: "10.0.0.3", key: "ns2.dns.skydns.test."},
+	{Host: "10.0.0.2", Key: "ns.dns.skydns.test."},
+	{Host: "10.0.0.3", Key: "ns2.dns.skydns.test."},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -603,8 +604,8 @@ func BenchmarkDNSSingleCache(b *testing.B) {
 	defer s.Stop()
 
 	serv := services[0]
-	addService(t, s, serv.key, 0, serv)
-	defer delService(t, s, serv.key)
+	addService(t, s, serv.Key, 0, serv)
+	defer delService(t, s, serv.Key)
 
 	c := new(dns.Client)
 	tc := dnsTestCases[0]
@@ -624,9 +625,9 @@ func BenchmarkDNSWildcardCache(b *testing.B) {
 	defer s.Stop()
 
 	for _, serv := range services {
-		m := &Service{Host: serv.Host, Port: serv.Port}
-		addService(t, s, serv.key, 0, m)
-		defer delService(t, s, serv.key)
+		m := &msg.Service{Host: serv.Host, Port: serv.Port}
+		addService(t, s, serv.Key, 0, m)
+		defer delService(t, s, serv.Key)
 	}
 
 	c := new(dns.Client)
@@ -647,8 +648,8 @@ func BenchmarkDNSSECSingleCache(b *testing.B) {
 	defer s.Stop()
 
 	serv := services[0]
-	addService(t, s, serv.key, 0, serv)
-	defer delService(t, s, serv.key)
+	addService(t, s, serv.Key, 0, serv)
+	defer delService(t, s, serv.Key)
 
 	c := new(dns.Client)
 	tc := dnsTestCases[0]
@@ -669,8 +670,8 @@ func BenchmarkDNSSingleNoCache(b *testing.B) {
 	defer s.Stop()
 
 	serv := services[0]
-	addService(t, s, serv.key, 0, serv)
-	defer delService(t, s, serv.key)
+	addService(t, s, serv.Key, 0, serv)
+	defer delService(t, s, serv.Key)
 
 	c := new(dns.Client)
 	tc := dnsTestCases[0]
@@ -690,9 +691,9 @@ func BenchmarkDNSWildcardNoCache(b *testing.B) {
 	defer s.Stop()
 
 	for _, serv := range services {
-		m := &Service{Host: serv.Host, Port: serv.Port}
-		addService(t, s, serv.key, 0, m)
-		defer delService(t, s, serv.key)
+		m := &msg.Service{Host: serv.Host, Port: serv.Port}
+		addService(t, s, serv.Key, 0, m)
+		defer delService(t, s, serv.Key)
 	}
 
 	c := new(dns.Client)
@@ -713,8 +714,8 @@ func BenchmarkDNSSECSingleNoCache(b *testing.B) {
 	defer s.Stop()
 
 	serv := services[0]
-	addService(t, s, serv.key, 0, serv)
-	defer delService(t, s, serv.key)
+	addService(t, s, serv.Key, 0, serv)
+	defer delService(t, s, serv.Key)
 
 	c := new(dns.Client)
 	tc := dnsTestCases[0]
