@@ -321,7 +321,8 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 		network = "tcp"
 	}
 
-	c := &dns.Client{Net: network, ReadTimeout: s.config.ReadTimeout}
+	// Try again, when it fails?
+	c := &dns.Client{Net: network, ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout}
 
 	// Use request Id for "random" nameserver selection.
 	nsid := int(req.Id) % len(s.config.Nameservers)
