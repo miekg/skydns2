@@ -378,7 +378,7 @@ var dnsTestCases = []dnsTestCase{
 		Qname: "104.server1.development.region1.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1")},
 	},
-	// Multiplee A Record Test
+	// Multiple A Record Test
 	{
 		Qname: "ipaddr.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{
@@ -530,6 +530,8 @@ var dnsTestCases = []dnsTestCase{
 			new(dns.OPT),
 		},
 	},
+	// Caps Test
+
 	// NXDOMAIN Test
 
 	// NODATA Test
@@ -578,7 +580,18 @@ var dnsTestCases = []dnsTestCase{
 			newTXT("authors.bind. 0 TXT \"Miek Gieben\""),
 		},
 	},
-	// Author test 2
+	// Author test, caps test
+	{
+		Qname: "AUTHOrs.BIND.", Qtype: dns.TypeTXT,
+		chaos: true,
+		Answer: []dns.RR{
+			newTXT("AUTHOrs.BIND. 0 TXT \"Brian Ketelsen\""),
+			newTXT("AUTHOrs.BIND. 0 TXT \"Erik St. Martin\""),
+			newTXT("AUTHOrs.BIND. 0 TXT \"Michael Crosby\""),
+			newTXT("AUTHOrs.BIND. 0 TXT \"Miek Gieben\""),
+		},
+	},
+	// Author test 3, no answer.
 	{
 		Qname: "local.dns.skydns.test.", Qtype: dns.TypeA,
 		chaos: true,

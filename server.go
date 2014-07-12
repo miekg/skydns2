@@ -159,7 +159,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			case "authors.bind.":
 				fallthrough
 			case s.config.Domain:
-				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
+				hdr := dns.RR_Header{Name: q.Name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
 				authors := []string{"Erik St. Martin", "Brian Ketelsen", "Miek Gieben", "Michael Crosby"}
 				for _, a := range authors {
 					m.Answer = append(m.Answer, &dns.TXT{Hdr: hdr, Txt: []string{a}})
@@ -176,14 +176,14 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			case "version.bind.":
 				fallthrough
 			case "version.server.":
-				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
+				hdr := dns.RR_Header{Name: q.Name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
 				m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"SkyDNS 2.0.0"}}}
 				return
 			case "hostname.bind.":
 				fallthrough
 			case "id.server.":
 				// TODO(miek): machine name to return
-				hdr := dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
+				hdr := dns.RR_Header{Name: q.Name, Rrtype: dns.TypeTXT, Class: dns.ClassCHAOS, Ttl: 0}
 				m.Answer = []dns.RR{&dns.TXT{Hdr: hdr, Txt: []string{"localhost"}}}
 				return
 			}
