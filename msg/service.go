@@ -2,7 +2,7 @@
 // Use of this source code is governed by The MIT License (MIT) that can be
 // found in the LICENSE file.
 
-package main
+package msg
 
 import (
 	"net"
@@ -22,7 +22,7 @@ type Service struct {
 	Weight   int    `json:"weight,omitempty"`
 	Ttl      uint32 `json:"ttl,omitempty"`
 
-	key string
+	Key string // etcd key where we found this service
 }
 
 // NewSRV returns a new SRV record based on the Service.
