@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/skynetservices/skydns/msg"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
+	"github.com/skynetservices/skydns/msg"
 )
 
 type server struct {

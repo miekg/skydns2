@@ -16,8 +16,8 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/coreos/go-log/log"
-	"github.com/skynetservices/skydns/msg"
 	"github.com/miekg/dns"
+	"github.com/skynetservices/skydns/msg"
 )
 
 // Keep global port counter that increments with 10 for each
