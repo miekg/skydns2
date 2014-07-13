@@ -21,8 +21,8 @@ type Service struct {
 	Priority int    `json:"priority,omitempty"`
 	Weight   int    `json:"weight,omitempty"`
 	Ttl      uint32 `json:"ttl,omitempty"`
-
-	Key string // etcd key where we found this service
+	// etcd key where we found this service and ignore from json un-/marshalling
+	Key 	 string `json:"-"`
 }
 
 // NewSRV returns a new SRV record based on the Service.
