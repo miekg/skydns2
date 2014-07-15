@@ -71,6 +71,7 @@ func newTestServer(t *testing.T, cache bool) *server {
 	s.config.Priority = 10
 	s.config.RCacheTtl = RCacheTtl
 	s.config.Ttl = 3600
+	s.config.Ndots = 2
 	s.config.log = log.New("skydns", false, log.NullSink())
 	go s.Run()
 	return s

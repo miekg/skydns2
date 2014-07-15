@@ -46,6 +46,8 @@ type Config struct {
 	RCache int `josn:"rcache,omitempty"`
 	// RCacheTtl, how long to cache in seconds.
 	RCacheTtl int `json:"rcache_ttl,omitempty"`
+	// How many labels a name should have before we allow forwarding. Default to 2.
+	Ndots int `json:"ndot,omitempty"`
 
 	// DNSSEC key material
 	PubKey          *dns.DNSKEY    `json:"-"`
@@ -55,7 +57,7 @@ type Config struct {
 	ClosestEncloser *dns.NSEC3     `json:"-"`
 	DenyWildcard    *dns.NSEC3     `json:"-"`
 
-	log *log.Logger `json:"-"`
+	log *log.Logger
 
 	// some predefined string "constants"
 	localDomain string // "local.dns." + config.Domain
@@ -117,6 +119,9 @@ func setDefaults(config *Config) error {
 	}
 	if config.RCacheTtl <= 0 {
 		config.RCacheTtl = RCacheTtl
+	}
+	if config.Ndots <= 0 {
+		config.Ndots = 2
 	}
 
 	if len(config.Nameservers) == 0 {
