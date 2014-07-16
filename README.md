@@ -298,8 +298,8 @@ and
 We have created the following CNAME chain: `1.rails.production.east.skydns.local` -> `service1.skydns.local` ->
 `10.0.2.15`. If you then query for an A or AAAA for 1.rails.production.east.skydns.local SkyDNS returns:
 
-    1.rails.production.east.skydns.local. 3600  IN  CNAME   server1.skydns.local.
-    server1.skydns.local.                 3600  IN  A       10.0.2.15
+    1.rails.production.east.skydns.local. 3600  IN  CNAME   service1.skydns.local.
+    service1.skydns.local.                 3600  IN  A       10.0.2.15
 
 ##### External Names
 
