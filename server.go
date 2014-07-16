@@ -16,6 +16,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
+	"github.com/skynetservices/skydns/cache"
 	"github.com/skynetservices/skydns/msg"
 )
 
@@ -23,15 +24,15 @@ type server struct {
 	client *etcd.Client
 	config *Config
 	group  *sync.WaitGroup
-	scache *cache
-	rcache *cache
+	scache *cache.Cache
+	rcache *cache.Cache
 }
 
 // NewServer returns a new SkyDNS server.
 func NewServer(config *Config, client *etcd.Client) *server {
 	return &server{client: client, config: config, group: new(sync.WaitGroup),
-		scache: NewCache(config.SCache, 0),
-		rcache: NewCache(config.RCache, config.RCacheTtl),
+		scache: cache.New(config.SCache, 0),
+		rcache: cache.New(config.RCache, config.RCacheTtl),
 	}
 }
 
@@ -127,7 +128,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 		if !cached {
-			s.rcache.InsertMsg(QuestionKey(req.Question[0]), 0, m.Answer, m.Extra)
+			s.rcache.InsertMsg(cache.QuestionKey(req.Question[0]), 0, m.Answer, m.Extra)
 		}
 		if dnssec > 0 {
 			StatsDnssecOkCount.Inc(1)
@@ -193,7 +194,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.SetRcode(req, dns.RcodeServerFailure)
 		return
 	}
-	key := QuestionKey(req.Question[0])
+	key := cache.QuestionKey(req.Question[0])
 	_, a1, e1, exp := s.rcache.Search(key)
 	if len(a1) > 0 {
 		// Cache hit! \o/

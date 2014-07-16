@@ -2,7 +2,7 @@
 // Use of this source code is governed by The MIT License (MIT) that can be
 // found in the LICENSE file.
 
-package main
+package cache
 
 // LRU cache that holds RRs and for DNSSEC an RRSIG.
 
@@ -23,12 +23,12 @@ const RcodeCodeNoData uint16 = 254
 type Elem struct {
 	key        string
 	expiration time.Time // time added + TTL, after this the elem is invalid
-	rcode	   uint16 // hold rcode show we cache NXDOMAIN and NODATA as well
+	rcode      uint16    // hold rcode show we cache NXDOMAIN and NODATA as well
 	answer     []dns.RR
 	extra      []dns.RR
 }
 
-type cache struct {
+type Cache struct {
 	sync.Mutex
 	l        *list.List
 	m        map[string]*list.Element
@@ -40,8 +40,8 @@ type cache struct {
 // TODO(miek): add setCapacity so it can be set runtime.
 // TODO(miek): makes this lockfree(er).
 
-func NewCache(capacity, ttl int) *cache {
-	c := new(cache)
+func New(capacity, ttl int) *Cache {
+	c := new(Cache)
 	c.l = list.New()
 	c.m = make(map[string]*list.Element)
 	c.capacity = uint(capacity)
@@ -49,7 +49,7 @@ func NewCache(capacity, ttl int) *cache {
 	return c
 }
 
-func (c *cache) Remove(s string) {
+func (c *Cache) Remove(s string) {
 	c.Lock()
 	defer c.Unlock()
 	e := c.m[s]
@@ -62,7 +62,7 @@ func (c *cache) Remove(s string) {
 	c.shrink()
 }
 
-func (c *cache) shrink() {
+func (c *Cache) shrink() {
 	for c.size > c.capacity {
 		e := c.l.Back()
 		if e == nil { // nothing left
@@ -75,9 +75,9 @@ func (c *cache) shrink() {
 	}
 }
 
-// insertMsg inserts a message in the cache. We will cahce it for ttl seconds, which
+// insertMsg inserts a message in the Cache. We will cahce it for ttl seconds, which
 // should be a small (60...300) integer.
-func (c *cache) InsertMsg(s string, rcode uint16, answer, extra []dns.RR) {
+func (c *Cache) InsertMsg(s string, rcode uint16, answer, extra []dns.RR) {
 	if c.capacity == 0 {
 		return
 	}
@@ -92,7 +92,7 @@ func (c *cache) InsertMsg(s string, rcode uint16, answer, extra []dns.RR) {
 }
 
 // insertSig inserts a signature, the expiration time is used as the cache ttl.
-func (c *cache) InsertSig(s string, sig *dns.RRSIG) {
+func (c *Cache) InsertSig(s string, sig *dns.RRSIG) {
 	if c.capacity == 0 {
 		return
 	}
@@ -111,7 +111,7 @@ func (c *cache) InsertSig(s string, sig *dns.RRSIG) {
 	c.shrink()
 }
 
-func (c *cache) Search(s string) (uint16, []dns.RR, []dns.RR, time.Time) {
+func (c *Cache) Search(s string) (uint16, []dns.RR, []dns.RR, time.Time) {
 	if c.capacity == 0 {
 		return 0, nil, nil, time.Time{}
 	}
