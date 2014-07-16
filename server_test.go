@@ -17,6 +17,7 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/coreos/go-log/log"
 	"github.com/miekg/dns"
+	"github.com/skynetservices/skydns/cache"
 	"github.com/skynetservices/skydns/msg"
 )
 
@@ -47,7 +48,7 @@ func delService(t *testing.T, s *server, k string) {
 	}
 }
 
-func newTestServer(t *testing.T, cache bool) *server {
+func newTestServer(t *testing.T, c bool) *server {
 	Port += 10
 	StrPort = strconv.Itoa(Port)
 	s := new(server)
@@ -56,10 +57,10 @@ func newTestServer(t *testing.T, cache bool) *server {
 
 	s.group = new(sync.WaitGroup)
 	s.client = client
-	s.scache = NewCache(1000, 0)
-	s.rcache = NewCache(0, 0)
-	if cache {
-		s.rcache = NewCache(100, 60) // 100 items, 60s ttl
+	s.scache = cache.New(1000, 0)
+	s.rcache = cache.New(0, 0)
+	if c {
+		s.rcache = cache.New(100, 60) // 100 items, 60s ttl
 	}
 	s.config = new(Config)
 	s.config.Domain = "skydns.test."

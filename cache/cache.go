@@ -20,7 +20,7 @@ const RcodeCodeNoData uint16 = 254
 
 // Elem hold an answer and additional section that returned from the cache.
 // The signature is put in answer, extra is empty there. This wastes some memory.
-type Elem struct {
+type elem struct {
 	key        string
 	expiration time.Time // time added + TTL, after this the elem is invalid
 	rcode      uint16    // hold rcode show we cache NXDOMAIN and NODATA as well
@@ -68,7 +68,7 @@ func (c *Cache) shrink() {
 		if e == nil { // nothing left
 			break
 		}
-		v := e.Value.(*Elem)
+		v := e.Value.(*elem)
 		c.l.Remove(e)
 		delete(c.m, v.key)
 		c.size -= uint(len(v.answer) + len(v.extra))
@@ -84,7 +84,7 @@ func (c *Cache) InsertMsg(s string, rcode uint16, answer, extra []dns.RR) {
 	c.Lock()
 	defer c.Unlock()
 	if _, ok := c.m[s]; !ok {
-		e := c.l.PushFront(&Elem{s, time.Now().UTC().Add(c.ttl), rcode, answer, extra})
+		e := c.l.PushFront(&elem{s, time.Now().UTC().Add(c.ttl), rcode, answer, extra})
 		c.m[s] = e
 	}
 	c.size += uint(len(answer) + len(extra))
@@ -104,7 +104,7 @@ func (c *Cache) InsertSig(s string, sig *dns.RRSIG) {
 			m = 0
 		}
 		t := time.Unix(int64(sig.Expiration)-(m*(1<<31)), 0).UTC()
-		e := c.l.PushFront(&Elem{s, t, 0, []dns.RR{sig}, nil})
+		e := c.l.PushFront(&elem{s, t, 0, []dns.RR{sig}, nil})
 		c.m[s] = e
 	}
 	c.size += 1
@@ -119,7 +119,7 @@ func (c *Cache) Search(s string) (uint16, []dns.RR, []dns.RR, time.Time) {
 	defer c.Unlock()
 	if e, ok := c.m[s]; ok {
 		c.l.MoveToFront(e)
-		e := e.Value.(*Elem)
+		e := e.Value.(*elem)
 		answer := make([]dns.RR, len(e.answer))
 		extra := make([]dns.RR, len(e.extra))
 		for i, r := range e.answer {
