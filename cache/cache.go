@@ -27,6 +27,7 @@ type elem struct {
 	extra      []dns.RR
 }
 
+// Cache is a ...
 type Cache struct {
 	sync.Mutex
 	l        *list.List
@@ -39,6 +40,7 @@ type Cache struct {
 // TODO(miek): add setCapacity so it can be set runtime.
 // TODO(miek): makes this lockfree(er).
 
+// New returns a new cache with the capacity and the ttl specified.
 func New(capacity, ttl int) *Cache {
 	c := new(Cache)
 	c.l = list.New()
@@ -48,6 +50,7 @@ func New(capacity, ttl int) *Cache {
 	return c
 }
 
+// Remove removes the element under key s from the cache.
 func (c *Cache) Remove(s string) {
 	c.Lock()
 	defer c.Unlock()
@@ -61,6 +64,7 @@ func (c *Cache) Remove(s string) {
 	c.shrink()
 }
 
+// shrink ...
 func (c *Cache) shrink() {
 	for c.size > c.capacity {
 		e := c.l.Back()
@@ -76,7 +80,7 @@ func (c *Cache) shrink() {
 
 // insertMsg inserts a message in the Cache. We will cahce it for ttl seconds, which
 // should be a small (60...300) integer.
-func (c *Cache) InsertMsg(s string, answer, extra []dns.RR) {
+func (c *Cache) InsertMessage(s string, answer, extra []dns.RR) {
 	if c.capacity == 0 {
 		return
 	}
@@ -91,7 +95,7 @@ func (c *Cache) InsertMsg(s string, answer, extra []dns.RR) {
 }
 
 // insertSig inserts a signature, the expiration time is used as the cache ttl.
-func (c *Cache) InsertSig(s string, sig *dns.RRSIG) {
+func (c *Cache) InsertSignature(s string, sig *dns.RRSIG) {
 	if c.capacity == 0 {
 		return
 	}
