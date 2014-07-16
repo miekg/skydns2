@@ -77,6 +77,21 @@ func runDNSServer(group *sync.WaitGroup, mux *dns.ServeMux, net, addr string, re
 // ServeDNS is the handler for DNS requests, responsible for parsing DNS request, possibly forwarding
 // it to a real dns server and returning a response.
 func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
+	// Check cache first.
+	key := cache.QuestionKey(req.Question[0])
+	hit, a1, e1, exp := s.rcache.Search(key)
+	if hit {
+		// Cache hit! \o/
+		if time.Since(exp) < 0 {
+			m.Answer = a1
+			m.Extra = e1
+			cached = true
+			return
+		}
+		// Expired! /o\
+		s.rcache.Remove(key)
+	}
+
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
 	StatsRequestCount.Inc(1)
@@ -128,7 +143,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 		if !cached {
-			s.rcache.InsertMsg(cache.QuestionKey(req.Question[0]), m.Answer, m.Extra)
+			s.rcache.InsertMessage(cache.QuestionKey(req.Question[0]), m.Answer, m.Extra)
 		}
 		if dnssec > 0 {
 			StatsDnssecOkCount.Inc(1)
@@ -193,19 +208,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.SetReply(req)
 		m.SetRcode(req, dns.RcodeServerFailure)
 		return
-	}
-	key := cache.QuestionKey(req.Question[0])
-	hit, a1, e1, exp := s.rcache.Search(key)
-	if hit {
-		// Cache hit! \o/
-		if time.Since(exp) < 0 {
-			m.Answer = a1
-			m.Extra = e1
-			cached = true
-			return
-		}
-		// Expired! /o\
-		s.rcache.Remove(key)
 	}
 
 	switch q.Qtype {

@@ -121,7 +121,7 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 		return nil, err
 	}
 	if !shared {
-		s.scache.InsertSig(key, sig)
+		s.scache.InsertSignature(key, sig)
 	}
 	return dns.Copy(sig).(*dns.RRSIG), nil
 }
