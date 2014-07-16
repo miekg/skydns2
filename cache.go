@@ -15,11 +15,15 @@ import (
 	"github.com/miekg/dns"
 )
 
+// Fake Rcode for NODATA responses
+const RcodeCodeNoData uint16 = 254
+
 // Elem hold an answer and additional section that returned from the cache.
 // The signature is put in answer, extra is empty there. This wastes some memory.
 type Elem struct {
 	key        string
 	expiration time.Time // time added + TTL, after this the elem is invalid
+	rcode	   uint16 // hold rcode show we cache NXDOMAIN and NODATA as well
 	answer     []dns.RR
 	extra      []dns.RR
 }
@@ -34,6 +38,7 @@ type cache struct {
 }
 
 // TODO(miek): add setCapacity so it can be set runtime.
+// TODO(miek): makes this lockfree(er).
 
 func NewCache(capacity, ttl int) *cache {
 	c := new(cache)
@@ -72,14 +77,14 @@ func (c *cache) shrink() {
 
 // insertMsg inserts a message in the cache. We will cahce it for ttl seconds, which
 // should be a small (60...300) integer.
-func (c *cache) InsertMsg(s string, answer, extra []dns.RR) {
+func (c *cache) InsertMsg(s string, rcode uint16, answer, extra []dns.RR) {
 	if c.capacity == 0 {
 		return
 	}
 	c.Lock()
 	defer c.Unlock()
 	if _, ok := c.m[s]; !ok {
-		e := c.l.PushFront(&Elem{s, time.Now().UTC().Add(c.ttl), answer, extra})
+		e := c.l.PushFront(&Elem{s, time.Now().UTC().Add(c.ttl), rcode, answer, extra})
 		c.m[s] = e
 	}
 	c.size += uint(len(answer) + len(extra))
@@ -99,16 +104,16 @@ func (c *cache) InsertSig(s string, sig *dns.RRSIG) {
 			m = 0
 		}
 		t := time.Unix(int64(sig.Expiration)-(m*(1<<31)), 0).UTC()
-		e := c.l.PushFront(&Elem{s, t, []dns.RR{sig}, nil})
+		e := c.l.PushFront(&Elem{s, t, 0, []dns.RR{sig}, nil})
 		c.m[s] = e
 	}
 	c.size += 1
 	c.shrink()
 }
 
-func (c *cache) Search(s string) ([]dns.RR, []dns.RR, time.Time) {
+func (c *cache) Search(s string) (uint16, []dns.RR, []dns.RR, time.Time) {
 	if c.capacity == 0 {
-		return nil, nil, time.Time{}
+		return 0, nil, nil, time.Time{}
 	}
 	c.Lock()
 	defer c.Unlock()
@@ -126,9 +131,9 @@ func (c *cache) Search(s string) ([]dns.RR, []dns.RR, time.Time) {
 		for i, r := range e.extra {
 			extra[i] = dns.Copy(r)
 		}
-		return answer, extra, e.expiration
+		return e.rcode, answer, extra, e.expiration
 	}
-	return nil, nil, time.Time{}
+	return 0, nil, nil, time.Time{}
 }
 
 func QuestionKey(q dns.Question) string {
