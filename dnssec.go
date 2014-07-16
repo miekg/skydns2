@@ -96,7 +96,7 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 
 func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.RRSIG, error) {
 	key := cache.Key(r)
-	if _, sig, _, exp := s.scache.Search(key); sig != nil { // There can only be one sig in this cache.
+	if hit, sig, _, exp := s.scache.Search(key); hit { // There can only be one sig in this cache.
 		// Is it still valid 24 hours from now?
 		if now.Add(+24*time.Hour).Sub(exp) < -24*time.Hour {
 			return sig[0].(*dns.RRSIG), nil

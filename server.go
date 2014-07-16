@@ -128,7 +128,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 		if !cached {
-			s.rcache.InsertMsg(cache.QuestionKey(req.Question[0]), 0, m.Answer, m.Extra)
+			s.rcache.InsertMsg(cache.QuestionKey(req.Question[0]), m.Answer, m.Extra)
 		}
 		if dnssec > 0 {
 			StatsDnssecOkCount.Inc(1)
@@ -195,8 +195,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 	key := cache.QuestionKey(req.Question[0])
-	_, a1, e1, exp := s.rcache.Search(key)
-	if len(a1) > 0 {
+	hit, a1, e1, exp := s.rcache.Search(key)
+	if hit {
 		// Cache hit! \o/
 		if time.Since(exp) < 0 {
 			m.Answer = a1

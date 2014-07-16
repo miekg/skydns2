@@ -6,6 +6,9 @@ package cache
 
 // LRU cache that holds RRs and for DNSSEC an RRSIG.
 
+// TODO(miek): try to kill the mutex or at least don't write when we read.
+// TODO(miek): split elem in a rrsig and msg one so we store RRSIGs more efficient.
+
 import (
 	"container/list"
 	"crypto/sha1"
@@ -15,15 +18,11 @@ import (
 	"github.com/miekg/dns"
 )
 
-// Fake Rcode for NODATA responses
-const RcodeCodeNoData uint16 = 254
-
 // Elem hold an answer and additional section that returned from the cache.
 // The signature is put in answer, extra is empty there. This wastes some memory.
 type elem struct {
 	key        string
 	expiration time.Time // time added + TTL, after this the elem is invalid
-	rcode      uint16    // hold rcode show we cache NXDOMAIN and NODATA as well
 	answer     []dns.RR
 	extra      []dns.RR
 }
@@ -77,14 +76,14 @@ func (c *Cache) shrink() {
 
 // insertMsg inserts a message in the Cache. We will cahce it for ttl seconds, which
 // should be a small (60...300) integer.
-func (c *Cache) InsertMsg(s string, rcode uint16, answer, extra []dns.RR) {
+func (c *Cache) InsertMsg(s string, answer, extra []dns.RR) {
 	if c.capacity == 0 {
 		return
 	}
 	c.Lock()
 	defer c.Unlock()
 	if _, ok := c.m[s]; !ok {
-		e := c.l.PushFront(&elem{s, time.Now().UTC().Add(c.ttl), rcode, answer, extra})
+		e := c.l.PushFront(&elem{s, time.Now().UTC().Add(c.ttl), answer, extra})
 		c.m[s] = e
 	}
 	c.size += uint(len(answer) + len(extra))
@@ -104,16 +103,18 @@ func (c *Cache) InsertSig(s string, sig *dns.RRSIG) {
 			m = 0
 		}
 		t := time.Unix(int64(sig.Expiration)-(m*(1<<31)), 0).UTC()
-		e := c.l.PushFront(&elem{s, t, 0, []dns.RR{sig}, nil})
+		e := c.l.PushFront(&elem{s, t, []dns.RR{sig}, nil})
 		c.m[s] = e
 	}
 	c.size += 1
 	c.shrink()
 }
 
-func (c *Cache) Search(s string) (uint16, []dns.RR, []dns.RR, time.Time) {
+// Search returns .... and a boolean indicating if we found something
+// in the cache.
+func (c *Cache) Search(s string) ([]dns.RR, []dns.RR, time.Time, bool) {
 	if c.capacity == 0 {
-		return 0, nil, nil, time.Time{}
+		return nil, nil, time.Time{}, false
 	}
 	c.Lock()
 	defer c.Unlock()
@@ -131,9 +132,9 @@ func (c *Cache) Search(s string) (uint16, []dns.RR, []dns.RR, time.Time) {
 		for i, r := range e.extra {
 			extra[i] = dns.Copy(r)
 		}
-		return e.rcode, answer, extra, e.expiration
+		return answer, extra, e.expiration, true
 	}
-	return 0, nil, nil, time.Time{}
+	return nil, nil, time.Time{}, false
 }
 
 func QuestionKey(q dns.Question) string {
