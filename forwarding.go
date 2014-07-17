@@ -14,7 +14,7 @@ import (
 // ServeDNSForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	StatsForwardCount.Inc(1)
-	if len(s.config.Nameservers) == 0 || dns.CountLabel(req.Question[0].Name) <= s.config.Ndots {
+	if len(s.config.Nameservers) == 0 || dns.CountLabel(req.Question[0].Name) < s.config.Ndots {
 		s.config.log.Infof("no nameservers defined or name too short, can not forward")
 		m := new(dns.Msg)
 		m.SetReply(req)
@@ -84,7 +84,7 @@ func (s *server) Lookup(n string, t, dnssec uint16) (*dns.Msg, error) {
 	if len(s.config.Nameservers) == 0 {
 		return nil, fmt.Errorf("no nameservers configured can not lookup name")
 	}
-	if dns.CountLabel(n) <= s.config.Ndots {
+	if dns.CountLabel(n) < s.config.Ndots {
 		return nil, fmt.Errorf("name has fewer than three labels")
 	}
 	m := new(dns.Msg)
