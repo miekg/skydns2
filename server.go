@@ -165,6 +165,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				s.sign(m, bufsize)
 			}
 		}
+		if m.Len() > int(bufsize) {
+			// TODO(miek): this is a little brain dead, better is to not added
+			// RRs in the message in the first place.
+			m.Truncated = true
+		}
 		if err := w.WriteMsg(m); err != nil {
 			s.config.log.Errorf("failure to return reply %q", err)
 		}
