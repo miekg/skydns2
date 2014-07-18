@@ -72,13 +72,13 @@ func main() {
 	if nameserver != "" {
 		for _, hostPort := range strings.Split(nameserver, ",") {
 			if err := validateHostPort(hostPort); err != nil {
-				log.Fatalf("-nameservers error: %s\n", err)
+				log.Fatalf("nameserver is invalid: %s\n", err)
 			}
 			config.Nameservers = append(config.Nameservers, hostPort)
 		}
 	}
 	if err := validateHostPort(config.DnsAddr); err != nil {
-		log.Fatalf("-addr error: %s\n", err)
+		log.Fatalf("addr is invalid: %s\n", err)
 	}
 	config, err := loadConfig(client, config)
 	if err != nil {
@@ -113,18 +113,16 @@ func main() {
 }
 
 func validateHostPort(hostPort string) error {
-	host, portStr, err := net.SplitHostPort(hostPort)
+	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
 		return err
 	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return fmt.Errorf("'%s' is not a valid IP address", host)
+	if ip := net.ParseIP(host); ip == nil {
+		return fmt.Errorf("bad IP address: %s", host)
 	}
 
-	_, err = strconv.Atoi(portStr)
-	if err != nil {
-		return fmt.Errorf("'%s' is not a valid port number", portStr)
+	if p, _ := strconv.Atoi(port); p < 1 || p > 65535 {
+		return fmt.Errorf("bad port number %s", port)
 	}
 	return nil
 }
