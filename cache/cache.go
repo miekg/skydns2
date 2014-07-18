@@ -2,9 +2,12 @@
 // Use of this source code is governed by The MIT License (MIT) that can be
 // found in the LICENSE file.
 
-package main
+package cache
 
 // LRU cache that holds RRs and for DNSSEC an RRSIG.
+
+// TODO(miek): try to kill the mutex or at least don't write when we read.
+// TODO(miek): split elem in a rrsig and msg one so we store RRSIGs more efficient.
 
 import (
 	"container/list"
@@ -17,14 +20,15 @@ import (
 
 // Elem hold an answer and additional section that returned from the cache.
 // The signature is put in answer, extra is empty there. This wastes some memory.
-type Elem struct {
+type elem struct {
 	key        string
 	expiration time.Time // time added + TTL, after this the elem is invalid
 	answer     []dns.RR
 	extra      []dns.RR
 }
 
-type cache struct {
+// Cache is a ...
+type Cache struct {
 	sync.Mutex
 	l        *list.List
 	m        map[string]*list.Element
@@ -34,9 +38,11 @@ type cache struct {
 }
 
 // TODO(miek): add setCapacity so it can be set runtime.
+// TODO(miek): makes this lockfree(er).
 
-func NewCache(capacity, ttl int) *cache {
-	c := new(cache)
+// New returns a new cache with the capacity and the ttl specified.
+func New(capacity, ttl int) *Cache {
+	c := new(Cache)
 	c.l = list.New()
 	c.m = make(map[string]*list.Element)
 	c.capacity = uint(capacity)
@@ -44,7 +50,8 @@ func NewCache(capacity, ttl int) *cache {
 	return c
 }
 
-func (c *cache) Remove(s string) {
+// Remove removes the element under key s from the cache.
+func (c *Cache) Remove(s string) {
 	c.Lock()
 	defer c.Unlock()
 	e := c.m[s]
@@ -57,29 +64,30 @@ func (c *cache) Remove(s string) {
 	c.shrink()
 }
 
-func (c *cache) shrink() {
+// shrink ...
+func (c *Cache) shrink() {
 	for c.size > c.capacity {
 		e := c.l.Back()
 		if e == nil { // nothing left
 			break
 		}
-		v := e.Value.(*Elem)
+		v := e.Value.(*elem)
 		c.l.Remove(e)
 		delete(c.m, v.key)
 		c.size -= uint(len(v.answer) + len(v.extra))
 	}
 }
 
-// insertMsg inserts a message in the cache. We will cahce it for ttl seconds, which
+// insertMsg inserts a message in the Cache. We will cahce it for ttl seconds, which
 // should be a small (60...300) integer.
-func (c *cache) InsertMsg(s string, answer, extra []dns.RR) {
+func (c *Cache) InsertMessage(s string, answer, extra []dns.RR) {
 	if c.capacity == 0 {
 		return
 	}
 	c.Lock()
 	defer c.Unlock()
 	if _, ok := c.m[s]; !ok {
-		e := c.l.PushFront(&Elem{s, time.Now().UTC().Add(c.ttl), answer, extra})
+		e := c.l.PushFront(&elem{s, time.Now().UTC().Add(c.ttl), answer, extra})
 		c.m[s] = e
 	}
 	c.size += uint(len(answer) + len(extra))
@@ -87,7 +95,7 @@ func (c *cache) InsertMsg(s string, answer, extra []dns.RR) {
 }
 
 // insertSig inserts a signature, the expiration time is used as the cache ttl.
-func (c *cache) InsertSig(s string, sig *dns.RRSIG) {
+func (c *Cache) InsertSignature(s string, sig *dns.RRSIG) {
 	if c.capacity == 0 {
 		return
 	}
@@ -99,22 +107,24 @@ func (c *cache) InsertSig(s string, sig *dns.RRSIG) {
 			m = 0
 		}
 		t := time.Unix(int64(sig.Expiration)-(m*(1<<31)), 0).UTC()
-		e := c.l.PushFront(&Elem{s, t, []dns.RR{sig}, nil})
+		e := c.l.PushFront(&elem{s, t, []dns.RR{sig}, nil})
 		c.m[s] = e
 	}
 	c.size += 1
 	c.shrink()
 }
 
-func (c *cache) Search(s string) ([]dns.RR, []dns.RR, time.Time) {
+// Search returns .... and a boolean indicating if we found something
+// in the cache.
+func (c *Cache) Search(s string) ([]dns.RR, []dns.RR, time.Time, bool) {
 	if c.capacity == 0 {
-		return nil, nil, time.Time{}
+		return nil, nil, time.Time{}, false
 	}
 	c.Lock()
 	defer c.Unlock()
 	if e, ok := c.m[s]; ok {
 		c.l.MoveToFront(e)
-		e := e.Value.(*Elem)
+		e := e.Value.(*elem)
 		answer := make([]dns.RR, len(e.answer))
 		extra := make([]dns.RR, len(e.extra))
 		for i, r := range e.answer {
@@ -126,9 +136,9 @@ func (c *cache) Search(s string) ([]dns.RR, []dns.RR, time.Time) {
 		for i, r := range e.extra {
 			extra[i] = dns.Copy(r)
 		}
-		return answer, extra, e.expiration
+		return answer, extra, e.expiration, true
 	}
-	return nil, nil, time.Time{}
+	return nil, nil, time.Time{}, false
 }
 
 func QuestionKey(q dns.Question) string {

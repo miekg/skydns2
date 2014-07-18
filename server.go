@@ -16,6 +16,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
+	"github.com/skynetservices/skydns/cache"
 	"github.com/skynetservices/skydns/msg"
 )
 
@@ -23,15 +24,15 @@ type server struct {
 	client *etcd.Client
 	config *Config
 	group  *sync.WaitGroup
-	scache *cache
-	rcache *cache
+	scache *cache.Cache
+	rcache *cache.Cache
 }
 
 // NewServer returns a new SkyDNS server.
 func NewServer(config *Config, client *etcd.Client) *server {
 	return &server{client: client, config: config, group: new(sync.WaitGroup),
-		scache: NewCache(config.SCache, 0),
-		rcache: NewCache(config.RCache, config.RCacheTtl),
+		scache: cache.New(config.SCache, 0),
+		rcache: cache.New(config.RCache, config.RCacheTtl),
 	}
 }
 
@@ -76,6 +77,39 @@ func runDNSServer(group *sync.WaitGroup, mux *dns.ServeMux, net, addr string, re
 // ServeDNS is the handler for DNS requests, responsible for parsing DNS request, possibly forwarding
 // it to a real dns server and returning a response.
 func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
+	m := new(dns.Msg)
+	m.SetReply(req)
+	m.Authoritative = true
+	m.RecursionAvailable = true
+	m.Compress = true
+	dnssec := uint16(0)
+	if o := req.IsEdns0(); o != nil && o.Do() {
+		dnssec = o.UDPSize()
+	}
+	// Check cache first.
+	key := cache.QuestionKey(req.Question[0])
+	a1, e1, exp, hit := s.rcache.Search(key)
+	if hit {
+		// Cache hit! \o/
+		if time.Since(exp) < 0 {
+			m.Answer = a1
+			m.Extra = e1
+			if dnssec > 0 {
+				StatsDnssecOkCount.Inc(1)
+				if s.config.PubKey != nil {
+					s.Denial(m)
+					s.sign(m, dnssec)
+				}
+			}
+			if err := w.WriteMsg(m); err != nil {
+				s.config.log.Errorf("failure to return reply %q", err)
+			}
+			return
+		}
+		// Expired! /o\
+		s.rcache.Remove(key)
+	}
+
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
 	StatsRequestCount.Inc(1)
@@ -85,11 +119,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	// If the qname is local.dns.skydns.local. and s.config.Local != "", substitute that name.
 	if s.config.Local != "" && name == s.config.localDomain {
 		name = s.config.Local
-	}
-	cached := false
-	dnssec := uint16(0)
-	if o := req.IsEdns0(); o != nil && o.Do() {
-		dnssec = o.UDPSize()
 	}
 
 	if q.Qtype == dns.TypePTR && strings.HasSuffix(name, ".in-addr.arpa.") || strings.HasSuffix(name, ".ip6.arpa.") {
@@ -102,11 +131,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 
-	m := new(dns.Msg)
-	m.SetReply(req)
-	m.Authoritative = true
-	m.RecursionAvailable = true
-	m.Compress = true
 	defer func() {
 		if m.Rcode == dns.RcodeServerFailure {
 			if err := w.WriteMsg(m); err != nil {
@@ -126,9 +150,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				r.Header().Ttl = minttl
 			}
 		}
-		if !cached {
-			s.rcache.InsertMsg(QuestionKey(req.Question[0]), m.Answer, m.Extra)
-		}
+
+		s.rcache.InsertMessage(cache.QuestionKey(req.Question[0]), m.Answer, m.Extra)
+
 		if dnssec > 0 {
 			StatsDnssecOkCount.Inc(1)
 			if s.config.PubKey != nil {
@@ -192,19 +216,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.SetReply(req)
 		m.SetRcode(req, dns.RcodeServerFailure)
 		return
-	}
-	key := QuestionKey(req.Question[0])
-	a1, e1, exp := s.rcache.Search(key)
-	if len(a1) > 0 {
-		// Cache hit! \o/
-		if time.Since(exp) < 0 {
-			m.Answer = a1
-			m.Extra = e1
-			cached = true
-			return
-		}
-		// Expired! /o\
-		s.rcache.Remove(key)
 	}
 
 	switch q.Qtype {

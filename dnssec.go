@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/skynetservices/skydns/cache"
 )
 
 var inflight = new(single)
@@ -94,8 +95,8 @@ func (s *server) sign(m *dns.Msg, bufsize uint16) {
 }
 
 func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.RRSIG, error) {
-	key := Key(r)
-	if sig, _, exp := s.scache.Search(key); sig != nil { // There can only be one sig in this cache.
+	key := cache.Key(r)
+	if sig, _, exp, hit := s.scache.Search(key); hit { // There can only be one sig in this cache.
 		// Is it still valid 24 hours from now?
 		if now.Add(+24*time.Hour).Sub(exp) < -24*time.Hour {
 			return sig[0].(*dns.RRSIG), nil
@@ -120,7 +121,7 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 		return nil, err
 	}
 	if !shared {
-		s.scache.InsertSig(key, sig)
+		s.scache.InsertSignature(key, sig)
 	}
 	return dns.Copy(sig).(*dns.RRSIG), nil
 }
