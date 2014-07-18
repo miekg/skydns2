@@ -6,8 +6,11 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -67,7 +70,15 @@ func main() {
 	machines := strings.Split(machine, ",")
 	client := NewClient(machines)
 	if nameserver != "" {
-		config.Nameservers = strings.Split(nameserver, ",")
+		for _, hostPort := range strings.Split(nameserver, ",") {
+			if err := validateHostPort(hostPort); err != nil {
+				log.Fatalf("-nameservers error: %s\n", err)
+			}
+			config.Nameservers = append(config.Nameservers, hostPort)
+		}
+	}
+	if err := validateHostPort(config.DnsAddr); err != nil {
+		log.Fatalf("-addr error: %s\n", err)
 	}
 	config, err := loadConfig(client, config)
 	if err != nil {
@@ -99,4 +110,21 @@ func main() {
 	if err := s.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func validateHostPort(hostPort string) error {
+	host, portStr, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return err
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return fmt.Errorf("'%s' is not a valid IP address", host)
+	}
+
+	_, err = strconv.Atoi(portStr)
+	if err != nil {
+		return fmt.Errorf("'%s' is not a valid port number", portStr)
+	}
+	return nil
 }
