@@ -79,7 +79,7 @@ func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) {
 
 // Lookup looks up name,type using the recursive nameserver defines
 // in the server's config. If none defined it returns an error
-func (s *server) Lookup(n string, t, dnssec uint16) (*dns.Msg, error) {
+func (s *server) Lookup(n string, t, bufsize uint16, dnssec bool) (*dns.Msg, error) {
 	StatsLookupCount.Inc(1)
 	if len(s.config.Nameservers) == 0 {
 		return nil, fmt.Errorf("no nameservers configured can not lookup name")
@@ -89,9 +89,7 @@ func (s *server) Lookup(n string, t, dnssec uint16) (*dns.Msg, error) {
 	}
 	m := new(dns.Msg)
 	m.SetQuestion(n, t)
-	if dnssec > 0 {
-		m.SetEdns0(dnssec, true)
-	}
+	m.SetEdns0(bufsize, dnssec)
 
 	c := &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout}
 	nsid := int(m.Id) % len(s.config.Nameservers)

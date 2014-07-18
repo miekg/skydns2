@@ -82,9 +82,14 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.Authoritative = true
 	m.RecursionAvailable = true
 	m.Compress = true
-	dnssec := uint16(0)
-	if o := req.IsEdns0(); o != nil && o.Do() {
-		dnssec = o.UDPSize()
+	bufsize := uint16(512)
+	dnssec := false
+	if o := req.IsEdns0(); o != nil {
+		bufsize = o.UDPSize()
+		dnssec = o.Do()
+	}
+	if bufsize < 512 {
+		bufsize = 512
 	}
 	// Check cache first.
 	key := cache.QuestionKey(req.Question[0])
@@ -94,11 +99,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if time.Since(exp) < 0 {
 			m.Answer = a1
 			m.Extra = e1
-			if dnssec > 0 {
+			if dnssec {
 				StatsDnssecOkCount.Inc(1)
 				if s.config.PubKey != nil {
 					s.Denial(m)
-					s.sign(m, dnssec)
+					s.sign(m, bufsize)
 				}
 			}
 			if err := w.WriteMsg(m); err != nil {
@@ -153,11 +158,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 
 		s.rcache.InsertMessage(cache.QuestionKey(req.Question[0]), m.Answer, m.Extra)
 
-		if dnssec > 0 {
+		if dnssec {
 			StatsDnssecOkCount.Inc(1)
 			if s.config.PubKey != nil {
 				s.Denial(m)
-				s.sign(m, dnssec)
+				s.sign(m, bufsize)
 			}
 		}
 		if err := w.WriteMsg(m); err != nil {
@@ -264,7 +269,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					s.NameError(m, req)
 					return
 				}
-				m1, e1 := s.Lookup(target, req.Question[0].Qtype, dnssec)
+				m1, e1 := s.Lookup(target, req.Question[0].Qtype, bufsize, dnssec)
 				if e1 != nil {
 					s.config.log.Errorf("%q", err)
 					s.NameError(m, req)
@@ -288,7 +293,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	default:
 		fallthrough // also catch other types, so that they return NODATA
 	case dns.TypeSRV, dns.TypeANY:
-		records, extra, err := s.SRVRecords(q, name, dnssec)
+		records, extra, err := s.SRVRecords(q, name, bufsize, dnssec)
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
@@ -453,7 +458,7 @@ func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra
 
 // SRVRecords returns SRV records from etcd.
 // If the Target is not an name but an IP address, an name is created .
-func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records []dns.RR, extra []dns.RR, err error) {
+func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec bool) (records []dns.RR, extra []dns.RR, err error) {
 	path, star := msg.PathWithWildcard(name)
 	r, err := s.client.Get(path, false, true)
 	if err != nil {
@@ -477,11 +482,11 @@ func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records
 			srv := serv.NewSRV(q.Name, uint16(100))
 			records = append(records, srv)
 			if !dns.IsSubDomain(s.config.Domain, srv.Target) {
-				m1, e1 := s.Lookup(srv.Target, dns.TypeA, dnssec)
+				m1, e1 := s.Lookup(srv.Target, dns.TypeA, bufsize, dnssec)
 				if e1 == nil {
 					extra = append(extra, m1.Answer...)
 				}
-				m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA, dnssec)
+				m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA, bufsize, dnssec)
 				if e1 == nil {
 					// If we have seen CNAME's we *assume* that they already added.
 					for _, a := range m1.Answer {
@@ -536,11 +541,11 @@ func (s *server) SRVRecords(q dns.Question, name string, dnssec uint16) (records
 			records = append(records, srv)
 			if _, ok := lookup[srv.Target]; !ok {
 				if !dns.IsSubDomain(s.config.Domain, srv.Target) {
-					m1, e1 := s.Lookup(srv.Target, dns.TypeA, dnssec)
+					m1, e1 := s.Lookup(srv.Target, dns.TypeA, bufsize, dnssec)
 					if e1 == nil {
 						extra = append(extra, m1.Answer...)
 					}
-					m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA, dnssec)
+					m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA, bufsize, dnssec)
 					if e1 == nil {
 						// If we have seen CNAME's we *assume* that they are already added.
 						for _, a := range m1.Answer {
