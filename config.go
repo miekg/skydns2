@@ -21,6 +21,8 @@ import (
 type Config struct {
 	// The ip:port SkyDNS should be listening on for incoming DNS requests.
 	DnsAddr string `json:"dns_addr,omitempty"`
+	// bind to port(s) activated by systemd. If set to true, this overrides DnsAddr.
+	Systemd bool `json:"systemd,omitempty"`
 	// The domain SkyDNS is authoritative for, defaults to skydns.local.
 	Domain string `json:"domain,omitempty"`
 	// Domain pointing to a key where service info is stored when being queried
