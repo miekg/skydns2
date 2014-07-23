@@ -55,7 +55,7 @@ Also see the section "NS Records".
 SkyDNS' configuration is stored in etcd as a JSON object under the key `/skydns/config`. The following parameters
 may be set:
 
-* `dns_addr`: IP:port on which SkyDNS should listen, defaults to `127.0.0.1:53`.
+* `addr`: IP:port on which SkyDNS should listen, defaults to `127.0.0.1:53`.
 * `domain`: domain for which SkyDNS is authoritative, defaults to `skydns.local.`.
 * `dnssec`: enable DNSSEC
 * `hostmaster`: hostmaster email address to use.
@@ -83,7 +83,7 @@ You can also use the command line options, however the settings in etcd take pre
 
 ### Commandline flags
 
-* `-local`: used to specify a unique service for this SkyDNs instance. This should point to a (unique) domain into Etcd, when
+* `-local`: used to specify a unique service for this SkyDNS instance. This should point to a (unique) domain into Etcd, when
     SkyDNS receives a query for the name `local.dns.skydns.local` it will fetch this service and return it.
     For instance: `-local e2016c14-fbba-11e3-ae08-10604b7efbe2.dockerhosts.skydns.local` and then 
 
