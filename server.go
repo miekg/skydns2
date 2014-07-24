@@ -84,12 +84,18 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.Compress = true
 	bufsize := uint16(512)
 	dnssec := false
+	tcp := false
 	if o := req.IsEdns0(); o != nil {
 		bufsize = o.UDPSize()
 		dnssec = o.Do()
 	}
 	if bufsize < 512 {
 		bufsize = 512
+	}
+	// with TCP we can send 64K
+	if _, ok := w.RemoteAddr().(*net.TCPAddr); ok {
+		bufsize = dns.MaxMsgSize - 1
+		tcp = true
 	}
 	// Check cache first.
 	key := cache.QuestionKey(req.Question[0])
@@ -165,8 +171,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				s.sign(m, bufsize)
 			}
 		}
-		if m.Len() > int(bufsize) {
-			// TODO(miek): this is a little brain dead, better is to not added
+		if m.Len() > int(bufsize) && !tcp {
+			// TODO(miek): this is a little brain dead, better is to not add
 			// RRs in the message in the first place.
 			m.Truncated = true
 		}
