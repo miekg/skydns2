@@ -34,7 +34,7 @@ type Cache struct {
 	m        map[string]*list.Element
 	capacity uint          // number of RRs
 	size     uint          // current size
-	ttl      time.Duration // ttl use the storing messages
+	ttl      time.Duration
 }
 
 // TODO(miek): add setCapacity so it can be set runtime.

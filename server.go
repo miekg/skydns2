@@ -49,9 +49,9 @@ func (s *server) Run() error {
 	go runDNSServer(s.group, mux, "tcp", s.config.DnsAddr, s.config.ReadTimeout)
 	go runDNSServer(s.group, mux, "udp", s.config.DnsAddr, s.config.ReadTimeout)
 	if s.config.DNSSEC == "" {
-		s.config.log.Printf("ready for queries on %s for %s [rcache %d]", s.config.Domain, s.config.DnsAddr, s.config.RCache)
+		s.config.log.Printf("ready for queries on %s for %s [rcache %d - ttl %d]", s.config.Domain, s.config.DnsAddr, s.config.RCache, s.config.RCacheTtl)
 	} else {
-		s.config.log.Printf("ready for queries on %s for %s [rcache %d], signing with %s [scache %d]", s.config.Domain, s.config.DnsAddr, s.config.RCache, s.config.DNSSEC, s.config.SCache)
+		s.config.log.Printf("ready for queries on %s for %s [rcache %d], signing with %s [scache %d - ttl %d]", s.config.Domain, s.config.DnsAddr, s.config.RCache, s.config.RCacheTtl, s.config.DNSSEC, s.config.SCache)
 	}
 
 	s.group.Wait()

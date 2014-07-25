@@ -43,7 +43,7 @@ type Config struct {
 	// SCache, capacity of the signature cache in signatures stored.
 	SCache int `json:"scache,omitempty"`
 	// RCache, capacity of response cache in resource records stored.
-	RCache int `josn:"rcache,omitempty"`
+	RCache int `json:"rcache,omitempty"`
 	// RCacheTtl, how long to cache in seconds.
 	RCacheTtl int `json:"rcache_ttl,omitempty"`
 	// How many labels a name should have before we allow forwarding. Default to 2.
@@ -117,7 +117,7 @@ func setDefaults(config *Config) error {
 	if config.SCache < 0 {
 		config.SCache = 0
 	}
-	if config.RCacheTtl <= 0 {
+	if config.RCacheTtl == 0 {
 		config.RCacheTtl = RCacheTtl
 	}
 	if config.Ndots <= 0 {
