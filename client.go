@@ -8,12 +8,9 @@ import (
 	"log"
 	"net/url"
 	"strings"
-	"sync"
 
 	"github.com/coreos/go-etcd/etcd"
 )
-
-var etcdInflight = new(etcdSingle)
 
 func NewClient(machines []string) (client *etcd.Client) {
 	// set default if not specified in env
@@ -58,44 +55,6 @@ func (s *server) UpdateClient(resp *etcd.Response) {
 	// This is our RCU, switch the pointer, old readers get the old
 	// one, new reader get the new one.
 	s.client = c
-}
-
-type etcdCall struct {
-	wg   sync.WaitGroup
-	val  *etcd.Response
-	err  error
-	dups int
-}
-
-type etcdSingle struct {
-	sync.Mutex
-	m map[string]*etcdCall
-}
-
-func (g *etcdSingle) Do(key string, fn func() (*etcd.Response, error)) (*etcd.Response, error, bool) {
-	g.Lock()
-	if g.m == nil {
-		g.m = make(map[string]*etcdCall)
-	}
-	if c, ok := g.m[key]; ok {
-		c.dups++
-		g.Unlock()
-		c.wg.Wait()
-		return c.val, c.err, true
-	}
-	c := new(etcdCall)
-	c.wg.Add(1)
-	g.m[key] = c
-	g.Unlock()
-
-	c.val, c.err = fn()
-	c.wg.Done()
-
-	g.Lock()
-	delete(g.m, key)
-	g.Unlock()
-
-	return c.val, c.err, c.dups > 0
 }
 
 // get is a wrapper for client.Get that uses SingleInflight to suppress multiple
