@@ -21,18 +21,22 @@ import (
 )
 
 type server struct {
-	client *etcd.Client
-	config *Config
-	group  *sync.WaitGroup
-	scache *cache.Cache
-	rcache *cache.Cache
+	client    *etcd.Client
+	dnsUDPclient *dns.Client // used for forwarding queries
+	dnsTCPclient *dns.Client // used for forwarding queries
+	config    *Config
+	group     *sync.WaitGroup
+	scache    *cache.Cache
+	rcache    *cache.Cache
 }
 
 // NewServer returns a new SkyDNS server.
 func NewServer(config *Config, client *etcd.Client) *server {
 	return &server{client: client, config: config, group: new(sync.WaitGroup),
-		scache: cache.New(config.SCache, 0),
-		rcache: cache.New(config.RCache, config.RCacheTtl),
+		scache:    cache.New(config.SCache, 0),
+		rcache:    cache.New(config.RCache, config.RCacheTtl),
+		dnsUDPclient: &dns.Client{Net: "udp", ReadTimeout: 2 * config.ReadTimeout, WriteTimeout: 2 * config.ReadTimeout, SingleInflight: true},
+		dnsTCPclient: &dns.Client{Net: "tcp", ReadTimeout: 2 * config.ReadTimeout, WriteTimeout: 2 * config.ReadTimeout, SingleInflight: true},
 	}
 }
 

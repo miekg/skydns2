@@ -55,6 +55,7 @@ func newTestServer(t *testing.T, c bool) *server {
 	client := etcd.NewClient([]string{"http://127.0.0.1:4001"})
 	client.SyncCluster()
 
+	// TODO(miek): why don't I use NewServer??
 	s.group = new(sync.WaitGroup)
 	s.client = client
 	s.scache = cache.New(1000, 0)
@@ -74,6 +75,9 @@ func newTestServer(t *testing.T, c bool) *server {
 	s.config.Ttl = 3600
 	s.config.Ndots = 2
 	s.config.log = log.New("skydns", false, log.NullSink())
+	s.dnsUDPclient = &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
+	s.dnsTCPclient = &dns.Client{Net: "tcp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
+
 	go s.Run()
 	return s
 }

@@ -24,19 +24,25 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 		w.WriteMsg(m)
 		return
 	}
-	network := "udp"
+	tcp := false
 	if _, ok := w.RemoteAddr().(*net.TCPAddr); ok {
-		network = "tcp"
+		tcp = true
 	}
 
-	// Try again, when it fails?
-	c := &dns.Client{Net: network, ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout}
-
+	var (
+		r   *dns.Msg
+		err error
+		try int
+	)
 	// Use request Id for "random" nameserver selection.
 	nsid := int(req.Id) % len(s.config.Nameservers)
-	try := 0
 Redo:
-	r, _, err := c.Exchange(req, s.config.Nameservers[nsid])
+	switch tcp {
+	case false:
+		r, _, err = s.dnsUDPclient.Exchange(req, s.config.Nameservers[nsid])
+	case true:
+		r, _, err = s.dnsTCPclient.Exchange(req, s.config.Nameservers[nsid])
+	}
 	if err == nil {
 		r.Compress = true
 		w.WriteMsg(r)
