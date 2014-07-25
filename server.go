@@ -21,20 +21,20 @@ import (
 )
 
 type server struct {
-	client    *etcd.Client
+	client       *etcd.Client
 	dnsUDPclient *dns.Client // used for forwarding queries
 	dnsTCPclient *dns.Client // used for forwarding queries
-	config    *Config
-	group     *sync.WaitGroup
-	scache    *cache.Cache
-	rcache    *cache.Cache
+	config       *Config
+	group        *sync.WaitGroup
+	scache       *cache.Cache
+	rcache       *cache.Cache
 }
 
 // NewServer returns a new SkyDNS server.
 func NewServer(config *Config, client *etcd.Client) *server {
 	return &server{client: client, config: config, group: new(sync.WaitGroup),
-		scache:    cache.New(config.SCache, 0),
-		rcache:    cache.New(config.RCache, config.RCacheTtl),
+		scache:       cache.New(config.SCache, 0),
+		rcache:       cache.New(config.RCache, config.RCacheTtl),
 		dnsUDPclient: &dns.Client{Net: "udp", ReadTimeout: 2 * config.ReadTimeout, WriteTimeout: 2 * config.ReadTimeout, SingleInflight: true},
 		dnsTCPclient: &dns.Client{Net: "tcp", ReadTimeout: 2 * config.ReadTimeout, WriteTimeout: 2 * config.ReadTimeout, SingleInflight: true},
 	}
@@ -336,7 +336,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 
 func (s *server) AddressRecords(q dns.Question, name string, previousRecords []dns.RR) (records []dns.RR, err error) {
 	path, star := msg.PathWithWildcard(name)
-	r, err := s.client.Get(path, false, true)
+	r, err := get(s.client, path, true)
 	if err != nil {
 		return nil, err
 	}
@@ -420,7 +420,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 // NSRecords returns NS records from etcd.
 func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra []dns.RR, err error) {
 	path, star := msg.PathWithWildcard(name)
-	r, err := s.client.Get(path, false, true)
+	r, err := get(s.client, path, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -475,7 +475,7 @@ func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra
 // If the Target is not an name but an IP address, an name is created .
 func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec bool) (records []dns.RR, extra []dns.RR, err error) {
 	path, star := msg.PathWithWildcard(name)
-	r, err := s.client.Get(path, false, true)
+	r, err := get(s.client, path, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -587,7 +587,7 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 
 func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, err error) {
 	path, _ := msg.PathWithWildcard(name) // no wildcards here
-	r, err := s.client.Get(path, false, true)
+	r, err := get(s.client, path, true)
 	if err != nil {
 		return nil, err
 	}
@@ -614,7 +614,7 @@ func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
 	if star {
 		return nil, fmt.Errorf("reverse can not contain wildcards")
 	}
-	r, err := s.client.Get(path, false, false)
+	r, err := get(s.client, path, false)
 	if err != nil {
 		// if server has a forward, forward the query
 		return nil, err
