@@ -5,9 +5,9 @@
 package main
 
 import (
-	"github.com/miekg/go-metrics"
-	"github.com/miekg/go-metrics/stathat"
-	"github.com/miekg/go-metrics/influxdb"
+	"github.com/rcrowley/go-metrics"
+	"github.com/rcrowley/go-metrics/influxdb"
+	"github.com/rcrowley/go-metrics/stathat"
 	"net"
 	"os"
 )
