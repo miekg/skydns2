@@ -83,7 +83,7 @@ You can also use the command line options, however the settings in etcd take pre
 
 ### Commandline flags
 
-* `-addr`: used to specify the address to listen on.
+* `-addr`: used to specify the address to listen on (note: this will be changed into `-dns_addr` to match the json.
 * `-local`: used to specify a unique service for this SkyDNS instance. This should point to a (unique) domain into Etcd, when
     SkyDNS receives a query for the name `local.dns.skydns.local` it will fetch this service and return it.
     For instance: `-local e2016c14-fbba-11e3-ae08-10604b7efbe2.dockerhosts.skydns.local` and then 
