@@ -89,6 +89,19 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	bufsize := uint16(512)
 	dnssec := false
 	tcp := false
+
+	// fuck ANY queries
+	if req.Question[0].Qtype == dns.TypeANY {
+		m.Authoritative = false
+		m.Rcode = dns.RcodeRefused
+		m.RecursionAvailable = false
+		m.RecursionDesired = false
+		m.Compress = false
+		// if write fails don't care
+		w.WriteMsg(m)
+		return
+	}
+
 	if o := req.IsEdns0(); o != nil {
 		bufsize = o.UDPSize()
 		dnssec = o.Do()
