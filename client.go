@@ -20,7 +20,7 @@ func NewClient(machines []string) (client *etcd.Client) {
 	if strings.HasPrefix(machines[0], "https://") {
 		var err error
 		if client, err = etcd.NewTLSClient(machines, tlspem, tlskey, cacert); err != nil {
-			// TODO(miek): would be nice if this wan't a fatal error
+			// TODO(miek): would be nice if this wasn't a fatal error
 			log.Fatalf("failure to connect: %s\n", err)
 		}
 		client.SyncCluster()
