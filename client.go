@@ -19,6 +19,7 @@ func NewClient(machines []string) (client *etcd.Client) {
 	}
 	if strings.HasPrefix(machines[0], "https://") {
 		var err error
+		// TODO(miek): machines is local, the rest is global, ugly.
 		if client, err = etcd.NewTLSClient(machines, tlspem, tlskey, cacert); err != nil {
 			// TODO(miek): would be nice if this wasn't a fatal error
 			log.Fatalf("failure to connect: %s\n", err)
