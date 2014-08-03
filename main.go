@@ -18,6 +18,8 @@ import (
 	"github.com/miekg/dns"
 )
 
+const Version = "2.0.0a"
+
 var (
 	tlskey     = ""
 	tlspem     = ""
