@@ -281,7 +281,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				// We can not complete the CNAME internally, *iff* there is a
 				// external name in the set, take it, and try to resolve it externally.
 				if len(records) == 0 {
-					s.NoDataError(m, req)
+					s.NameError(m, req)
 					return
 				}
 				target := ""
@@ -294,6 +294,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					}
 				}
 				if target == "" {
+					s.config.log.Warningf("incomplete CNAME chain for %s", name)
 					s.NoDataError(m, req)
 					return
 				}
