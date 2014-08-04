@@ -200,6 +200,9 @@ func TestDNS(t *testing.T) {
 		sort.Sort(rrSet(resp.Ns))
 		sort.Sort(rrSet(resp.Extra))
 		t.Logf("%s\n", resp)
+		if resp.Rcode != tc.Rcode {
+			t.Fatalf("rcode is %q, expected %q", dns.RcodeToString[resp.Rcode], dns.RcodeToString[tc.Rcode])
+		}
 		if len(resp.Answer) != len(tc.Answer) {
 			t.Fatalf("answer for %q contained %d results, %d expected", tc.Qname, len(resp.Answer), len(tc.Answer))
 		}
@@ -327,6 +330,7 @@ type dnsTestCase struct {
 	Qtype  uint16
 	dnssec bool
 	chaos  bool
+	Rcode  int
 	Answer []dns.RR
 	Ns     []dns.RR
 	Extra  []dns.RR
@@ -512,11 +516,18 @@ var dnsTestCases = []dnsTestCase{
 	// NXDOMAIN Test
 	{
 		Qname: "doesnotexist.skydns.test.", Qtype: dns.TypeA,
+		Rcode: dns.RcodeNameError,
 		Ns: []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
 	},
 	// NODATA Test
 	{
 		Qname: "104.server1.development.region1.skydns.test.", Qtype: dns.TypeTXT,
+		Ns: []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+	},
+	// NODATA Test 2
+	{
+		Qname: "100.server1.development.region1.skydns.test.", Qtype: dns.TypeA,
+		Rcode: dns.RcodeSuccess,
 		Ns: []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
 	},
 
@@ -564,6 +575,7 @@ var dnsTestCases = []dnsTestCase{
 	// Reverse forwarding answer
 	{
 		Qname: "10.0.0.10.in-addr.arpa.", Qtype: dns.TypePTR,
+		Rcode: dns.RcodeNameError,
 		Ns: []dns.RR{newSOA("10.in-addr.arpa. 10800 SOA localhost. nobody.invalid. 1 0 0 0 0")},
 	},
 	// Reverse no answer
@@ -609,6 +621,7 @@ var dnsTestCases = []dnsTestCase{
 	// Author test 3, no answer.
 	{
 		Qname: "local.dns.skydns.test.", Qtype: dns.TypeA,
+		Rcode: dns.RcodeServerFailure,
 		chaos: true,
 	},
 }

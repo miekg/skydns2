@@ -281,7 +281,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				// We can not complete the CNAME internally, *iff* there is a
 				// external name in the set, take it, and try to resolve it externally.
 				if len(records) == 0 {
-					s.NameError(m, req)
+					s.NoDataError(m, req)
 					return
 				}
 				target := ""
@@ -294,13 +294,13 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					}
 				}
 				if target == "" {
-					s.NameError(m, req)
+					s.NoDataError(m, req)
 					return
 				}
 				m1, e1 := s.Lookup(target, req.Question[0].Qtype, bufsize, dnssec)
 				if e1 != nil {
 					s.config.log.Errorf("%q", err)
-					s.NameError(m, req)
+					s.NoDataError(m, req)
 					return
 				}
 				records = append(records, m1.Answer...)
@@ -764,4 +764,11 @@ func (s *server) NameError(m, req *dns.Msg) {
 	m.Ns = []dns.RR{s.NewSOA()}
 	m.Ns[0].Header().Ttl = s.config.MinTtl
 	StatsNameErrorCount.Inc(1)
+}
+
+func (s *server) NoDataError(m, req *dns.Msg) {
+	m.SetRcode(req, dns.RcodeSuccess)
+	m.Ns = []dns.RR{s.NewSOA()}
+	m.Ns[0].Header().Ttl = s.config.MinTtl
+//	StatsNoDataCount.Inc(1)
 }
