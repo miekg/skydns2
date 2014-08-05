@@ -32,8 +32,8 @@ type Cache struct {
 	sync.Mutex
 	l        *list.List
 	m        map[string]*list.Element
-	capacity uint          // number of RRs
-	size     uint          // current size
+	capacity uint // number of RRs
+	size     uint // current size
 	ttl      time.Duration
 }
 
