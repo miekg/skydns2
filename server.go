@@ -794,5 +794,5 @@ func (s *server) NoDataError(m, req *dns.Msg) {
 	m.SetRcode(req, dns.RcodeSuccess)
 	m.Ns = []dns.RR{s.NewSOA()}
 	m.Ns[0].Header().Ttl = s.config.MinTtl
-//	StatsNoDataCount.Inc(1)
+	//	StatsNoDataCount.Inc(1)
 }
