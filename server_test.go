@@ -343,6 +343,7 @@ var services = []*msg.Service{
 	{Host: "server3", Key: "103.server4.development.region2.skydns.test."},
 	{Host: "172.16.1.1", Key: "a.ipaddr.skydns.test."},
 	{Host: "172.16.1.2", Key: "b.ipaddr.skydns.test."},
+	{Host: "ipaddr.skydns.test", Key: "someotherservice.in.skydns.test."},
 	{Host: "10.0.0.1", Key: "104.server1.development.region1.skydns.test."},
 	{Host: "2001::8:8:8:8", Key: "105.server3.production.region2.skydns.test."},
 	{Host: "104.server1.development.region1.skydns.test", Key: "1.cname.skydns.test."},
@@ -529,6 +530,15 @@ var dnsTestCases = []dnsTestCase{
 		Qname: "100.server1.development.region1.skydns.test.", Qtype: dns.TypeA,
 		Rcode: dns.RcodeSuccess,
 		Ns: []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+	},
+	// CNAME Test that targets multiple A records (hits a directory in etcd)
+	{
+		Qname: "someotherservice.in.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{
+			newA("ipaddr.skydns.test. IN A 172.16.1.1"),
+			newA("ipaddr.skydns.test. IN A 172.16.1.2"),
+			newCNAME("someotherservice.in.skydns.test. IN CNAME ipaddr.skydns.test."),
+		},
 	},
 
 	// DNSSEC
