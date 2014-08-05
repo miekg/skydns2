@@ -404,6 +404,29 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
+			// TODO: deduplicate with above code
+			// Try to resolve as CNAME if it's not an IP.
+			newRecord := serv.NewCNAME(q.Name, dns.Fqdn(serv.Host))
+			if len(previousRecords) > 7 {
+				s.config.log.Errorf("CNAME lookup limit of 8 exceeded for %s", newRecord)
+				return nil, fmt.Errorf("exceeded CNAME lookup limit")
+			}
+			if s.isDuplicateCNAME(newRecord, previousRecords) {
+				s.config.log.Errorf("CNAME loop detected for record %s", newRecord)
+				return nil, fmt.Errorf("detected CNAME loop")
+			}
+
+			records = append(records, newRecord)
+			nextRecords, err := s.AddressRecords(dns.Question{Name: dns.Fqdn(serv.Host), Qtype: q.Qtype, Qclass: q.Qclass}, strings.ToLower(dns.Fqdn(serv.Host)), append(previousRecords, newRecord))
+			if err != nil {
+				// This means we can not complete the CNAME, this is OK, but
+				// if we return an error this will trigger an NXDOMAIN.
+				// We also don't want to return the CNAME, because of the
+				// no other data rule. So return nothing and let NODATA
+				// kick in (via a hack).
+				return records, fmt.Errorf("incomplete CNAME chain")
+			}
+			records = append(records, nextRecords...)
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
 			records = append(records, serv.NewA(q.Name, ip.To4()))
 		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
