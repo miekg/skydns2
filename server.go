@@ -184,6 +184,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if dnssec {
 			StatsDnssecOkCount.Inc(1)
 			if s.config.PubKey != nil {
+				m.AuthenticatedData = true
 				s.Denial(m)
 				s.sign(m, bufsize)
 			}

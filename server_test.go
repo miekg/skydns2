@@ -58,8 +58,8 @@ func newTestServer(t *testing.T, c bool) *server {
 	// TODO(miek): why don't I use NewServer??
 	s.group = new(sync.WaitGroup)
 	s.client = client
-	s.scache = cache.New(1000, 0)
-	s.rcache = cache.New(0, 0)
+	s.scache = cache.New(100, 0)
+	s.rcache = cache.New(100, 0)
 	if c {
 		s.rcache = cache.New(100, 60) // 100 items, 60s ttl
 	}
@@ -563,6 +563,19 @@ var dnsTestCases = []dnsTestCase{
 		Extra: []dns.RR{new(dns.OPT)},
 	},
 	// Signed Response Test
+	{
+		dnssec: true,
+		Qname:  "104.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{
+			newRRSIG("104.server1.development.region1.skydns.test. 3600 RRSIG SRV 5 6 3600 0 0 51945 skydns.test. deadbeaf"),
+			newSRV("104.server1.development.region1.skydns.test. 3600 SRV 10 100 0 104.server1.development.region1.skydns.test.")},
+		Extra: []dns.RR{
+			newRRSIG("104.server1.developmen.region1.skydns.test. 3600 RRSIG A 5 6 3600 0 0 51945 skydns.test. deadbeaf"),
+			newA("104.server1.development.region1.skydns.test. 3600 A 10.0.0.1"),
+			new(dns.OPT),
+		},
+	},
+	// Signed Response Test, ask twice to check cache
 	{
 		dnssec: true,
 		Qname:  "104.server1.development.region1.skydns.test.", Qtype: dns.TypeSRV,
