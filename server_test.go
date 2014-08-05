@@ -69,6 +69,7 @@ func newTestServer(t *testing.T, c bool) *server {
 	s.config.DnsAddr = "127.0.0.1:" + StrPort
 	s.config.Nameservers = []string{"8.8.4.4:53"}
 	setDefaults(s.config)
+	s.config.ClosestEncloser, s.config.DenyWildcard = newNSEC3CEandWildcard(config.Domain, config.Domain, config.MinTtl)
 	s.config.Local = "104.server1.development.region1.skydns.test."
 	s.config.Priority = 10
 	s.config.RCacheTtl = RCacheTtl
@@ -588,9 +589,20 @@ var dnsTestCases = []dnsTestCase{
 			new(dns.OPT),
 		},
 	},
-	// Caps Test
-
 	// NXDOMAIN Test
+	{
+		dnssec: true,
+		Qname:  "doesnotexist.skydns.test.", Qtype: dns.TypeA,
+		Rcode: dns.RcodeNameError,
+		Ns:    []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+	},
+	// NXDOMAIN Test, cache test
+	{
+		dnssec: true,
+		Qname:  "doesnotexist.skydns.test.", Qtype: dns.TypeA,
+		Rcode: dns.RcodeNameError,
+		Ns:    []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+	},
 
 	// NODATA Test
 
