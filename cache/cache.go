@@ -130,9 +130,12 @@ func (c *Cache) Search(s string) (*dns.Msg, time.Time, bool) {
 	return nil, time.Time{}, false
 }
 
-func QuestionKey(q dns.Question) string {
+func QuestionKey(q dns.Question, dnssec bool) string {
 	h := sha1.New()
 	i := append([]byte(q.Name), packUint16(q.Qtype)...)
+	if dnssec {
+		i = append(i, byte(255))
+	}
 	return string(h.Sum(i))
 }
 

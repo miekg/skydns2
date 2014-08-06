@@ -115,18 +115,23 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		tcp = true
 	}
 	// Check cache first.
-	key := cache.QuestionKey(req.Question[0])
+	key := cache.QuestionKey(req.Question[0], dnssec)
 	m1, exp, hit := s.rcache.Search(key)
 	if hit {
 		// Cache hit! \o/
 		if time.Since(exp) < 0 {
-			m1.Id = m1.Id
+			m1.Id = m.Id
 			if dnssec {
 				StatsDnssecOkCount.Inc(1)
-				if s.config.PubKey != nil {
-					s.Denial(m1)
-					s.sign(m1, bufsize)
-				}
+				// The key for DNS/DNSSEC in cache is different, no
+				// need to do Denial/Sign here.
+				//if s.config.PubKey != nil {
+				//s.Denial(m1) // not needed for cache hits
+				//s.Sign(m1, bufsize)
+				//}
+			}
+			if m.Len() > int(bufsize) && !tcp {
+				m.Truncated = true
 			}
 			if err := w.WriteMsg(m1); err != nil {
 				s.config.log.Errorf("failure to return reply %q", err)
@@ -178,14 +183,14 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 
-		s.rcache.InsertMessage(cache.QuestionKey(req.Question[0]), m)
+		s.rcache.InsertMessage(cache.QuestionKey(req.Question[0], dnssec), m)
 
 		if dnssec {
 			StatsDnssecOkCount.Inc(1)
 			if s.config.PubKey != nil {
 				m.AuthenticatedData = true
 				s.Denial(m)
-				s.sign(m, bufsize)
+				s.Sign(m, bufsize)
 			}
 		}
 		if m.Len() > int(bufsize) && !tcp {

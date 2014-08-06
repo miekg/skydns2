@@ -34,14 +34,14 @@ func ParseKeyFile(file string) (*dns.DNSKEY, dns.PrivateKey, error) {
 	return k.(*dns.DNSKEY), p, nil
 }
 
-// sign signs a message m, it takes care of negative or nodata responses as
+// Sign signs a message m, it takes care of negative or nodata responses as
 // well by synthesising NSEC3 records. It will also cache the signatures, using
 // a hash of the signed data as a key.
 // We also fake the origin TTL in the signature, because we don't want to
 // throw away signatures when services decide to have longer TTL. So we just
 // set the origTTL to 60.
 // TODO(miek): revisit origTTL
-func (s *server) sign(m *dns.Msg, bufsize uint16) {
+func (s *server) Sign(m *dns.Msg, bufsize uint16) {
 	now := time.Now().UTC()
 	incep := uint32(now.Add(-3 * time.Hour).Unix())     // 2+1 hours, be sure to catch daylight saving time and such
 	expir := uint32(now.Add(7 * 24 * time.Hour).Unix()) // sign for a week
