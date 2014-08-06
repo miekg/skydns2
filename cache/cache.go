@@ -23,8 +23,7 @@ import (
 type elem struct {
 	key        string
 	expiration time.Time // time added + TTL, after this the elem is invalid
-	answer     []dns.RR
-	extra      []dns.RR
+	msg	   *dns.Msg
 }
 
 // Cache is a ...
@@ -74,23 +73,23 @@ func (c *Cache) shrink() {
 		v := e.Value.(*elem)
 		c.l.Remove(e)
 		delete(c.m, v.key)
-		c.size -= uint(len(v.answer) + len(v.extra))
+		c.size -= uint(len(v.msg.Answer) + len(v.msg.Ns) + len(v.msg.Extra))
 	}
 }
 
 // insertMsg inserts a message in the Cache. We will cahce it for ttl seconds, which
 // should be a small (60...300) integer.
-func (c *Cache) InsertMessage(s string, answer, extra []dns.RR) {
+func (c *Cache) InsertMessage(s string, msg *dns.Msg) {
 	if c.capacity == 0 {
 		return
 	}
 	c.Lock()
 	defer c.Unlock()
 	if _, ok := c.m[s]; !ok {
-		e := c.l.PushFront(&elem{s, time.Now().UTC().Add(c.ttl), answer, extra})
+		e := c.l.PushFront(&elem{s, time.Now().UTC().Add(c.ttl), msg})
 		c.m[s] = e
 	}
-	c.size += uint(len(answer) + len(extra))
+	c.size += uint(len(msg.Answer) + len(msg.Ns) + len(msg.Extra))
 	c.shrink()
 }
 
@@ -107,7 +106,7 @@ func (c *Cache) InsertSignature(s string, sig *dns.RRSIG) {
 			m = 0
 		}
 		t := time.Unix(int64(sig.Expiration)-(m*(1<<31)), 0).UTC()
-		e := c.l.PushFront(&elem{s, t, []dns.RR{sig}, nil})
+		e := c.l.PushFront(&elem{s, t, &dns.Msg{Answer: []dns.RR{sig}}})
 		c.m[s] = e
 	}
 	c.size += 1
@@ -116,29 +115,19 @@ func (c *Cache) InsertSignature(s string, sig *dns.RRSIG) {
 
 // Search returns .... and a boolean indicating if we found something
 // in the cache.
-func (c *Cache) Search(s string) ([]dns.RR, []dns.RR, time.Time, bool) {
+func (c *Cache) Search(s string) (*dns.Msg, time.Time, bool) {
 	if c.capacity == 0 {
-		return nil, nil, time.Time{}, false
+		return nil, time.Time{}, false
 	}
 	c.Lock()
 	defer c.Unlock()
 	if e, ok := c.m[s]; ok {
 		c.l.MoveToFront(e)
 		e := e.Value.(*elem)
-		answer := make([]dns.RR, len(e.answer))
-		extra := make([]dns.RR, len(e.extra))
-		for i, r := range e.answer {
-			// we want to return a copy here, because if we didn't the RRSIG
-			// could be removed by another goroutine before the packet containing
-			// this signature is send out.
-			answer[i] = dns.Copy(r)
-		}
-		for i, r := range e.extra {
-			extra[i] = dns.Copy(r)
-		}
-		return answer, extra, e.expiration, true
+		e1 := e.msg.Copy()
+		return e1, e.expiration, true
 	}
-	return nil, nil, time.Time{}, false
+	return nil, time.Time{}, false
 }
 
 func QuestionKey(q dns.Question) string {

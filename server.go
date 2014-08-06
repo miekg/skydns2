@@ -116,20 +116,19 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 	// Check cache first.
 	key := cache.QuestionKey(req.Question[0])
-	a1, e1, exp, hit := s.rcache.Search(key)
+	m1, exp, hit := s.rcache.Search(key)
 	if hit {
 		// Cache hit! \o/
 		if time.Since(exp) < 0 {
-			m.Answer = a1
-			m.Extra = e1
+			m1.Id = m1.Id
 			if dnssec {
 				StatsDnssecOkCount.Inc(1)
 				if s.config.PubKey != nil {
-					s.Denial(m)
-					s.sign(m, bufsize)
+					s.Denial(m1)
+					s.sign(m1, bufsize)
 				}
 			}
-			if err := w.WriteMsg(m); err != nil {
+			if err := w.WriteMsg(m1); err != nil {
 				s.config.log.Errorf("failure to return reply %q", err)
 			}
 			return
@@ -179,7 +178,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 
-		s.rcache.InsertMessage(cache.QuestionKey(req.Question[0]), m.Answer, m.Extra)
+		s.rcache.InsertMessage(cache.QuestionKey(req.Question[0]), m)
 
 		if dnssec {
 			StatsDnssecOkCount.Inc(1)
