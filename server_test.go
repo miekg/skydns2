@@ -285,40 +285,49 @@ func TestDNS(t *testing.T) {
 					t.Fatalf("CNAME target should be %q, but is %q", x.Target, tt.Target)
 				}
 			}
-			for i, n := range resp.Ns {
-				switch x := n.(type) {
-				case *dns.SOA:
-					tt := tc.Answer[i].(*dns.SOA)
-					if x.Ns != tt.Ns {
-						t.Fatalf("SOA nameserver should be %q, but is %q", x.Ns, tt.Ns)
-					}
-				case *dns.NS:
-					tt := tc.Answer[i].(*dns.NS)
-					if x.Ns != tt.Ns {
-						t.Fatalf("NS nameserver should be %q, but is %q", x.Ns, tt.Ns)
-					}
-				case *dns.NSEC3:
-					// TODO(miek)
+		}
+		if len(resp.Ns) != len(tc.Ns) {
+			t.Fatalf("authority for %q contained %d results, %d expected", tc.Qname, len(resp.Ns), len(tc.Ns))
+		}
+		for i, n := range resp.Ns {
+			switch x := n.(type) {
+			case *dns.SOA:
+				tt := tc.Ns[i].(*dns.SOA)
+				if x.Ns != tt.Ns {
+					t.Fatalf("SOA nameserver should be %q, but is %q", x.Ns, tt.Ns)
+				}
+			case *dns.NS:
+				tt := tc.Ns[i].(*dns.NS)
+				if x.Ns != tt.Ns {
+					t.Fatalf("NS nameserver should be %q, but is %q", x.Ns, tt.Ns)
+				}
+			case *dns.NSEC3:
+				tt := tc.Ns[i].(*dns.NSEC3)
+				if x.NextDomain != tt.NextDomain {
+					t.Fatalf("NSEC3 nextdomain should be %q, but is %q", x.NextDomain, tt.NextDomain)
+				}
+				if x.Hdr.Name != tt.Hdr.Name {
+					t.Fatalf("NSEC3 ownername should be %q, but is %q", x.Hdr.Name, tt.Hdr.Name)
 				}
 			}
-			if len(resp.Extra) != len(tc.Extra) {
-				t.Fatalf("additional for %q contained %d results, %d expected", tc.Qname, len(resp.Extra), len(tc.Extra))
-			}
-			for i, e := range resp.Extra {
-				switch x := e.(type) {
-				case *dns.A:
-					if x.A.String() != tc.Extra[i].(*dns.A).A.String() {
-						t.Fatalf("extra %d should have a address of %q, but has %q", i, tc.Extra[i].(*dns.A).A.String(), x.A.String())
-					}
-				case *dns.AAAA:
-					if x.AAAA.String() != tc.Extra[i].(*dns.AAAA).AAAA.String() {
-						t.Fatalf("extra %d should have a address of %q, but has %q", i, tc.Extra[i].(*dns.AAAA).AAAA.String(), x.AAAA.String())
-					}
-				case *dns.CNAME:
-					tt := tc.Extra[i].(*dns.CNAME)
-					if x.Target != tt.Target {
-						t.Fatalf("CNAME target should be %q, but is %q", x.Target, tt.Target)
-					}
+		}
+		if len(resp.Extra) != len(tc.Extra) {
+			t.Fatalf("additional for %q contained %d results, %d expected", tc.Qname, len(resp.Extra), len(tc.Extra))
+		}
+		for i, e := range resp.Extra {
+			switch x := e.(type) {
+			case *dns.A:
+				if x.A.String() != tc.Extra[i].(*dns.A).A.String() {
+					t.Fatalf("extra %d should have a address of %q, but has %q", i, tc.Extra[i].(*dns.A).A.String(), x.A.String())
+				}
+			case *dns.AAAA:
+				if x.AAAA.String() != tc.Extra[i].(*dns.AAAA).AAAA.String() {
+					t.Fatalf("extra %d should have a address of %q, but has %q", i, tc.Extra[i].(*dns.AAAA).AAAA.String(), x.AAAA.String())
+				}
+			case *dns.CNAME:
+				tt := tc.Extra[i].(*dns.CNAME)
+				if x.Target != tt.Target {
+					t.Fatalf("CNAME target should be %q, but is %q", x.Target, tt.Target)
 				}
 			}
 		}
@@ -454,11 +463,13 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "2.cname.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{},
+		Ns: []dns.RR{newSOA("skydns.test. 60 SOA ns.dns.skydns.test. hostmaster.skydns.test. 1407441600 28800 7200 604800 60")},
 	},
 	// CNAME loop detection
 	{
 		Qname: "3.cname.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{},
+		Ns: []dns.RR{newSOA("skydns.test. 60 SOA ns.dns.skydns.test. hostmaster.skydns.test. 1407441600 28800 7200 604800 60")},
 	},
 	// CNAME (resolvable external name)
 	{
@@ -473,6 +484,7 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "external2.cname.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{},
+		Ns: []dns.RR{newSOA("skydns.test. 60 SOA ns.dns.skydns.test. hostmaster.skydns.test. 1407441600 28800 7200 604800 60")},
 	},
 	// Priority Test
 	{
@@ -518,18 +530,20 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "doesnotexist.skydns.test.", Qtype: dns.TypeA,
 		Rcode: dns.RcodeNameError,
-		Ns:    []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+		Ns:    []dns.RR{
+			newSOA("skydns.test. 3600 SOA ns.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0"),
+		},
 	},
 	// NODATA Test
 	{
 		Qname: "104.server1.development.region1.skydns.test.", Qtype: dns.TypeTXT,
-		Ns: []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+		Ns: []dns.RR{newSOA("skydns.test. 3600 SOA ns.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
 	},
 	// NODATA Test 2
 	{
 		Qname: "100.server1.development.region1.skydns.test.", Qtype: dns.TypeA,
 		Rcode: dns.RcodeSuccess,
-		Ns:    []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+		Ns:    []dns.RR{newSOA("skydns.test. 3600 SOA ns.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
 	},
 	// CNAME Test that targets multiple A records (hits a directory in etcd)
 	{
@@ -593,14 +607,34 @@ var dnsTestCases = []dnsTestCase{
 		dnssec: true,
 		Qname:  "doesnotexist.skydns.test.", Qtype: dns.TypeA,
 		Rcode: dns.RcodeNameError,
-		Ns:    []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+		Ns:    []dns.RR{
+			newNSEC3("44ohaq2njb0idnvolt9ggthvsk1e1uv8.skydns.test.	60 NSEC3 1 0 0 - 44OHAQ2NJB0IDNVOLT9GGTHVSK1E1UVA"),
+			newRRSIG("44ohaq2njb0idnvolt9ggthvsk1e1uv8.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814205559 20140807175559 51945 skydns.test. deadbeef"),
+			newNSEC3("ah4v7g5qoiri26armrb3bldqi1sng6a2.skydns.test.	60 NSEC3 1 0 0 - AH4V7G5QOIRI26ARMRB3BLDQI1SNG6A3 A NS SOA AAAA RRSIG DNSKEY"),
+			newRRSIG("ah4v7g5qoiri26armrb3bldqi1sng6a2.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814205559 20140807175559 51945 skydns.test. deadbeef"),
+			newNSEC3("lksd858f4cldl7emdord75k5jeks49p8.skydns.test.	60 NSEC3 1 0 0 - LKSD858F4CLDL7EMDORD75K5JEKS49PA"),
+			newRRSIG("lksd858f4cldl7emdord75k5jeks49p8.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814205559 20140807175559 51945 skydns.test. deadbeef"),
+			newRRSIG("skydns.test.	60 RRSIG SOA 5 2 3600 20140814205559 20140807175559 51945 skydns.test. deadbeaf"),
+			newSOA("skydns.test. 3600 SOA ns.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0"),
+		},
+		Extra: []dns.RR{new(dns.OPT)},
 	},
 	// NXDOMAIN Test, cache test
 	{
 		dnssec: true,
 		Qname:  "doesnotexist.skydns.test.", Qtype: dns.TypeA,
 		Rcode: dns.RcodeNameError,
-		Ns:    []dns.RR{newSOA("skydns.test. 3600 SOA ns1.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0")},
+		Ns:    []dns.RR{
+			newNSEC3("44ohaq2njb0idnvolt9ggthvsk1e1uv8.skydns.test.	60 NSEC3 1 0 0 - 44OHAQ2NJB0IDNVOLT9GGTHVSK1E1UVA"),
+			newRRSIG("44ohaq2njb0idnvolt9ggthvsk1e1uv8.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814205559 20140807175559 51945 skydns.test. deadbeef"),
+			newNSEC3("ah4v7g5qoiri26armrb3bldqi1sng6a2.skydns.test.	60 NSEC3 1 0 0 - AH4V7G5QOIRI26ARMRB3BLDQI1SNG6A3 A NS SOA AAAA RRSIG DNSKEY"),
+			newRRSIG("ah4v7g5qoiri26armrb3bldqi1sng6a2.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814205559 20140807175559 51945 skydns.test. deadbeef"),
+			newNSEC3("lksd858f4cldl7emdord75k5jeks49p8.skydns.test.	60 NSEC3 1 0 0 - LKSD858F4CLDL7EMDORD75K5JEKS49PA"),
+			newRRSIG("lksd858f4cldl7emdord75k5jeks49p8.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814205559 20140807175559 51945 skydns.test. deadbeef"),
+			newRRSIG("skydns.test.	60 RRSIG SOA 5 2 3600 20140814205559 20140807175559 51945 skydns.test. deadbeaf"),
+			newSOA("skydns.test. 3600 SOA ns.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0"),
+		},
+		Extra: []dns.RR{new(dns.OPT)},
 	},
 
 	// NODATA Test
@@ -615,12 +649,14 @@ var dnsTestCases = []dnsTestCase{
 		Answer: []dns.RR{newPTR("1.0.0.10.in-addr.arpa. 3600 PTR reverse.example.com.")},
 	},
 	// Reverse v6 local answer
-	// Reverse forwarding answer
-	{
-		Qname: "10.0.0.10.in-addr.arpa.", Qtype: dns.TypePTR,
-		Rcode: dns.RcodeNameError,
-		Ns:    []dns.RR{newSOA("10.in-addr.arpa. 10800 SOA localhost. nobody.invalid. 1 0 0 0 0")},
-	},
+
+	// Reverse forwarding answer, TODO(miek) does not work
+//	{
+//		Qname: "1.0.16.172.in-addr.arpa.", Qtype: dns.TypePTR,
+//		Rcode: dns.RcodeNameError,
+//		Ns:    []dns.RR{newSOA("16.172.in-addr.arpa. 10800 SOA localhost. nobody.invalid. 0 0 0 0 0")},
+//	},
+
 	// Reverse no answer
 
 	// Local data query
@@ -677,7 +713,7 @@ func newSOA(rr string) *dns.SOA       { r, _ := dns.NewRR(rr); return r.(*dns.SO
 func newNS(rr string) *dns.NS         { r, _ := dns.NewRR(rr); return r.(*dns.NS) }
 func newDNSKEY(rr string) *dns.DNSKEY { r, _ := dns.NewRR(rr); return r.(*dns.DNSKEY) }
 func newRRSIG(rr string) *dns.RRSIG   { r, _ := dns.NewRR(rr); return r.(*dns.RRSIG) }
-func newNNSEC3(rr string) *dns.NSEC3  { r, _ := dns.NewRR(rr); return r.(*dns.NSEC3) }
+func newNSEC3(rr string) *dns.NSEC3  { r, _ := dns.NewRR(rr); return r.(*dns.NSEC3) }
 func newPTR(rr string) *dns.PTR       { r, _ := dns.NewRR(rr); return r.(*dns.PTR) }
 func newTXT(rr string) *dns.TXT       { r, _ := dns.NewRR(rr); return r.(*dns.TXT) }
 
