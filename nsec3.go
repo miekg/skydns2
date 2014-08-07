@@ -82,7 +82,7 @@ func (s *server) newNSEC3NoData(qname string) *dns.NSEC3 {
 	n.Hash = dns.SHA1
 	n.Flags = 0
 	n.Salt = ""
-	n.TypeBitMap = []uint16{}
+	n.TypeBitMap = []uint16{dns.TypeA, dns.TypeNS, dns.TypeAAAA, dns.TypeSRV, dns.TypeRRSIG}
 
 	n.Hdr.Name = dns.HashName(qname, dns.SHA1, 0, "")
 	buf := packBase32(n.Hdr.Name)
@@ -104,7 +104,7 @@ func newNSEC3CEandWildcard(apex, ce string, ttl uint32) (*dns.NSEC3, *dns.NSEC3)
 	n1.Flags = 0
 	n1.Iterations = 0
 	n1.Salt = ""
-	n1.TypeBitMap = []uint16{dns.TypeA, dns.TypeNS, dns.TypeSOA, dns.TypeAAAA, dns.TypeRRSIG, dns.TypeDNSKEY}
+	n1.TypeBitMap = []uint16{dns.TypeA, dns.TypeNS, dns.TypeAAAA, dns.TypeSRV, dns.TypeRRSIG}
 	prev := dns.HashName(ce, dns.SHA1, n1.Iterations, n1.Salt)
 	n1.Hdr.Name = strings.ToLower(prev) + "." + apex
 	buf := packBase32(prev)

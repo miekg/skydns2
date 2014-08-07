@@ -50,10 +50,10 @@ type Config struct {
 	Ndots int `json:"ndot,omitempty"`
 
 	// DNSSEC key material
-	PubKey          *dns.DNSKEY    `json:"-"`
-	KeyTag          uint16         `json:"-"`
-	PrivKey         dns.PrivateKey `json:"-"`
-	DomainLabels    int            `json:"-"`
+	PubKey       *dns.DNSKEY    `json:"-"`
+	KeyTag       uint16         `json:"-"`
+	PrivKey      dns.PrivateKey `json:"-"`
+	DomainLabels int            `json:"-"`
 
 	log *log.Logger
 
