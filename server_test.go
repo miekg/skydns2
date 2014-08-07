@@ -69,7 +69,6 @@ func newTestServer(t *testing.T, c bool) *server {
 	s.config.DnsAddr = "127.0.0.1:" + StrPort
 	s.config.Nameservers = []string{"8.8.4.4:53"}
 	setDefaults(s.config)
-	s.config.ClosestEncloser, s.config.DenyWildcard = newNSEC3CEandWildcard(config.Domain, config.Domain, config.MinTtl)
 	s.config.Local = "104.server1.development.region1.skydns.test."
 	s.config.Priority = 10
 	s.config.RCacheTtl = RCacheTtl

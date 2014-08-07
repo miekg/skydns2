@@ -54,8 +54,6 @@ type Config struct {
 	KeyTag          uint16         `json:"-"`
 	PrivKey         dns.PrivateKey `json:"-"`
 	DomainLabels    int            `json:"-"`
-	ClosestEncloser *dns.NSEC3     `json:"-"`
-	DenyWildcard    *dns.NSEC3     `json:"-"`
 
 	log *log.Logger
 
@@ -149,7 +147,6 @@ func setDefaults(config *Config) error {
 		config.PubKey = k
 		config.KeyTag = k.KeyTag()
 		config.PrivKey = p
-		config.ClosestEncloser, config.DenyWildcard = newNSEC3CEandWildcard(config.Domain, config.Domain, config.MinTtl)
 	}
 	config.localDomain = "local.dns." + config.Domain
 	config.dnsDomain = "dns." + config.Domain

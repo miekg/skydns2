@@ -12,28 +12,27 @@ import (
 )
 
 // Do DNSSEC NXDOMAIN with NSEC3 whitelies: rfc 7129, appendix B.
-// The closest encloser will always be config.Domain and we
-// will deny the wildcard for *.config.Domain. This allows
-// use to pre-compute those records. We then only need to compute
-// the NSEC3 that covers the qname.
+// The closest encloser will be qname - the left most label and the
+// next closer will be the full qname which we then will deny.
+// Idem for source of synthesis.
 
 func (s *server) Denial(m *dns.Msg) {
 	if m.Rcode == dns.RcodeNameError {
-		// Deny Qname nsec3
-		nsec3 := s.NewNSEC3NameError(m.Question[0].Name)
-		m.Ns = append(m.Ns, nsec3)
+		// ce is qname minus the left label
+		idx := dns.Split(m.Question[0].Name)
+		ce := m.Question[0].Name[idx[1]:]
 
-		if nsec3.Hdr.Name != s.config.ClosestEncloser.Hdr.Name {
-			m.Ns = append(m.Ns, s.config.ClosestEncloser)
-		}
-		if nsec3.Hdr.Name != s.config.DenyWildcard.Hdr.Name {
-			m.Ns = append(m.Ns, s.config.DenyWildcard)
-		}
+		nsec3ce, nsec3wildcard := newNSEC3CEandWildcard(s.config.Domain, ce, s.config.MinTtl)
+		// Add ce and wildcard
+		m.Ns = append(m.Ns, nsec3ce)
+		m.Ns = append(m.Ns, nsec3wildcard)
+		// Deny Qname nsec3
+		m.Ns = append(m.Ns, s.newNSEC3NameError(m.Question[0].Name))
 	}
 	if m.Rcode == dns.RcodeSuccess && len(m.Ns) == 1 {
 		// NODATA
 		if _, ok := m.Ns[0].(*dns.SOA); ok {
-			m.Ns = append(m.Ns, s.NewNSEC3NoData(m.Question[0].Name))
+			m.Ns = append(m.Ns, s.newNSEC3NoData(m.Question[0].Name))
 		}
 	}
 }
@@ -52,8 +51,8 @@ func unpackBase32(b []byte) string {
 	return string(b32)
 }
 
-// NewNSEC3 returns the NSEC3 record needed to denial qname.
-func (s *server) NewNSEC3NameError(qname string) *dns.NSEC3 {
+// newNSEC3NameError returns the NSEC3 record needed to denial qname.
+func (s *server) newNSEC3NameError(qname string) *dns.NSEC3 {
 	n := new(dns.NSEC3)
 	n.Hdr.Class = dns.ClassINET
 	n.Hdr.Rrtype = dns.TypeNSEC3
@@ -74,8 +73,8 @@ func (s *server) NewNSEC3NameError(qname string) *dns.NSEC3 {
 	return n
 }
 
-// NewNSEC3 returns the NSEC3 record needed to denial the types
-func (s *server) NewNSEC3NoData(qname string) *dns.NSEC3 {
+// newNSEC3NoData returns the NSEC3 record needed to denial the types
+func (s *server) newNSEC3NoData(qname string) *dns.NSEC3 {
 	n := new(dns.NSEC3)
 	n.Hdr.Class = dns.ClassINET
 	n.Hdr.Rrtype = dns.TypeNSEC3
