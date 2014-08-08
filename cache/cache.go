@@ -77,7 +77,7 @@ func (c *Cache) shrink() {
 	}
 }
 
-// insertMsg inserts a message in the Cache. We will cahce it for ttl seconds, which
+// InsertMessage inserts a message in the Cache. We will cahce it for ttl seconds, which
 // should be a small (60...300) integer.
 func (c *Cache) InsertMessage(s string, msg *dns.Msg) {
 	if c.capacity == 0 {
@@ -93,7 +93,7 @@ func (c *Cache) InsertMessage(s string, msg *dns.Msg) {
 	c.shrink()
 }
 
-// insertSig inserts a signature, the expiration time is used as the cache ttl.
+// InsertSignature inserts a signature, the expiration time is used as the cache ttl.
 func (c *Cache) InsertSignature(s string, sig *dns.RRSIG) {
 	if c.capacity == 0 {
 		return
@@ -130,6 +130,8 @@ func (c *Cache) Search(s string) (*dns.Msg, time.Time, bool) {
 	return nil, time.Time{}, false
 }
 
+// QuestionKey creates a hash key from a question section. It creates a different key
+// for requests with DNSSEC.
 func QuestionKey(q dns.Question, dnssec bool) string {
 	h := sha1.New()
 	i := append([]byte(q.Name), packUint16(q.Qtype)...)
