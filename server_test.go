@@ -302,13 +302,17 @@ func TestDNS(t *testing.T) {
 					t.Fatalf("NS nameserver should be %q, but is %q", x.Ns, tt.Ns)
 				}
 			case *dns.NSEC3:
-				// TODO(miek): Check type list
 				tt := tc.Ns[i].(*dns.NSEC3)
 				if x.NextDomain != tt.NextDomain {
 					t.Fatalf("NSEC3 nextdomain should be %q, but is %q", x.NextDomain, tt.NextDomain)
 				}
 				if x.Hdr.Name != tt.Hdr.Name {
 					t.Fatalf("NSEC3 ownername should be %q, but is %q", x.Hdr.Name, tt.Hdr.Name)
+				}
+				for j, y := range x.TypeBitMap {
+					if y != tt.TypeBitMap[j] {
+						t.Fatalf("NSEC3 bitmap should have %q, but is %q", dns.TypeToString[y], dns.TypeToString[tt.TypeBitMap[j]])
+					}
 				}
 			}
 		}
@@ -611,7 +615,7 @@ var dnsTestCases = []dnsTestCase{
 		Ns: []dns.RR{
 			newNSEC3("44ohaq2njb0idnvolt9ggthvsk1e1uv8.skydns.test.	60 NSEC3 1 0 0 - 44OHAQ2NJB0IDNVOLT9GGTHVSK1E1UVA"),
 			newRRSIG("44ohaq2njb0idnvolt9ggthvsk1e1uv8.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814205559 20140807175559 51945 skydns.test. deadbeef"),
-			newNSEC3("ah4v7g5qoiri26armrb3bldqi1sng6a2.skydns.test.	60 NSEC3 1 0 0 - AH4V7G5QOIRI26ARMRB3BLDQI1SNG6A3 A NS SOA AAAA RRSIG DNSKEY"),
+			newNSEC3("ah4v7g5qoiri26armrb3bldqi1sng6a2.skydns.test.	60 NSEC3 1 0 0 - AH4V7G5QOIRI26ARMRB3BLDQI1SNG6A3 A AAAA SRV RRSIG"),
 			newRRSIG("ah4v7g5qoiri26armrb3bldqi1sng6a2.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814205559 20140807175559 51945 skydns.test. deadbeef"),
 			newNSEC3("lksd858f4cldl7emdord75k5jeks49p8.skydns.test.	60 NSEC3 1 0 0 - LKSD858F4CLDL7EMDORD75K5JEKS49PA"),
 			newRRSIG("lksd858f4cldl7emdord75k5jeks49p8.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814205559 20140807175559 51945 skydns.test. deadbeef"),
@@ -628,7 +632,7 @@ var dnsTestCases = []dnsTestCase{
 		Ns: []dns.RR{
 			newNSEC3("44ohaq2njb0idnvolt9ggthvsk1e1uv8.skydns.test.	60 NSEC3 1 0 0 - 44OHAQ2NJB0IDNVOLT9GGTHVSK1E1UVA"),
 			newRRSIG("44ohaq2njb0idnvolt9ggthvsk1e1uv8.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814205559 20140807175559 51945 skydns.test. deadbeef"),
-			newNSEC3("ah4v7g5qoiri26armrb3bldqi1sng6a2.skydns.test.	60 NSEC3 1 0 0 - AH4V7G5QOIRI26ARMRB3BLDQI1SNG6A3 A NS SOA AAAA RRSIG DNSKEY"),
+			newNSEC3("ah4v7g5qoiri26armrb3bldqi1sng6a2.skydns.test.	60 NSEC3 1 0 0 - AH4V7G5QOIRI26ARMRB3BLDQI1SNG6A3 A AAAA SRV RRSIG"),
 			newRRSIG("ah4v7g5qoiri26armrb3bldqi1sng6a2.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814205559 20140807175559 51945 skydns.test. deadbeef"),
 			newNSEC3("lksd858f4cldl7emdord75k5jeks49p8.skydns.test.	60 NSEC3 1 0 0 - LKSD858F4CLDL7EMDORD75K5JEKS49PA"),
 			newRRSIG("lksd858f4cldl7emdord75k5jeks49p8.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814205559 20140807175559 51945 skydns.test. deadbeef"),
@@ -643,7 +647,7 @@ var dnsTestCases = []dnsTestCase{
 		Qname:  "104.server1.development.region1.skydns.test.", Qtype: dns.TypeTXT,
 		Rcode: dns.RcodeSuccess,
 		Ns: []dns.RR{
-			newNSEC3("E76CLEL5E7TQHRTFLTBVH0645NEKFJV9.skydns.test.	60 NSEC3 1 0 0 - E76CLEL5E7TQHRTFLTBVH0645NEKFJVA"),
+			newNSEC3("E76CLEL5E7TQHRTFLTBVH0645NEKFJV9.skydns.test.	60 NSEC3 1 0 0 - E76CLEL5E7TQHRTFLTBVH0645NEKFJVA A AAAA SRV RRSIG"),
 			newRRSIG("E76CLEL5E7TQHRTFLTBVH0645NEKFJV9.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814211641 20140807181641 51945 skydns.test. deadbeef"),
 			newRRSIG("skydns.test.	60 RRSIG SOA 5 2 3600 20140814211641 20140807181641 51945 skydns.test. deadbeef"),
 			newSOA("skydns.test.	60 SOA ns.dns.skydns.test. hostmaster.skydns.test. 1407445200 28800 7200 604800 60"),
