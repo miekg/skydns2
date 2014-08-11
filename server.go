@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/coreos/go-systemd/activation"
 	"github.com/miekg/dns"
 	"github.com/skynetservices/skydns/cache"
 	"github.com/skynetservices/skydns/msg"
@@ -45,13 +46,67 @@ func (s *server) Run() error {
 	mux := dns.NewServeMux()
 	mux.Handle(".", s)
 
-	s.group.Add(2)
-	go runDNSServer(s.group, mux, "tcp", s.config.DnsAddr, s.config.ReadTimeout)
-	go runDNSServer(s.group, mux, "udp", s.config.DnsAddr, s.config.ReadTimeout)
-	if s.config.DNSSEC == "" {
-		s.config.log.Printf("ready for queries on %s for %s [rcache %d - ttl %d]", s.config.Domain, s.config.DnsAddr, s.config.RCache, s.config.RCacheTtl)
+	dnsReadyMsg := func(addr, net string) {
+		if s.config.DNSSEC == "" {
+			s.config.log.Printf("ready for queries on %s for %s://%s [rcache %d]", s.config.Domain, net, addr, s.config.RCache)
+		} else {
+			s.config.log.Printf("ready for queries on %s for %s://%s [rcache %d], signing with %s [scache %d]", s.config.Domain, net, addr, s.config.RCache, s.config.DNSSEC, s.config.SCache)
+		}
+	}
+
+	if s.config.Systemd {
+		packetConns, err := activation.PacketConns(false)
+		if err != nil {
+			return err
+		}
+		listeners, err := activation.Listeners(true)
+		if err != nil {
+			return err
+		}
+		if len(packetConns) == 0 && len(listeners) == 0 {
+			return fmt.Errorf("no UDP or TCP sockets supplied by systemd")
+		}
+		for _, p := range packetConns {
+			if u, ok := p.(*net.UDPConn); ok {
+				s.group.Add(1)
+				go func() {
+					defer s.group.Done()
+					if err := dns.ActivateAndServe(nil, u, mux); err != nil {
+						log.Fatal(err)
+					}
+				}()
+				dnsReadyMsg(u.LocalAddr().String(), "udp")
+			}
+		}
+		for _, l := range listeners {
+			if t, ok := l.(*net.TCPListener); ok {
+				s.group.Add(1)
+				go func() {
+					defer s.group.Done()
+					if err := dns.ActivateAndServe(t, nil, mux); err != nil {
+						log.Fatal(err)
+					}
+				}()
+				dnsReadyMsg(t.Addr().String(), "tcp")
+			}
+		}
 	} else {
-		s.config.log.Printf("ready for queries on %s for %s [rcache %d - ttl %d], signing with %s [scache %d]", s.config.Domain, s.config.DnsAddr, s.config.RCache, s.config.RCacheTtl, s.config.DNSSEC, s.config.SCache)
+		s.group.Add(1)
+		go func() {
+			defer s.group.Done()
+			if err := dns.ListenAndServe(s.config.DnsAddr, "tcp", mux); err != nil {
+				log.Fatal(err)
+			}
+		}()
+		dnsReadyMsg(s.config.DnsAddr, "tcp")
+		s.group.Add(1)
+		go func() {
+			defer s.group.Done()
+			if err := dns.ListenAndServe(s.config.DnsAddr, "udp", mux); err != nil {
+				log.Fatal(err)
+			}
+		}()
+		dnsReadyMsg(s.config.DnsAddr, "udp")
 	}
 
 	s.group.Wait()
@@ -62,20 +117,6 @@ func (s *server) Run() error {
 func (s *server) Stop() {
 	// TODO(miek)
 	//s.group.Add(-2)
-}
-
-func runDNSServer(group *sync.WaitGroup, mux *dns.ServeMux, net, addr string, readTimeout time.Duration) {
-	defer group.Done()
-
-	server := &dns.Server{
-		Addr:        addr,
-		Net:         net,
-		Handler:     mux,
-		ReadTimeout: readTimeout,
-	}
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatal(err)
-	}
 }
 
 // ServeDNS is the handler for DNS requests, responsible for parsing DNS request, possibly forwarding

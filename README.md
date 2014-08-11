@@ -70,6 +70,7 @@ may be set:
 * `scache`: the capacity of the DNSSEC signature cache, defaults to 10000 records if not set.
 * `rcache`: the capacity of the response cache, defaults to 0 records if not set.
 * `rcache-ttl`: the TTL of the response cache, defaults to 60 if not set.
+* `systemd`: bind to socket(s) activated by systemd (ignore -addr).
 
 To set the configuration, use something like:
 
