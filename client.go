@@ -51,11 +51,18 @@ func (s *server) UpdateClient(resp *etcd.Response) {
 		}
 		machines = append(machines, ms[0][5:])
 	}
-	s.config.log.Infof("setting new etcd cluster to %v", machines)
-	c := NewClient(machines)
-	// This is our RCU, switch the pointer, old readers get the old
-	// one, new reader get the new one.
-	s.client = c
+	// When CoreOS (and thus ectd), this call back seems to trigger, but we
+	// don't have any machines, don't trigger this update then, as a) is
+	// crashes SkyDNS and b) potentially leaves with no machines to connect to.
+	// Keep the old ones and hope they still work and wait for another update
+	// in the future.
+	if len(machines) > 0 {
+		s.config.log.Infof("setting new etcd cluster to %v", machines)
+		c := NewClient(machines)
+		// This is our RCU, switch the pointer, old readers get the old
+		// one, new reader get the new one.
+		s.client = c
+	}
 }
 
 // get is a wrapper for client.Get that uses SingleInflight to suppress multiple
