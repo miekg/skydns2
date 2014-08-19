@@ -51,8 +51,8 @@ func (s *server) UpdateClient(resp *etcd.Response) {
 		}
 		machines = append(machines, ms[0][5:])
 	}
-	// When CoreOS (and thus ectd), this call back seems to trigger, but we
-	// don't have any machines, don't trigger this update then, as a) is
+	// When CoreOS (and thus ectd) crash this call back seems to also trigger, but we
+	// don't have any machines. Don't trigger this update then, as a) it
 	// crashes SkyDNS and b) potentially leaves with no machines to connect to.
 	// Keep the old ones and hope they still work and wait for another update
 	// in the future.
