@@ -171,8 +171,29 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				//s.Sign(m1, bufsize)
 				//}
 			}
-			if m.Len() > int(bufsize) && !tcp {
-				m.Truncated = true
+			if m1.Len() > int(bufsize) && !tcp {
+				m1.Truncated = true
+			}
+			// Still round-robin even with hits from the cache.
+			if s.config.RoundRobin && (req.Question[0].Qtype == dns.TypeA ||
+				req.Question[0].Qtype == dns.TypeAAAA) {
+				switch l := len(m1.Answer); l {
+				case 2:
+					if dns.Id()%2 == 0 {
+						m1.Answer[0], m1.Answer[1] = m1.Answer[1], m1.Answer[0]
+					}
+				default:
+					// Do a minimum of l swap, maximum of 4l swaps
+					for j := 0; j < l*(int(dns.Id())%4+1); j++ {
+						q := int(dns.Id()) % l
+						p := int(dns.Id()) % l
+						if q == p {
+							p = (p + 1) % l
+						}
+						m1.Answer[q], m1.Answer[p] = m1.Answer[p], m1.Answer[q]
+					}
+				}
+
 			}
 			if err := w.WriteMsg(m1); err != nil {
 				s.config.log.Errorf("failure to return reply %q", err)
