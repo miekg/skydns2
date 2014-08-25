@@ -447,7 +447,8 @@ to work we create the hosts named `x{123}.db.skydns.local` in Etcd:
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/db/x3 -d \
         value='{"Host": "127.0.0.3"'}
 
-Now the name `db.skydns.local` is the "load balanced" name for the database.
+Now the name `db.skydns.local` is the "load balanced" name for the database, SkyDNS
+will round-robin by default in this case unless `-round-robin=false` is enabled.
 
 # License
 The MIT License (MIT)
