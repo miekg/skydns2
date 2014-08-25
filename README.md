@@ -431,7 +431,25 @@ in the etcd backend so a restart of SkyDNS with the same unique value will give 
     ;; ANSWER SECTION:
     local.dns.skydns.local. 3600 IN  A   192.0.2.1
 
-## License
+# FAQ
+
+## How Do I Create an Address Pool and Round Robin Between Them
+
+You have 3 machines with 3 different IP addresses and you want to have
+1 name pointing to all 3 possible addresses. The name we want to use is:
+`db.skydns.local` and the 3 addresses are 127.0.0.{123}. For this
+to work we create the hosts named `x{123}.db.skydns.local` in Etcd:
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/db/x1 -d \
+        value='{"Host":"127.0.0.1"}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/db/x2 -d \
+        value='{"Host": "127.0.0.2"'}
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/db/x3 -d \
+        value='{"Host": "127.0.0.3"'}
+
+Now the name `db.skydns.local` is the "load balanced" name for the database.
+
+# License
 The MIT License (MIT)
 
 Copyright © 2014 The SkyDNS Authors
