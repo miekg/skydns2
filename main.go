@@ -99,6 +99,7 @@ func main() {
 			for {
 				select {
 				case n := <-recv:
+					s.config.log.Info("ectd machine cluster update")
 					// we can see an n == nil, probably when we can't connect to etcd.
 					if n != nil {
 						s.UpdateClient(n)
