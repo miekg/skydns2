@@ -1,5 +1,5 @@
 # SkyDNS [![Build Status](https://travis-ci.org/skynetservices/skydns.png)](https://travis-ci.org/skynetservices/skydns)
-*Version 2.0.0f*
+*Version 2.0.0g*
 
 SkyDNS is a distributed service for announcement and discovery of services built on
 top of [etcd](https://github.com/coreos/etcd). It utilizes DNS queries
