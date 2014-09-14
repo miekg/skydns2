@@ -102,6 +102,7 @@ func main() {
 				case n := <-recv:
 					if n != nil {
 						s.UpdateClient(n)
+						duration = 1 * time.Second // reset
 					} else {
 						// we can see an n == nil, probably when we can't connect to etcd.
 						s.config.log.Infof("ectd machine cluster update failed, sleeping %s", duration)
