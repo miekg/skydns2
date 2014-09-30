@@ -1,4 +1,4 @@
-# SkyDNS [![Build Status](https://travis-ci.org/skynetservices/skydns.png)](https://travis-ci.org/skynetservices/skydns)
+# SkyDNS
 *Version 2.0.0g*
 
 SkyDNS is a distributed service for announcement and discovery of services built on
