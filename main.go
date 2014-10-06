@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -105,8 +106,8 @@ func main() {
 						duration = 1 * time.Second // reset
 					} else {
 						// we can see an n == nil, probably when we can't connect to etcd.
-						s.config.log.Infof("ectd machine cluster update failed, sleeping %s", duration)
-						time.Sleep(duration)
+						s.config.log.Infof("ectd machine cluster update failed, sleeping %s + ~3s", duration)
+						time.Sleep(duration + (time.Duration(rand.Float32() * 3e9))) // Add some random.
 						duration *= 2
 						if duration > 32*time.Second {
 							duration = 32 * time.Second
