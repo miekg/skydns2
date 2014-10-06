@@ -108,7 +108,7 @@ func main() {
 						s.config.log.Infof("ectd machine cluster update failed, sleeping %s", duration)
 						time.Sleep(duration)
 						duration *= 2
-						if duration > 32 * time.Second {
+						if duration > 32*time.Second {
 							duration = 32 * time.Second
 						}
 					}
