@@ -62,7 +62,7 @@ func (ksync *KubernetesSync) ensureDNS() {
 // removed if missing from the update set.
 
 func (ksync *KubernetesSync) OnUpdate(services []api.Service) {
-	log.Println("Received update notice: %+v", services)
+	log.Printf("Received update notice: %+v\n", services)
 	activeServices := util.StringSet{}
 	for _, service := range services {
 		activeServices.Insert(service.ID)
@@ -70,25 +70,24 @@ func (ksync *KubernetesSync) OnUpdate(services []api.Service) {
 		serviceIP := net.ParseIP(service.PortalIP)
 		if exists && info.portalPort == service.Port && info.portalIP.Equal(serviceIP) {
 			//bump TTL
+			log.Println("Service exists.")
 		}
 		if exists && (info.portalPort != service.Port || !info.portalIP.Equal(serviceIP)) {
 			err := ksync.removeDNS(service.ID, info)
 			if err != nil {
-				log.Println("Failed to remove dns for %q: %s", service.ID, err)
+				log.Printf("Failed to remove dns for %q: %s\n", service.ID, err)
 			}
 		}
-		log.Println("Adding new service %q at %s:%d/%s (local :%d)", service.ID, serviceIP, service.Port, service.Protocol, service.ProxyPort)
-
+		log.Printf("Adding new service %q at %s:%d/%s (local :%d)\n", service.ID, serviceIP, service.Port, service.Protocol, service.ProxyPort)
 		si := &serviceInfo{
 			proxyPort: service.ProxyPort,
 			protocol:  service.Protocol,
 			active:    true,
 		}
 		ksync.setServiceInfo(service.ID, si)
-
-		info.portalIP = serviceIP
-		info.portalPort = service.Port
-		err := ksync.addDNS(service.ID, info)
+		si.portalIP = serviceIP
+		si.portalPort = service.Port
+		err := ksync.addDNS(service.ID, si)
 		if err != nil {
 			log.Println("Failed to add dns %q: %s", service.ID, err)
 		}
@@ -119,8 +118,11 @@ func (ksync *KubernetesSync) setServiceInfo(service string, info *serviceInfo) {
 }
 
 func (ksync *KubernetesSync) removeDNS(service string, info *serviceInfo) error {
+	record := service + "." + config.Domain
 	// Remove from SkyDNS registration
-	return nil
+	log.Printf("removing %s from DNS", record)
+	_, err := ksync.eclient.Delete(msg.Path(record), true)
+	return err
 }
 
 func (ksync *KubernetesSync) addDNS(service string, info *serviceInfo) error {
@@ -133,9 +135,11 @@ func (ksync *KubernetesSync) addDNS(service string, info *serviceInfo) error {
 		Ttl:      30,
 	}
 	b, err := json.Marshal(svc)
-	record := service + config.Domain
+	record := service + "." + config.Domain
 	//Set with no TTL, and hope that kubernetes events are accurate.
 	//TODO(BJK) Think this through a little more
+
+	log.Printf("Setting dns record: %v\n", record)
 	_, err = ksync.eclient.Set(msg.Path(record), string(b), uint64(0))
 	return err
 }
