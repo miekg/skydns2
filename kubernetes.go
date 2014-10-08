@@ -46,13 +46,14 @@ func (ksync *KubernetesSync) SyncLoop() {
 }
 
 // Ensure that dns records exist for all services.
+// This seems a bit redundant. TBD - remove?
 func (ksync *KubernetesSync) ensureDNS() {
 	ksync.mu.Lock()
 	defer ksync.mu.Unlock()
 	for name, info := range ksync.serviceMap {
 		err := ksync.addDNS(name, info)
 		if err != nil {
-			log.Println("Failed to ensure portal for %q: %s", name, err)
+			log.Println("Failed to ensure dns for %q: %s", name, err)
 		}
 	}
 }
@@ -100,6 +101,7 @@ func (ksync *KubernetesSync) OnUpdate(services []api.Service) {
 			if err != nil {
 				log.Println("Failed to remove dns for %q: %s", name, err)
 			}
+			delete(ksync.serviceMap, name)
 		}
 	}
 }
@@ -163,7 +165,7 @@ func WatchKubernetes(eclient *etcd.Client) {
 
 	// define api config source
 	if clientConfig.Host != "" {
-		log.Println("Using api calls to get config %v", clientConfig.Host)
+		log.Println("Using api calls to get Kubernetes config %v", clientConfig.Host)
 		client, err := client.New(clientConfig)
 		if err != nil {
 			log.Fatalf("Kubernetes requested, but received invalid API configuration: %v", err)
