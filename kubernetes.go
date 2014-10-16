@@ -42,7 +42,7 @@ func (ksync *KubernetesSync) SyncLoop() {
 	for {
 		select {
 		case <-time.After(syncInterval):
-			log.Println("Periodic sync")
+			log.Println("periodic sync")
 			ksync.ensureDNS()
 		}
 	}
@@ -56,7 +56,7 @@ func (ksync *KubernetesSync) ensureDNS() {
 	for name, info := range ksync.serviceMap {
 		err := ksync.addDNS(name, info)
 		if err != nil {
-			log.Println("Failed to ensure dns for %q: %s", name, err)
+			log.Println("failed to ensure dns for %q: %s", name, err)
 		}
 	}
 }
@@ -73,10 +73,10 @@ func (ksync *KubernetesSync) OnUpdate(services []api.Service) {
 		if exists && (info.portalPort != service.Port || !info.portalIP.Equal(serviceIP)) {
 			err := ksync.removeDNS(service.ID, info)
 			if err != nil {
-				log.Printf("Failed to remove dns for %q: %s\n", service.ID, err)
+				log.Printf("failed to remove dns for %q: %s\n", service.ID, err)
 			}
 		}
-		log.Printf("Adding new service %q at %s:%d/%s (local :%d)\n", service.ID, serviceIP, service.Port, service.Protocol, service.ProxyPort)
+		log.Printf("adding new service %q at %s:%d/%s (local :%d)\n", service.ID, serviceIP, service.Port, service.Protocol, service.ProxyPort)
 		si := &serviceInfo{
 			proxyPort: service.ProxyPort,
 			protocol:  service.Protocol,
@@ -87,7 +87,7 @@ func (ksync *KubernetesSync) OnUpdate(services []api.Service) {
 		si.portalPort = service.Port
 		err := ksync.addDNS(service.ID, si)
 		if err != nil {
-			log.Println("Failed to add dns %q: %s", service.ID, err)
+			log.Println("failed to add dns %q: %s", service.ID, err)
 		}
 	}
 	ksync.mu.Lock()
@@ -96,7 +96,7 @@ func (ksync *KubernetesSync) OnUpdate(services []api.Service) {
 		if !activeServices.Has(name) {
 			err := ksync.removeDNS(name, info)
 			if err != nil {
-				log.Println("Failed to remove dns for %q: %s", name, err)
+				log.Println("failed to remove dns for %q: %s", name, err)
 			}
 			delete(ksync.serviceMap, name)
 		}
@@ -162,7 +162,7 @@ func WatchKubernetes(eclient *etcd.Client) {
 
 	// define api config source
 	if clientConfig.Host != "" {
-		log.Println("Using api calls to get Kubernetes config %v", clientConfig.Host)
+		log.Println("using api calls to get Kubernetes config %v", clientConfig.Host)
 		client, err := client.New(clientConfig)
 		if err != nil {
 			log.Fatalf("Kubernetes requested, but received invalid API configuration: %v", err)
