@@ -34,7 +34,10 @@ func NewKubernetesSync(client *etcd.Client) *KubernetesSync {
 	return ks
 }
 
-// SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
+// This is a belt-and-suspenders loop that periodically
+// addes the records in the local cache of Kubernetes
+// services to the skydns repository to prevent them
+// from expiring.
 func (ksync *KubernetesSync) SyncLoop() {
 	for {
 		select {
@@ -61,7 +64,6 @@ func (ksync *KubernetesSync) ensureDNS() {
 // OnUpdate manages the active set of service records.
 // Active service records get ttl bumps if found in the update set or
 // removed if missing from the update set.
-
 func (ksync *KubernetesSync) OnUpdate(services []api.Service) {
 	activeServices := util.StringSet{}
 	for _, service := range services {
@@ -136,7 +138,7 @@ func (ksync *KubernetesSync) addDNS(service string, info *serviceInfo) error {
 	//Set with no TTL, and hope that kubernetes events are accurate.
 	//TODO(BJK) Think this through a little more
 
-	log.Printf("Setting dns record: %v\n", record)
+	log.Printf("setting dns record: %v\n", record)
 	_, err = ksync.eclient.Set(msg.Path(record), string(b), uint64(0))
 	return err
 }
