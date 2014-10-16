@@ -11,6 +11,10 @@ install:
   - go get github.com/rcrowley/go-metrics
   - go get github.com/rcrowley/go-metrics/influxdb
   - go get github.com/rcrowley/go-metrics/stathat
+  - go get github.com/GoogleCloudPlatform/kubernetes/pkg/client
+  - go get github.com/GoogleCloudPlatform/kubernetes/pkg/api
+  - go get github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config
+  - go get github.com/GoogleCloudPlatform/kubernetes/pkg/util
 
 before_script:
   - go build -o $HOME/gopath/src/github.com/coreos/etcd/etcd.run github.com/coreos/etcd
