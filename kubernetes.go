@@ -63,16 +63,11 @@ func (ksync *KubernetesSync) ensureDNS() {
 // removed if missing from the update set.
 
 func (ksync *KubernetesSync) OnUpdate(services []api.Service) {
-	log.Printf("Received update notice: %+v\n", services)
 	activeServices := util.StringSet{}
 	for _, service := range services {
 		activeServices.Insert(service.ID)
 		info, exists := ksync.getServiceInfo(service.ID)
 		serviceIP := net.ParseIP(service.PortalIP)
-		if exists && info.portalPort == service.Port && info.portalIP.Equal(serviceIP) {
-			//bump TTL
-			log.Println("Service exists.")
-		}
 		if exists && (info.portalPort != service.Port || !info.portalIP.Equal(serviceIP)) {
 			err := ksync.removeDNS(service.ID, info)
 			if err != nil {
