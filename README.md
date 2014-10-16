@@ -432,6 +432,37 @@ in the etcd backend so a restart of SkyDNS with the same unique value will give 
 
     ;; ANSWER SECTION:
     local.dns.skydns.local. 3600 IN  A   192.0.2.1
+## Kubernetes
+SkyDNS now has primitive support for watching the API of a Kubernetes master and
+inserting DNS records to represent the services running in a Kubernetes cluster.
+
+The service name in Kubernetes will be registered as a host (A) record under the SkyDNS
+domain.  For example, if you use the default `skydns.local` configuration, a service called 
+`redismaster` will be available at `redismaster.skydns.local`.  Additionally, SRV records
+are created for each service that is registered, so queries for SRV records will return all
+information necessary to connect to your service:
+
+```
+;; ANSWER SECTION:
+redismaster.skydns.local. 30	IN	SRV	10 100 10000 10.0.2.17 
+```
+In the query above, you can see the IP address, the weight and the port have been set
+by SkyDNS.
+
+Kubernets support is experimental and will improve with time.  To enable it, start SkyDNS
+with the `-kubernetes` flag and the client configuration parameters that you would use to connect
+to an APIServer instance.  At a minimum you need to pass the -master flag.  A common example to 
+start a SkyDNS server:
+
+```
+sudo skydns -kubernetes -domain kubernetes.local. -master="http://127.0.0.1:8080"
+```
+This command starts a SkyDNS service listening on port 53/udp, connecting to the 
+Kubernetes APIServer on localhost, and serving the domain `kubernetes.local`, meaning all 
+services in Kubernetes will be resolved in the form `servicename.kubernetes.local`
+
+For questions on SkyDNS/Kubernetes integration please see the #google-containers channel
+on freenode, or open tickets in the SkyDNS repository.
 
 # FAQ
 
