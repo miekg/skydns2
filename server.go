@@ -131,7 +131,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	dnssec := false
 	tcp := false
 
-	// fuck ANY queries
 	if req.Question[0].Qtype == dns.TypeANY {
 		m.Authoritative = false
 		m.Rcode = dns.RcodeRefused

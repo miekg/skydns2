@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
 )
@@ -22,14 +23,16 @@ import (
 const Version = "2.0.0h"
 
 var (
-	tlskey     = ""
-	tlspem     = ""
-	cacert     = ""
-	config     = &Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
-	nameserver = ""
-	machine    = ""
-	discover   = false
-	verbose    = false
+	tlskey       = ""
+	tlspem       = ""
+	cacert       = ""
+	config       = &Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
+	nameserver   = ""
+	machine      = ""
+	discover     = false
+	verbose      = false
+	kubernetes   = false
+	clientConfig = &kclient.Config{}
 )
 
 const (
@@ -60,6 +63,7 @@ func init() {
 	flag.BoolVar(&discover, "discover", false, "discover new machines by watching /v2/_etcd/machines")
 	flag.BoolVar(&verbose, "verbose", false, "log queries")
 	flag.BoolVar(&config.Systemd, "systemd", false, "bind to socket(s) activated by systemd (ignore -addr)")
+	flag.BoolVar(&kubernetes, "kubernetes", false, "read endpoints from a kubernetes master")
 
 	// TTl
 	// Minttl
@@ -119,7 +123,9 @@ func main() {
 	}
 
 	statsCollect()
-
+	if kubernetes {
+		go WatchKubernetes(client)
+	}
 	if err := s.Run(); err != nil {
 		log.Fatal(err)
 	}
