@@ -13,7 +13,7 @@ Since then, SkyDNS has seen some changes, most notably the ability to use etcd a
 
 SkyDNS2:
 
-* Does away with Raft and uses Etcd (which uses raft).
+* Does away with Raft and uses etcd (which uses raft).
 * Makes is possible to query arbitrary domain names.
 * Is a thin layer above etcd, that translates etcd keys and values to the DNS.
     In the near future, SkyDNS2 will possibly be upstreamed and incorporated directly in etcd.
@@ -43,7 +43,7 @@ you can set. To start SkyDNS, set the etcd machines with the environment variabl
     ./skydns
 
 If `ETCD_MACHINES` is not set, SkyDNS will default to using `http://127.0.0.1:4001` to connect to etcd.
-Or you can use the flag `-machines`. Autodiscovering new machines added to the network can
+Or you can use the flag `-machines`. Auto-discovering new machines added to the network can
 be enabled by enabling the flag `-discover`.
 
 Optionally (but recommended) give it a nameserver:
@@ -80,14 +80,14 @@ To set the configuration, use something like:
         -d value='{"dns_addr":"127.0.0.1:5354","ttl":3600, "nameservers": ["8.8.8.8:53","8.8.4.4:53"]}'
 
 SkyDNS needs to be restarted for configuration changes to take effect. This might change, so that SkyDNS
-can re-read the config from Etcd after a HUP signal.
+can re-read the config from etcd after a HUP signal.
 
 You can also use the command line options, however the settings in etcd take precedence.
 
 ### Commandline flags
 
 * `-addr`: used to specify the address to listen on (note: this will be changed into `-dns_addr` to match the json.
-* `-local`: used to specify a unique service for this SkyDNS instance. This should point to a (unique) domain into Etcd, when
+* `-local`: used to specify a unique service for this SkyDNS instance. This should point to a (unique) domain into etcd, when
     SkyDNS receives a query for the name `local.dns.skydns.local` it will fetch this service and return it.
     For instance: `-local e2016c14-fbba-11e3-ae08-10604b7efbe2.dockerhosts.skydns.local` and then 
 
@@ -208,7 +208,7 @@ Testing one of the names with `dig`:
     % dig @localhost SRV 1.rails.production.east.skydns.local
 
     ;; QUESTION SECTION:
-    ;1.rails.production.east.skydns.local.	IN	SRV
+    ;1.rails.production.east.skydns.local.      IN      SRV
 
     ;; ANSWER SECTION:
     1.rails.production.east.skydns.local. 3600 IN SRV 10 0 8080 service1.example.com.
@@ -309,7 +309,7 @@ We have created the following CNAME chain: `1.rails.production.east.skydns.local
 
 If the CNAME chains leads to a name that falls outside of the domain (i.e. does not end with `skydns.local.`),
 a.k.a. an external name, SkyDNS will attempt to resolve that name using the supplied nameservers. If this succeeds
-the reply is concatenated to the current one and send to the client. So if we registrer this service:
+the reply is concatenated to the current one and send to the client. So if we register this service:
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/east/production/rails/1 \
         -d value='{"host":"www.miek.nl","port":8080}'
@@ -325,7 +325,7 @@ The first CNAME is generated from within SkyDNS, the other two are from the recu
 #### NS Records
 
 For DNS to work properly SkyDNS needs to tell peers its nameservers. This information is stored
-inside Etcd, in the key `local/skydns/dns/`. There multiple services maybe stored. Note these
+inside etcd, in the key `local/skydns/dns/`. There multiple services maybe stored. Note these
 services MUST use IP address, using names will not work. For instance:
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dns/ns \
@@ -345,7 +345,7 @@ Registers `ns.dns.skydns.local` as a nameserver with ip address 172.16.0.1:
     ns.dns.skydns.local.    3600    IN  A   172.16.0.1
 
 The first nameserver should have the hostname `ns`  (as this is used in the SOA record). Having the nameserver(s)
-in Etcd make sense because usualy it is hard for SkyDNS to figure this out by itself, espcially when
+in etcd make sense because usualy it is hard for SkyDNS to figure this out by itself, espcially when
 running behind NAT or running on 127.0.0.1:53 and being forwarded packets IPv6 packets, etc. etc.
 
 #### PTR Records: Reverse Addresses
@@ -412,12 +412,12 @@ see [RFC7129](http://tools.ietf.org/html/rfc7129), Appendix B.
 SkyDNS supports storing values which are specific for that instance of SkyDNS.
 
 This can be useful when you have SkyDNS running on each host and want to store values that are specific
-for host. For example the public IP-address of the host or the IP-address on the tenant network.
+for that host. For example the public IP-address of the host or the IP-address on the tenant network.
 
 To do that you need to specify a unique value for that host with `-local`. A good unique value for that
 would be to use a tool like `uuidgen` to generate an UUID.
 
-That unique value is used to store the values seperately from the normal values. It is still stored
+That unique value is used as a path in etcd to store the values separately from the normal values. It is still stored
 in the etcd backend so a restart of SkyDNS with the same unique value will give it access to the old data.
 
     % skydns -local public.addresses.skydns.local
@@ -432,6 +432,7 @@ in the etcd backend so a restart of SkyDNS with the same unique value will give 
 
     ;; ANSWER SECTION:
     local.dns.skydns.local. 3600 IN  A   192.0.2.1
+
 ## Kubernetes
 SkyDNS now has primitive support for watching the API of a Kubernetes master and
 inserting DNS records to represent the services running in a Kubernetes cluster.
@@ -444,7 +445,7 @@ information necessary to connect to your service:
 
 ```
 ;; ANSWER SECTION:
-redismaster.skydns.local. 30	IN	SRV	10 100 10000 10.0.2.17 
+redismaster.skydns.local. 30    IN      SRV     10 100 10000 10.0.2.17
 ```
 In the query above, you can see the IP address, the weight and the port have been set
 by SkyDNS.
@@ -457,8 +458,8 @@ start a SkyDNS server:
 ```
 sudo skydns -kubernetes -domain kubernetes.local. -master="http://127.0.0.1:8080"
 ```
-This command starts a SkyDNS service listening on port 53/udp, connecting to the 
-Kubernetes APIServer on localhost, and serving the domain `kubernetes.local`, meaning all 
+This command starts a SkyDNS service listening on port 53, connecting to the
+Kubernetes APIServer on localhost, and serving the domain `kubernetes.local`, meaning all
 services in Kubernetes will be resolved in the form `servicename.kubernetes.local`
 
 For questions on SkyDNS/Kubernetes integration please see the #google-containers channel
@@ -470,8 +471,8 @@ on freenode, or open tickets in the SkyDNS repository.
 
 You have 3 machines with 3 different IP addresses and you want to have
 1 name pointing to all 3 possible addresses. The name we want to use is:
-`db.skydns.local` and the 3 addresses are 127.0.0.{123}. For this
-to work we create the hosts named `x{123}.db.skydns.local` in Etcd:
+`db.skydns.local` and the 3 addresses are 127.0.0.{1,2,3}. For this
+to work we create the hosts named `x{1,2,3}.db.skydns.local` in etcd:
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/db/x1 -d \
         value='{"Host":"127.0.0.1"}'

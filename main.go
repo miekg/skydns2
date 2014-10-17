@@ -20,7 +20,7 @@ import (
 	"github.com/miekg/dns"
 )
 
-const Version = "2.0.0h"
+const Version = "2.0.1b"
 
 var (
 	tlskey       = ""
