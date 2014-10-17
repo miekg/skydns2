@@ -159,21 +159,30 @@ func init() {
 func WatchKubernetes(eclient *etcd.Client) {
 	serviceConfig := pconfig.NewServiceConfig()
 	endpointsConfig := pconfig.NewEndpointsConfig()
-
-	// define api config source
-	if clientConfig.Host != "" {
-		log.Println("using api calls to get Kubernetes config %v", clientConfig.Host)
-		client, err := client.New(clientConfig)
-		if err != nil {
-			log.Fatalf("Kubernetes requested, but received invalid API configuration: %v", err)
+	/*
+		// disable API requests for now due to namespace bug in k8s
+		// api.  Re-enable when bug is fixed, api is best long term
+		// communnication channel
+		// define api config source
+		if clientConfig.Host != "" {
+			log.Println("using api calls to get Kubernetes config %v", clientConfig.Host)
+			client, err := client.New(clientConfig)
+			if err != nil {
+				log.Fatalf("Kubernetes requested, but received invalid API configuration: %v", err)
+			}
+			pconfig.NewSourceAPI(
+				client,
+				30*time.Second,
+				serviceConfig.Channel("api"),
+				endpointsConfig.Channel("api"),
+			)
 		}
-		pconfig.NewSourceAPI(
-			client,
-			30*time.Second,
-			serviceConfig.Channel("api"),
-			endpointsConfig.Channel("api"),
-		)
-	}
+	*/
+
+	pconfig.NewConfigSourceEtcd(eclient,
+		serviceConfig.Channel("etcd"),
+		endpointsConfig.Channel("etcd"))
+
 	ks := NewKubernetesSync(eclient)
 	// Wire skydns to handle changes to services
 	serviceConfig.RegisterHandler(ks)
