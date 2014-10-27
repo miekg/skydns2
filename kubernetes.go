@@ -67,27 +67,27 @@ func (ksync *KubernetesSync) ensureDNS() {
 func (ksync *KubernetesSync) OnUpdate(services []api.Service) {
 	activeServices := util.StringSet{}
 	for _, service := range services {
-		activeServices.Insert(service.ID)
-		info, exists := ksync.getServiceInfo(service.ID)
+		activeServices.Insert(service.Name)
+		info, exists := ksync.getServiceInfo(service.Name)
 		serviceIP := net.ParseIP(service.PortalIP)
 		if exists && (info.portalPort != service.Port || !info.portalIP.Equal(serviceIP)) {
-			err := ksync.removeDNS(service.ID, info)
+			err := ksync.removeDNS(service.Name, info)
 			if err != nil {
-				log.Printf("failed to remove dns for %q: %s\n", service.ID, err)
+				log.Printf("failed to remove dns for %q: %s\n", service.Name, err)
 			}
 		}
-		log.Printf("adding new service %q at %s:%d/%s (local :%d)\n", service.ID, serviceIP, service.Port, service.Protocol, service.ProxyPort)
+		log.Printf("adding new service %q at %s:%d/%s (local :%d)\n", service.Name, serviceIP, service.Port, service.Protocol, service.ProxyPort)
 		si := &serviceInfo{
 			proxyPort: service.ProxyPort,
 			protocol:  service.Protocol,
 			active:    true,
 		}
-		ksync.setServiceInfo(service.ID, si)
+		ksync.setServiceInfo(service.Name, si)
 		si.portalIP = serviceIP
 		si.portalPort = service.Port
-		err := ksync.addDNS(service.ID, si)
+		err := ksync.addDNS(service.Name, si)
 		if err != nil {
-			log.Println("failed to add dns %q: %s", service.ID, err)
+			log.Println("failed to add dns %q: %s", service.Name, err)
 		}
 	}
 	ksync.mu.Lock()
