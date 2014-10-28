@@ -34,33 +34,6 @@ func NewKubernetesSync(client *etcd.Client) *KubernetesSync {
 	return ks
 }
 
-// This is a belt-and-suspenders loop that periodically
-// addes the records in the local cache of Kubernetes
-// services to the skydns repository to prevent them
-// from expiring.
-func (ksync *KubernetesSync) SyncLoop() {
-	for {
-		select {
-		case <-time.After(syncInterval):
-			log.Println("periodic sync")
-			ksync.ensureDNS()
-		}
-	}
-}
-
-// Ensure that dns records exist for all services.
-// This seems a bit redundant. TBD - remove?
-func (ksync *KubernetesSync) ensureDNS() {
-	ksync.mu.Lock()
-	defer ksync.mu.Unlock()
-	for name, info := range ksync.serviceMap {
-		err := ksync.addDNS(name, info)
-		if err != nil {
-			log.Println("failed to ensure dns for %q: %s", name, err)
-		}
-	}
-}
-
 // OnUpdate manages the active set of service records.
 // Active service records get ttl bumps if found in the update set or
 // removed if missing from the update set.
@@ -136,7 +109,6 @@ func (ksync *KubernetesSync) addDNS(service string, info *serviceInfo) error {
 	b, err := json.Marshal(svc)
 	record := service + "." + config.Domain
 	//Set with no TTL, and hope that kubernetes events are accurate.
-	//TODO(BJK) Think this through a little more
 
 	log.Printf("setting dns record: %v\n", record)
 	_, err = ksync.eclient.Set(msg.Path(record), string(b), uint64(0))
@@ -159,32 +131,23 @@ func init() {
 func WatchKubernetes(eclient *etcd.Client) {
 	serviceConfig := pconfig.NewServiceConfig()
 	endpointsConfig := pconfig.NewEndpointsConfig()
-	/*
-		// disable API requests for now due to namespace bug in k8s
-		// api.  Re-enable when bug is fixed, api is best long term
-		// communnication channel
-		// define api config source
-		if clientConfig.Host != "" {
-			log.Println("using api calls to get Kubernetes config %v", clientConfig.Host)
-			client, err := client.New(clientConfig)
-			if err != nil {
-				log.Fatalf("Kubernetes requested, but received invalid API configuration: %v", err)
-			}
-			pconfig.NewSourceAPI(
-				client,
-				30*time.Second,
-				serviceConfig.Channel("api"),
-				endpointsConfig.Channel("api"),
-			)
-		}
-	*/
 
-	pconfig.NewConfigSourceEtcd(eclient,
-		serviceConfig.Channel("etcd"),
-		endpointsConfig.Channel("etcd"))
+	if clientConfig.Host != "" {
+		log.Printf("using api calls to get Kubernetes config %v\n", clientConfig.Host)
+		client, err := client.New(clientConfig)
+		if err != nil {
+			log.Fatalf("Kubernetes requested, but received invalid API configuration: %v", err)
+		}
+		pconfig.NewSourceAPI(
+			client.Services(api.NamespaceAll),
+			client.Endpoints(api.NamespaceAll),
+			syncInterval,
+			serviceConfig.Channel("api"),
+			endpointsConfig.Channel("api"),
+		)
+	}
 
 	ks := NewKubernetesSync(eclient)
 	// Wire skydns to handle changes to services
 	serviceConfig.RegisterHandler(ks)
-	ks.SyncLoop()
 }
