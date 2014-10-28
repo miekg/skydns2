@@ -1,5 +1,5 @@
 # SkyDNS [![Build Status](https://travis-ci.org/skynetservices/skydns.png)](https://travis-ci.org/skynetservices/skydns)
-*Version 2.0.1a*
+*Version 2.0.1c*
 
 SkyDNS is a distributed service for announcement and discovery of services built on
 top of [etcd](https://github.com/coreos/etcd). It utilizes DNS queries
@@ -482,6 +482,13 @@ to work we create the hosts named `x{123}.db.skydns.local` in Etcd:
 
 Now the name `db.skydns.local` is the "load balanced" name for the database, SkyDNS
 will round-robin by default in this case unless `-round-robin=false` is enabled.
+
+# Docker
+Official Docker images are at the [Docker Hub](https://registry.hub.docker.com/u/skynetservices/skydns/)
+
+master -> skynetservices/skydns:latest
+latest tag -> skynetservices/skydns:latest-tagged
+
 
 # License
 The MIT License (MIT)
