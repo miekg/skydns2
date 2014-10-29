@@ -8,6 +8,7 @@ with special meaning given to subdomains, priorities and weights.
 
 This is the original [announcement blog post](http://blog.gopheracademy.com/skydns) for version 1.
 Since then, SkyDNS has seen some changes, most notably the ability to use etcd as a backend.
+[Here you can find the SkyDNS2 announcement](http://miek.nl/posts/2014/Jun/08/announcing%20SkyDNS%20version%202/).
 
 # Changes since version 1
 
@@ -485,11 +486,10 @@ Now the name `db.skydns.local` is the "load balanced" name for the database, Sky
 will round-robin by default in this case unless `-round-robin=false` is enabled.
 
 # Docker
-Official Docker images are at the [Docker Hub](https://registry.hub.docker.com/u/skynetservices/skydns/)
+Official Docker images are at the [Docker Hub](https://registry.hub.docker.com/u/skynetservices/skydns/):
 
-master -> skynetservices/skydns:latest
-latest tag -> skynetservices/skydns:latest-tagged
-
+* master -> skynetservices/skydns:latest
+* latest tag -> skynetservices/skydns:latest-tagged
 
 # License
 The MIT License (MIT)
