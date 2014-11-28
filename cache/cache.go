@@ -77,7 +77,7 @@ func (c *Cache) shrink() {
 	}
 }
 
-// InsertMessage inserts a message in the Cache. We will cahce it for ttl seconds, which
+// InsertMessage inserts a message in the Cache. We will cache it for ttl seconds, which
 // should be a small (60...300) integer.
 func (c *Cache) InsertMessage(s string, msg *dns.Msg) {
 	if c.capacity == 0 {
