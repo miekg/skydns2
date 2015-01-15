@@ -2,7 +2,7 @@
 // Use of this source code is governed by The MIT License (MIT) that can be
 // found in the LICENSE file.
 
-package main
+package server
 
 import (
 	"encoding/json"
@@ -15,6 +15,12 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/coreos/go-log/log"
 	"github.com/miekg/dns"
+)
+
+const (
+	SCacheCapacity = 10000
+	RCacheCapacity = 100000
+	RCacheTtl      = 60
 )
 
 // Config provides options to the SkyDNS resolver.
@@ -57,6 +63,8 @@ type Config struct {
 	PrivKey      dns.PrivateKey `json:"-"`
 	DomainLabels int            `json:"-"`
 
+	Verbose bool `json:"-"`
+
 	log *log.Logger
 
 	// some predefined string "constants"
@@ -64,7 +72,7 @@ type Config struct {
 	dnsDomain   string // "dns". + config.Domain
 }
 
-func loadConfig(client *etcd.Client, config *Config) (*Config, error) {
+func LoadConfig(client *etcd.Client, config *Config) (*Config, error) {
 	config.log = log.New("skydns", false,
 		log.CombinedSink(os.Stderr, "[%s] %s %-9s | %s\n", []string{"prefix", "time", "priority", "message"}))
 

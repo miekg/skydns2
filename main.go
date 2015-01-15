@@ -10,6 +10,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -18,27 +19,20 @@ import (
 	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
-)
 
-const Version = "2.0.1b"
+	"github.com/skynetservices/skydns/server"
+)
 
 var (
 	tlskey       = ""
 	tlspem       = ""
 	cacert       = ""
-	config       = &Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
+	config       = &server.Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
 	nameserver   = ""
 	machine      = ""
 	discover     = false
-	verbose      = false
 	kubernetes   = false
 	clientConfig = &kclient.Config{}
-)
-
-const (
-	SCacheCapacity = 10000
-	RCacheCapacity = 100000
-	RCacheTtl      = 60
 )
 
 func env(key, def string) string {
@@ -61,22 +55,24 @@ func init() {
 	flag.DurationVar(&config.ReadTimeout, "rtimeout", 2*time.Second, "read timeout")
 	flag.BoolVar(&config.RoundRobin, "round-robin", true, "round robin A/AAAA replies")
 	flag.BoolVar(&discover, "discover", false, "discover new machines by watching /v2/_etcd/machines")
-	flag.BoolVar(&verbose, "verbose", false, "log queries")
+	flag.BoolVar(&config.Verbose, "verbose", false, "log queries")
 	flag.BoolVar(&config.Systemd, "systemd", false, "bind to socket(s) activated by systemd (ignore -addr)")
 	flag.BoolVar(&kubernetes, "kubernetes", false, "read endpoints from a kubernetes master")
 
 	// TTl
 	// Minttl
 	flag.StringVar(&config.Hostmaster, "hostmaster", "hostmaster@skydns.local.", "hostmaster email address to use")
-	flag.IntVar(&config.SCache, "scache", SCacheCapacity, "capacity of the signature cache")
+	flag.IntVar(&config.SCache, "scache", server.SCacheCapacity, "capacity of the signature cache")
 	flag.IntVar(&config.RCache, "rcache", 0, "capacity of the response cache") // default to 0 for now
-	flag.IntVar(&config.RCacheTtl, "rcache-ttl", RCacheTtl, "TTL of the response cache")
+	flag.IntVar(&config.RCacheTtl, "rcache-ttl", server.RCacheTtl, "TTL of the response cache")
+
+	kclient.BindClientConfigFlags(flag.CommandLine, clientConfig)
 }
 
 func main() {
 	flag.Parse()
 	machines := strings.Split(machine, ",")
-	client := NewClient(machines)
+	client := newClient(machines, tlskey, tlspem, cacert)
 	if nameserver != "" {
 		for _, hostPort := range strings.Split(nameserver, ",") {
 			if err := validateHostPort(hostPort); err != nil {
@@ -88,29 +84,32 @@ func main() {
 	if err := validateHostPort(config.DnsAddr); err != nil {
 		log.Fatalf("addr is invalid: %s\n", err)
 	}
-	config, err := loadConfig(client, config)
+
+	config, err := server.LoadConfig(client, config)
 	if err != nil {
 		log.Fatal(err)
 	}
-	s := NewServer(config, client)
-	if s.config.Local != "" {
-		s.config.Local = dns.Fqdn(s.config.Local)
+	if config.Local != "" {
+		config.Local = dns.Fqdn(config.Local)
 	}
+	s := server.New(config, client)
 
 	if discover {
 		go func() {
 			recv := make(chan *etcd.Response)
-			go s.client.Watch("/_etcd/machines/", 0, true, recv, nil)
+			go client.Watch("/_etcd/machines/", 0, true, recv, nil)
 			duration := 1 * time.Second
 			for {
 				select {
 				case n := <-recv:
 					if n != nil {
-						s.UpdateClient(n)
+						if client := updateClient(n, tlskey, tlspem, cacert); client != nil {
+							s.UpdateClient(client)
+						}
 						duration = 1 * time.Second // reset
 					} else {
 						// we can see an n == nil, probably when we can't connect to etcd.
-						s.config.log.Infof("ectd machine cluster update failed, sleeping %s + ~3s", duration)
+						log.Printf("ectd machine cluster update failed, sleeping %s + ~3s", duration)
 						time.Sleep(duration + (time.Duration(rand.Float32() * 3e9))) // Add some random.
 						duration *= 2
 						if duration > 32*time.Second {
@@ -122,9 +121,9 @@ func main() {
 		}()
 	}
 
-	statsCollect()
+	server.StatsCollect()
 	if kubernetes {
-		go WatchKubernetes(client)
+		go server.WatchKubernetes(config, clientConfig, client)
 	}
 	if err := s.Run(); err != nil {
 		log.Fatal(err)
@@ -142,6 +141,57 @@ func validateHostPort(hostPort string) error {
 
 	if p, _ := strconv.Atoi(port); p < 1 || p > 65535 {
 		return fmt.Errorf("bad port number %s", port)
+	}
+	return nil
+}
+
+func newClient(machines []string, tlsCert, tlsKey, tlsCACert string) (client *etcd.Client) {
+	// set default if not specified in env
+	if len(machines) == 1 && machines[0] == "" {
+		machines[0] = "http://127.0.0.1:4001"
+	}
+	if strings.HasPrefix(machines[0], "https://") {
+		var err error
+		// TODO(miek): machines is local, the rest is global, ugly.
+		if client, err = etcd.NewTLSClient(machines, tlsCert, tlsKey, tlsCACert); err != nil {
+			// TODO(miek): would be nice if this wasn't a fatal error
+			log.Fatalf("failure to connect: %s\n", err)
+		}
+		client.SyncCluster()
+	} else {
+		client = etcd.NewClient(machines)
+		client.SyncCluster()
+	}
+	return client
+}
+
+// updateClient updates the client with the machines found in v2/_etcd/machines.
+func updateClient(resp *etcd.Response, tlsCert, tlsKey, tlsCACert string) (client *etcd.Client) {
+	machines := make([]string, 0, 3)
+	for _, m := range resp.Node.Nodes {
+		u, e := url.Parse(m.Value)
+		if e != nil {
+			continue
+		}
+		// etcd=bla&raft=bliep
+		// TODO(miek): surely there is a better way to do this
+		ms := strings.Split(u.String(), "&")
+		if len(ms) == 0 {
+			continue
+		}
+		if len(ms[0]) < 5 {
+			continue
+		}
+		machines = append(machines, ms[0][5:])
+	}
+	// When CoreOS (and thus ectd) crash this call back seems to also trigger, but we
+	// don't have any machines. Don't trigger this update then, as a) it
+	// crashes SkyDNS and b) potentially leaves with no machines to connect to.
+	// Keep the old ones and hope they still work and wait for another update
+	// in the future.
+	if len(machines) > 0 {
+		log.Printf("setting new etcd cluster to %v", machines)
+		return newClient(machines, tlsCert, tlsKey, tlsCACert)
 	}
 	return nil
 }

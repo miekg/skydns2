@@ -2,7 +2,7 @@
 // Use of this source code is governed by The MIT License (MIT) that can be
 // found in the LICENSE file.
 
-package main
+package server
 
 import (
 	"encoding/json"
@@ -21,6 +21,8 @@ import (
 	"github.com/skynetservices/skydns/msg"
 )
 
+const Version = "2.0.1b"
+
 type server struct {
 	client       *etcd.Client
 	dnsUDPclient *dns.Client // used for forwarding queries
@@ -31,8 +33,8 @@ type server struct {
 	rcache       *cache.Cache
 }
 
-// NewServer returns a new SkyDNS server.
-func NewServer(config *Config, client *etcd.Client) *server {
+// New returns a new SkyDNS server.
+func New(config *Config, client *etcd.Client) *server {
 	return &server{client: client, config: config, group: new(sync.WaitGroup),
 		scache:       cache.New(config.SCache, 0),
 		rcache:       cache.New(config.RCache, config.RCacheTtl),
@@ -206,7 +208,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
 	StatsRequestCount.Inc(1)
-	if verbose {
+	if s.config.Verbose {
 		s.config.log.Infof("received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 	}
 	// If the qname is local.dns.skydns.local. and s.config.Local != "", substitute that name.
@@ -861,4 +863,8 @@ func (s *server) NoDataError(m, req *dns.Msg) {
 	m.Ns = []dns.RR{s.NewSOA()}
 	m.Ns[0].Header().Ttl = s.config.MinTtl
 	//	StatsNoDataCount.Inc(1)
+}
+
+func (s *server) UpdateClient(client *etcd.Client) {
+	s.client = client
 }

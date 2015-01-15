@@ -2,7 +2,7 @@
 // Use of this source code is governed by The MIT License (MIT) that can be
 // found in the LICENSE file.
 
-package main
+package server
 
 // etcd needs to be running on http://127.0.0.1:4001
 

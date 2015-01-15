@@ -1,7 +1,6 @@
-package main
+package server
 
 import (
-	"flag"
 	"log"
 	"net"
 	"sync"
@@ -24,12 +23,14 @@ type KubernetesSync struct {
 	mu         sync.Mutex // protects serviceMap
 	serviceMap map[string]*serviceInfo
 	eclient    *etcd.Client
+	config     *Config
 }
 
-func NewKubernetesSync(client *etcd.Client) *KubernetesSync {
+func NewKubernetesSync(config *Config, client *etcd.Client) *KubernetesSync {
 	ks := &KubernetesSync{
 		serviceMap: make(map[string]*serviceInfo),
 		eclient:    client,
+		config:     config,
 	}
 	return ks
 }
@@ -90,7 +91,7 @@ func (ksync *KubernetesSync) setServiceInfo(service string, info *serviceInfo) {
 }
 
 func (ksync *KubernetesSync) removeDNS(service string, info *serviceInfo) error {
-	record := service + "." + config.Domain
+	record := service + "." + ksync.config.Domain
 	// Remove from SkyDNS registration
 	log.Printf("removing %s from DNS", record)
 	_, err := ksync.eclient.Delete(msg.Path(record), true)
@@ -107,7 +108,7 @@ func (ksync *KubernetesSync) addDNS(service string, info *serviceInfo) error {
 		Ttl:      30,
 	}
 	b, err := json.Marshal(svc)
-	record := service + "." + config.Domain
+	record := service + "." + ksync.config.Domain
 	//Set with no TTL, and hope that kubernetes events are accurate.
 
 	log.Printf("setting dns record: %v\n", record)
@@ -124,11 +125,7 @@ type serviceInfo struct {
 	active     bool
 }
 
-func init() {
-	client.BindClientConfigFlags(flag.CommandLine, clientConfig)
-}
-
-func WatchKubernetes(eclient *etcd.Client) {
+func WatchKubernetes(config *Config, clientConfig *client.Config, eclient *etcd.Client) {
 	serviceConfig := pconfig.NewServiceConfig()
 	endpointsConfig := pconfig.NewEndpointsConfig()
 
@@ -147,7 +144,7 @@ func WatchKubernetes(eclient *etcd.Client) {
 		)
 	}
 
-	ks := NewKubernetesSync(eclient)
+	ks := NewKubernetesSync(config, eclient)
 	// Wire skydns to handle changes to services
 	serviceConfig.RegisterHandler(ks)
 }
