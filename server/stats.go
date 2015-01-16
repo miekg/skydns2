@@ -2,7 +2,7 @@
 // Use of this source code is governed by The MIT License (MIT) that can be
 // found in the LICENSE file.
 
-package main
+package server
 
 import (
 	"github.com/rcrowley/go-metrics"
@@ -64,7 +64,7 @@ func init() {
 	metrics.Register("skydns-nodata-responses", StatsNoDataCount)
 }
 
-func statsCollect() {
+func StatsCollect() {
 	if graphiteServer != "" {
 		addr, err := net.ResolveTCPAddr("tcp", graphiteServer)
 		if err == nil {
