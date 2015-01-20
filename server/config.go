@@ -105,7 +105,7 @@ func setDefaults(config *Config) error {
 		config.Domain = "skydns.local."
 	}
 	if config.Hostmaster == "" {
-		config.Hostmaster = "hostmaster." + config.Domain
+		config.Hostmaster = appendDomain("hostmaster", config.Domain)
 	}
 	// People probably don't know that SOA's email addresses cannot
 	// contain @-signs, replace them with dots
@@ -158,7 +158,14 @@ func setDefaults(config *Config) error {
 		config.KeyTag = k.KeyTag()
 		config.PrivKey = p
 	}
-	config.localDomain = "local.dns." + config.Domain
-	config.dnsDomain = "dns." + config.Domain
+	config.localDomain = appendDomain("local.dns", config.Domain)
+	config.dnsDomain = appendDomain("dns", config.Domain)
 	return nil
+}
+
+func appendDomain(s1, s2 string) string {
+	if len(s2) > 0 && s2[0] == '.' {
+		return s1 + s2
+	}
+	return s1 + "." + s2
 }

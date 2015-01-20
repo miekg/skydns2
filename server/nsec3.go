@@ -66,7 +66,7 @@ func (s *server) newNSEC3NameError(qname string) *dns.NSEC3 {
 
 	buf := packBase32(covername)
 	byteArith(buf, false) // one before
-	n.Hdr.Name = strings.ToLower(unpackBase32(buf)) + "." + s.config.Domain
+	n.Hdr.Name = appendDomain(strings.ToLower(unpackBase32(buf)), s.config.Domain)
 	byteArith(buf, true) // one next
 	byteArith(buf, true) // and another one
 	n.NextDomain = unpackBase32(buf)
@@ -89,7 +89,7 @@ func (s *server) newNSEC3NoData(qname string) *dns.NSEC3 {
 	byteArith(buf, true) // one next
 	n.NextDomain = unpackBase32(buf)
 
-	n.Hdr.Name += "." + s.config.Domain
+	n.Hdr.Name += appendDomain(".", s.config.Domain)
 	return n
 }
 
