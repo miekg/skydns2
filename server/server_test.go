@@ -76,6 +76,9 @@ func newTestServer(t *testing.T, c bool) *server {
 	s.config.Ttl = 3600
 	s.config.Ndots = 2
 	s.config.log = log.New("skydns", false, log.NullSink())
+	// Leave this in as enabling this aids in debugging.
+	//s.config.log = log.New("skydns", false, log.WriterSink(os.Stderr, log.BasicFormat, log.BasicFields))
+
 	s.dnsUDPclient = &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
 	s.dnsTCPclient = &dns.Client{Net: "tcp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
 
@@ -646,18 +649,18 @@ var dnsTestCases = []dnsTestCase{
 		Extra: []dns.RR{new(dns.OPT)},
 	},
 	// NODATA Test
-	//{
-	//	dnssec: true,
-	//	Qname:  "104.server1.development.region1.skydns.test.", Qtype: dns.TypeTXT,
-	//	Rcode: dns.RcodeSuccess,
-	//	Ns: []dns.RR{
-	//		newNSEC3("E76CLEL5E7TQHRTFLTBVH0645NEKFJV9.skydns.test.	60 NSEC3 1 0 0 - E76CLEL5E7TQHRTFLTBVH0645NEKFJVA A AAAA SRV RRSIG"),
-	//		newRRSIG("E76CLEL5E7TQHRTFLTBVH0645NEKFJV9.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814211641 20140807181641 51945 skydns.test. deadbeef"),
-	//		newRRSIG("skydns.test.	60 RRSIG SOA 5 2 3600 20140814211641 20140807181641 51945 skydns.test. deadbeef"),
-	//		newSOA("skydns.test.	60 SOA ns.dns.skydns.test. hostmaster.skydns.test. 1407445200 28800 7200 604800 60"),
-	//	},
-	//	Extra: []dns.RR{new(dns.OPT)},
-	//},
+	{
+		dnssec: true,
+		Qname:  "104.server1.development.region1.skydns.test.", Qtype: dns.TypeTXT,
+		Rcode: dns.RcodeSuccess,
+		Ns: []dns.RR{
+			newNSEC3("E76CLEL5E7TQHRTFLTBVH0645NEKFJV9.skydns.test.	60 NSEC3 1 0 0 - E76CLEL5E7TQHRTFLTBVH0645NEKFJVA A AAAA SRV RRSIG"),
+			newRRSIG("E76CLEL5E7TQHRTFLTBVH0645NEKFJV9.skydns.test.	60 RRSIG NSEC3 5 3 3600 20140814211641 20140807181641 51945 skydns.test. deadbeef"),
+			newRRSIG("skydns.test.	60 RRSIG SOA 5 2 3600 20140814211641 20140807181641 51945 skydns.test. deadbeef"),
+			newSOA("skydns.test.	60 SOA ns.dns.skydns.test. hostmaster.skydns.test. 1407445200 28800 7200 604800 60"),
+		},
+		Extra: []dns.RR{new(dns.OPT)},
+	},
 	// Reverse v4 local answer
 	{
 		Qname: "1.0.0.10.in-addr.arpa.", Qtype: dns.TypePTR,

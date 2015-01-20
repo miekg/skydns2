@@ -89,7 +89,7 @@ func (s *server) newNSEC3NoData(qname string) *dns.NSEC3 {
 	byteArith(buf, true) // one next
 	n.NextDomain = unpackBase32(buf)
 
-	n.Hdr.Name += appendDomain(".", s.config.Domain)
+	n.Hdr.Name += appendDomain("", s.config.Domain)
 	return n
 }
 
@@ -124,7 +124,7 @@ func newNSEC3CEandWildcard(apex, ce string, ttl uint32) (*dns.NSEC3, *dns.NSEC3)
 	prev = dns.HashName("*."+ce, dns.SHA1, n2.Iterations, n2.Salt)
 	buf = packBase32(prev)
 	byteArith(buf, false) // one before
-	n2.Hdr.Name = strings.ToLower(unpackBase32(buf)) + "." + apex
+	n2.Hdr.Name = appendDomain(strings.ToLower(unpackBase32(buf)), apex)
 	byteArith(buf, true) // one next
 	byteArith(buf, true) // and another one
 	n2.NextDomain = unpackBase32(buf)
