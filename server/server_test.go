@@ -866,3 +866,23 @@ func BenchmarkDNSSECSingleNoCache(b *testing.B) {
 		c.Exchange(m, "127.0.0.1:"+StrPort)
 	}
 }
+
+func TestSplit255(t *testing.T) {
+	xs := split255("abc")
+	if len(xs) != 1 && xs[0] != "abc" {
+		t.Logf("Failure to split abc")
+	}
+	s := ""
+	for i := 0; i < 255; i++ {
+		s += "a"
+	}
+	xs = split255(s)
+	if len(xs) != 1 && xs[0] != s {
+		t.Logf("Failure to split 255 char long string")
+	}
+	s += "b"
+	xs = split255(s)
+	if len(xs) != 2 && xs[1] != "b" {
+		t.Logf("Failure to split 256 char long string")
+	}
+}
