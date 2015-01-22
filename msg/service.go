@@ -52,14 +52,14 @@ func (s *Service) NewNS(name string, target string) *dns.NS {
 	return &dns.NS{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: s.Ttl}, Ns: target}
 }
 
+// NewTXT returns a new TXT record based on the Service.
+func (s *Service) NewTXT(name string) *dns.TXT {
+	return &dns.TXT{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: s.Ttl}, Txt: split255(s.Text)}
+}
+
 // NewPTR returns a new PTR record based on the Service.
 func (s *Service) NewPTR(name string, ttl uint32) *dns.PTR {
 	return &dns.PTR{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: ttl}, Ptr: dns.Fqdn(s.Host)}
-}
-
-// NewTXT returns a new TXT record based on the Service.
-func (s *Service) NewTXT(name string, ttl uint32) *dns.TXT {
-	return &dns.TXT{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: ttl}, Txt: split255(s.Text)}
 }
 
 // As Path, but

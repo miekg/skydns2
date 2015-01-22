@@ -725,8 +725,7 @@ func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, er
 }
 
 func (s *server) TXTRecords(q dns.Question, name string) (records []dns.RR, err error) {
-	// TODO(miek): check this function.
-	path, _ := msg.PathWithWildcard(name) // no wildcards here
+	path, star := msg.PathWithWildcard(name)
 	r, err := get(s.client, path, true)
 	if err != nil {
 		return nil, err
@@ -741,8 +740,20 @@ func (s *server) TXTRecords(q dns.Question, name string) (records []dns.RR, err 
 		serv.Key = r.Node.Key
 		serv.Ttl = ttl
 		records = append(records, serv.NewTXT(q.Name, ttl))
+		return records, nil
 	}
-	return records, nil
+	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.Path(name), "/"), star, nil)
+	if err != nil || len(sx) == 0 {
+		return nil, nil, err
+	}
+	for _, serv := range sx {
+		ttl := s.calculateTtl(r.Node, serv)
+		serv.Key = r.Node.Key
+		serv.Ttl = ttl
+		records = append(records, serv.NewTXT(q.Name))
+		return records, nil
+
+	}
 }
 
 func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
