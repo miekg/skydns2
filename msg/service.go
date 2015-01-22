@@ -59,9 +59,7 @@ func (s *Service) NewPTR(name string, ttl uint32) *dns.PTR {
 
 // NewTXT returns a new TXT record based on the Service.
 func (s *Service) NewTXT(name string, ttl uint32) *dns.TXT {
-	//	return &dns.TXT{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: ttl}, Txt: strings.Split(s.Text, "\n")}
-	// Need to split the text on 255 byte boundery
-	return nil
+	return &dns.TXT{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: ttl}, Txt: split255(s.Text)}
 }
 
 // As Path, but
@@ -100,4 +98,28 @@ func Domain(s string) string {
 		l[i], l[j] = l[j], l[i]
 	}
 	return dns.Fqdn(strings.Join(l[1:len(l)-1], "."))
+}
+
+// Split255 splits a string into 255 byte chunks.
+func split255(s string) []string {
+	if len(s) < 255 {
+		return []string{s}
+	}
+	sx := []string{}
+	for p, i := 0, 255; i < len(s); p, i = p+255, i+255 {
+		sx = append(sx, s[p:i])
+	}
+	p, i := 0, 255
+	for {
+		if i <= len(s) {
+			sx = append(sx, s[p:i])
+		} else {
+			sx = append(sx, s[p:])
+			break
+
+		}
+		p, i = p+255, i+255
+	}
+
+	return sx
 }
