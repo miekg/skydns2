@@ -736,24 +736,30 @@ func (s *server) TXTRecords(q dns.Question, name string) (records []dns.RR, err 
 			s.config.log.Infof("failed to parse json: %s", err.Error())
 			return nil, err
 		}
-		ttl := s.calculateTtl(r.Node, serv)
-		serv.Key = r.Node.Key
-		serv.Ttl = ttl
-		records = append(records, serv.NewTXT(q.Name, ttl))
-		return records, nil
-	}
-	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.Path(name), "/"), star, nil)
-	if err != nil || len(sx) == 0 {
-		return nil, nil, err
-	}
-	for _, serv := range sx {
+		// empty txt
+		if serv.Text == "" {
+			return nil, nil
+		}
 		ttl := s.calculateTtl(r.Node, serv)
 		serv.Key = r.Node.Key
 		serv.Ttl = ttl
 		records = append(records, serv.NewTXT(q.Name))
 		return records, nil
-
 	}
+	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.Path(name), "/"), star, nil)
+	if err != nil || len(sx) == 0 {
+		return nil, err
+	}
+	for _, serv := range sx {
+		if serv.Text == "" {
+			continue
+		}
+		ttl := s.calculateTtl(r.Node, serv)
+		serv.Key = r.Node.Key
+		serv.Ttl = ttl
+		records = append(records, serv.NewTXT(q.Name))
+	}
+	return records, nil
 }
 
 func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
@@ -804,6 +810,7 @@ type bareService struct {
 	Port     int
 	Priority int
 	Weight   int
+	Text     string
 }
 
 // skydns/local/skydns/east/staging/web
@@ -847,7 +854,7 @@ Nodes:
 		if err := json.Unmarshal([]byte(n.Value), serv); err != nil {
 			return nil, err
 		}
-		b := bareService{serv.Host, serv.Port, serv.Priority, serv.Weight}
+		b := bareService{serv.Host, serv.Port, serv.Priority, serv.Weight, serv.Text}
 		if _, ok := bx[b]; ok {
 			continue
 		}
