@@ -868,27 +868,3 @@ func (s *server) NoDataError(m, req *dns.Msg) {
 func (s *server) UpdateClient(client *etcd.Client) {
 	s.client = client
 }
-
-// split a string into 255 byte chunks
-func split255(s string) []string {
-	if len(s) < 255 {
-		return []string{s}
-	}
-	sx := []string{}
-	for p, i := 0, 255; i < len(s); p, i = p+255, i+255 {
-		sx = append(sx, s[p:i])
-	}
-	p, i := 0, 255
-	for {
-		if i <= len(s) {
-			sx = append(sx, s[p:i])
-		} else {
-			sx = append(sx, s[p:])
-			break
-
-		}
-		p, i = p+255, i+255
-	}
-
-	return sx
-}
