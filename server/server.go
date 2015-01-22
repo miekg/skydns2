@@ -376,6 +376,17 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 		m.Answer = append(m.Answer, records...)
+	case dns.TypeTXT:
+		records, err := s.TXTRecords(q, name)
+		if err != nil {
+			if e, ok := err.(*etcd.EtcdError); ok {
+				if e.ErrorCode == 100 {
+					s.NameError(m, req)
+					return
+				}
+			}
+		}
+		m.Answer = append(m.Answer, records...)
 	case dns.TypeCNAME:
 		records, err := s.CNAMERecords(q, name)
 		if err != nil {
@@ -709,6 +720,27 @@ func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, er
 		if ip == nil {
 			records = append(records, serv.NewCNAME(q.Name, dns.Fqdn(serv.Host)))
 		}
+	}
+	return records, nil
+}
+
+func (s *server) TXTRecords(q dns.Question, name string) (records []dns.RR, err error) {
+	// TODO(miek): check this function.
+	path, _ := msg.PathWithWildcard(name) // no wildcards here
+	r, err := get(s.client, path, true)
+	if err != nil {
+		return nil, err
+	}
+	if !r.Node.Dir {
+		serv := new(msg.Service)
+		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
+			s.config.log.Infof("failed to parse json: %s", err.Error())
+			return nil, err
+		}
+		ttl := s.calculateTtl(r.Node, serv)
+		serv.Key = r.Node.Key
+		serv.Ttl = ttl
+		records = append(records, serv.NewTXT(q.Name, ttl))
 	}
 	return records, nil
 }
