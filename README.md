@@ -17,8 +17,7 @@ SkyDNS2:
 * Does away with Raft and uses etcd (which uses raft).
 * Makes is possible to query arbitrary domain names.
 * Is a thin layer above etcd, that translates etcd keys and values to the DNS.
-    In the near future, SkyDNS2 will possibly be upstreamed and incorporated directly in etcd.
-* Does DNSSEC with NSEC3 instead of NSEC (Work in progress).
+* Does DNSSEC with NSEC3 instead of NSEC.
 
 Note that bugs in SkyDNS1 will still be fixed, but the main development effort will be focussed on version 2.
 [Version 1 of SkyDNS can be found here](https://github.com/skynetservices/skydns1).
@@ -26,7 +25,6 @@ Note that bugs in SkyDNS1 will still be fixed, but the main development effort w
 # Future ideas
 
 * Abstract away the backend in an interface, so different backends can be used.
-* Make SkyDNS a library and provide a small server.
 
 ## Setup / Install
 Download/compile and run etcd. See the documentation for etcd at <https://github.com/coreos/etcd>.
@@ -73,7 +71,7 @@ may be set:
 * `scache`: the capacity of the DNSSEC signature cache, defaults to 10000 records if not set.
 * `rcache`: the capacity of the response cache, defaults to 0 records if not set.
 * `rcache_ttl`: the TTL of the response cache, defaults to 60 if not set.
-* `systemd`: bind to socket(s) activated by systemd (ignore -addr).
+* `systemd`: bind to socket(s) activated by systemd (ignores -addr).
 
 To set the configuration, use something like:
 
@@ -305,6 +303,10 @@ We have created the following CNAME chain: `1.rails.production.east.skydns.local
 
     1.rails.production.east.skydns.local. 3600  IN  CNAME   service1.skydns.local.
     service1.skydns.local.                 3600  IN  A       10.0.2.15
+
+#### TXT Records
+
+SkyDNS also allows you to query for TXT records. Just register a json with the 'text' field set.
 
 ##### External Names
 

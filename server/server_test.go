@@ -245,6 +245,12 @@ func TestDNS(t *testing.T) {
 				if x.AAAA.String() != tc.Answer[i].(*dns.AAAA).AAAA.String() {
 					t.Fatalf("answer %d should have a Address of %q, but has %q", i, tc.Answer[i].(*dns.AAAA).AAAA.String(), x.AAAA.String())
 				}
+			case *dns.TXT:
+				for j, txt := range x.Txt {
+					if txt != tc.Answer[i].(*dns.TXT).Txt[j] {
+						t.Fatalf("answer %d should have a Txt of %q, but has %q", i, tc.Answer[i].(*dns.TXT).Txt[j], txt)
+					}
+				}
 			case *dns.DNSKEY:
 				tt := tc.Answer[i].(*dns.DNSKEY)
 				if x.Flags != tt.Flags {
@@ -384,6 +390,9 @@ var services = []*msg.Service{
 	// nameserver
 	{Host: "10.0.0.2", Key: "ns.dns.skydns.test."},
 	{Host: "10.0.0.3", Key: "ns2.dns.skydns.test."},
+	// txt
+	{Text: "abc", Key: "a1.txt.skydns.test."},
+	{Text: "abc abc", Key: "a2.txt.skydns.test."},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -573,6 +582,26 @@ var dnsTestCases = []dnsTestCase{
 			newCNAME("backend.in.skydns.test. IN CNAME ipaddr.skydns.test."),
 			newA("ipaddr.skydns.test. IN A 172.16.1.1"),
 			newA("ipaddr.skydns.test. IN A 172.16.1.2"),
+		},
+	},
+	// Txt
+	{
+		Qname: "a1.txt.skydns.test.", Qtype: dns.TypeTXT,
+		Answer: []dns.RR{
+			newTXT("a1.txt.skydns.test. IN TXT \"abc\""),
+		},
+	},
+	{
+		Qname: "a2.txt.skydns.test.", Qtype: dns.TypeTXT,
+		Answer: []dns.RR{
+			newTXT("a2.txt.skydns.test. IN TXT \"abc abc\""),
+		},
+	},
+	{
+		Qname: "txt.skydns.test.", Qtype: dns.TypeTXT,
+		Answer: []dns.RR{
+			newTXT("txt.skydns.test. IN TXT \"abc abc\""),
+			newTXT("txt.skydns.test. IN TXT \"abc\""),
 		},
 	},
 

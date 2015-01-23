@@ -376,6 +376,17 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 		m.Answer = append(m.Answer, records...)
+	case dns.TypeTXT:
+		records, err := s.TXTRecords(q, name)
+		if err != nil {
+			if e, ok := err.(*etcd.EtcdError); ok {
+				if e.ErrorCode == 100 {
+					s.NameError(m, req)
+					return
+				}
+			}
+		}
+		m.Answer = append(m.Answer, records...)
 	case dns.TypeCNAME:
 		records, err := s.CNAMERecords(q, name)
 		if err != nil {
@@ -713,6 +724,44 @@ func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, er
 	return records, nil
 }
 
+func (s *server) TXTRecords(q dns.Question, name string) (records []dns.RR, err error) {
+	path, star := msg.PathWithWildcard(name)
+	r, err := get(s.client, path, true)
+	if err != nil {
+		return nil, err
+	}
+	if !r.Node.Dir {
+		serv := new(msg.Service)
+		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
+			s.config.log.Infof("failed to parse json: %s", err.Error())
+			return nil, err
+		}
+		// empty txt
+		if serv.Text == "" {
+			return nil, nil
+		}
+		ttl := s.calculateTtl(r.Node, serv)
+		serv.Key = r.Node.Key
+		serv.Ttl = ttl
+		records = append(records, serv.NewTXT(q.Name))
+		return records, nil
+	}
+	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.Path(name), "/"), star, nil)
+	if err != nil || len(sx) == 0 {
+		return nil, err
+	}
+	for _, serv := range sx {
+		if serv.Text == "" {
+			continue
+		}
+		ttl := s.calculateTtl(r.Node, serv)
+		serv.Key = r.Node.Key
+		serv.Ttl = ttl
+		records = append(records, serv.NewTXT(q.Name))
+	}
+	return records, nil
+}
+
 func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
 	path, star := msg.PathWithWildcard(name)
@@ -761,6 +810,7 @@ type bareService struct {
 	Port     int
 	Priority int
 	Weight   int
+	Text     string
 }
 
 // skydns/local/skydns/east/staging/web
@@ -804,7 +854,7 @@ Nodes:
 		if err := json.Unmarshal([]byte(n.Value), serv); err != nil {
 			return nil, err
 		}
-		b := bareService{serv.Host, serv.Port, serv.Priority, serv.Weight}
+		b := bareService{serv.Host, serv.Port, serv.Priority, serv.Weight, serv.Text}
 		if _, ok := bx[b]; ok {
 			continue
 		}

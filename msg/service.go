@@ -20,6 +20,7 @@ type Service struct {
 	Port     int    `json:"port,omitempty"`
 	Priority int    `json:"priority,omitempty"`
 	Weight   int    `json:"weight,omitempty"`
+	Text     string `json:"text,omitempty"`
 	Ttl      uint32 `json:"ttl,omitempty"`
 	// etcd key where we found this service and ignore from json un-/marshalling
 	Key string `json:"-"`
@@ -49,6 +50,11 @@ func (s *Service) NewCNAME(name string, target string) *dns.CNAME {
 // NewNS returns a new NS record based on the Service.
 func (s *Service) NewNS(name string, target string) *dns.NS {
 	return &dns.NS{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeNS, Class: dns.ClassINET, Ttl: s.Ttl}, Ns: target}
+}
+
+// NewTXT returns a new TXT record based on the Service.
+func (s *Service) NewTXT(name string) *dns.TXT {
+	return &dns.TXT{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: s.Ttl}, Txt: split255(s.Text)}
 }
 
 // NewPTR returns a new PTR record based on the Service.
@@ -92,4 +98,28 @@ func Domain(s string) string {
 		l[i], l[j] = l[j], l[i]
 	}
 	return dns.Fqdn(strings.Join(l[1:len(l)-1], "."))
+}
+
+// Split255 splits a string into 255 byte chunks.
+func split255(s string) []string {
+	if len(s) < 255 {
+		return []string{s}
+	}
+	sx := []string{}
+	for p, i := 0, 255; i < len(s); p, i = p+255, i+255 {
+		sx = append(sx, s[p:i])
+	}
+	p, i := 0, 255
+	for {
+		if i <= len(s) {
+			sx = append(sx, s[p:i])
+		} else {
+			sx = append(sx, s[p:])
+			break
+
+		}
+		p, i = p+255, i+255
+	}
+
+	return sx
 }
