@@ -159,9 +159,8 @@ Or with [`etcdctl`](https://github.com/coreos/etcdctl):
     etcdctl set /skydns/local/skydns/east/production/rails \
         '{"host":"service5.example.com","priority":20}'
 
-When querying the DNS for services you can use wildcards or query for subdomains. See the section named "Wildcards" below for more information.
-
-The Weight of a service is calculated as follows. We treat Weight as a percentage, so if there are
+When doing a SRV query for these keys an SRV record is returned with the priority and a certain weight.
+The weight of a service is calculated as follows. We treat weight as a percentage, so if there are
 3 services, the weight is set to 33 for each:
 
 | Service | Weight  | SRV.Weight |
@@ -179,6 +178,8 @@ If we add other weights to the equation some services will get a different Weigh
 |    c    |   130   |    37      |
 
 Note, all calculations are rounded down, so the sum total might be lower than 100.
+
+When querying the DNS for services you can use wildcards or query for subdomains. See the section named "Wildcards" below for more information.
 
 ## Service Discovery via the DNS
 
