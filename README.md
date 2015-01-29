@@ -117,10 +117,6 @@ And these are used for statistics:
 * `GRAPHITE_SERVER`
 * `GRAPHITE_PREFIX`
 * `STATHAT_USER`
-* `INFLUX_SERVER`
-* `INFLUX_DATABASE`
-* `INFLUX_USER`
-* `INFLUX_PASSWORD`
 
 ### SSL Usage and Authentication with Client Certificates
 

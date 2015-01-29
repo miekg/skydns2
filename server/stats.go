@@ -5,11 +5,11 @@
 package server
 
 import (
-	"github.com/rcrowley/go-metrics"
-	"github.com/rcrowley/go-metrics/influxdb"
-	"github.com/rcrowley/go-metrics/stathat"
 	"net"
 	"os"
+
+	"github.com/rcrowley/go-metrics"
+	"github.com/rcrowley/go-metrics/stathat"
 )
 
 var (
@@ -21,23 +21,12 @@ var (
 	StatsNameErrorCount  metrics.Counter
 	StatsNoDataCount     metrics.Counter
 
-	influxConfig   *influxdb.Config
 	graphiteServer = os.Getenv("GRAPHITE_SERVER")
 	graphitePrefix = os.Getenv("GRAPHITE_PREFIX")
 	stathatUser    = os.Getenv("STATHAT_USER")
-	influxServer   = os.Getenv("INFLUX_SERVER")
-	influxDatabase = os.Getenv("INFLUX_DATABASE")
-	influxUser     = os.Getenv("INFLUX_USER")
-	influxPassword = os.Getenv("INFLUX_PASSWORD")
 )
 
 func init() {
-	influxConfig = &influxdb.Config{}
-	influxConfig.Host = influxServer
-	influxConfig.Database = influxDatabase
-	influxConfig.Username = influxUser
-	influxConfig.Password = influxPassword
-
 	if graphitePrefix == "" {
 		graphitePrefix = "skydns"
 	}
@@ -74,9 +63,5 @@ func StatsCollect() {
 
 	if stathatUser != "" {
 		go stathat.Stathat(metrics.DefaultRegistry, 10e9, stathatUser)
-	}
-
-	if influxConfig.Host != "" {
-		go influxdb.Influxdb(metrics.DefaultRegistry, 10e9, influxConfig)
 	}
 }
