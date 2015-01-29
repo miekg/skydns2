@@ -140,14 +140,15 @@ When providing information you will need to fill out (some of) the following val
 * Path - The path of the key in etcd, e.g. if the domain you want to register is "rails.production.east.skydns.local", you need to reverse it and replace the dots with slashes. So the name here becomes:
     `local/skydns/east/production/rails`.
   Then prefix the `/skydns/` string too, so the final path becomes
-    `/v2/keys/skdydns/local/skydns/east/production/rails`
-* Host - The name of your service, e.g., `service5.mydomain.com`,  and IP address (either v4 or v6)
-* Port - the port where the service can be reached.
+    `/v2/keys/skydns/local/skydns/east/production/rails`
+* Host - The name of your service, e.g., `service5.mydomain.com` or an IP address (either v4 or v6);
+* Port - the port where the service can be reached;
 * Priority - the priority of the service, the lower the value, the more preferred;
-* Weight - a weight factor that will be used for services with the same Priority.
+* Weight - a weight factor that will be used for services with the same Priority;
+* Text - text you want to add (this returned when doing a TXT query);
 * TTL - the time-to-live of the service, overriding the default TTL. If the etcd key also has a TTL, the minimum of this value and the etcd TTL is used.
 
-Path and Host are mandatory.
+Path is the only mandatory field.
 
 Adding the service can thus be done with:
 
@@ -305,10 +306,6 @@ We have created the following CNAME chain: `1.rails.production.east.skydns.local
     1.rails.production.east.skydns.local. 3600  IN  CNAME   service1.skydns.local.
     service1.skydns.local.                 3600  IN  A       10.0.2.15
 
-#### TXT Records
-
-SkyDNS also allows you to query for TXT records. Just register a json with the 'text' field set.
-
 ##### External Names
 
 If the CNAME chains leads to a name that falls outside of the domain (i.e. does not end with `skydns.local.`),
@@ -324,7 +321,11 @@ Doing an A/AAAA query for this will lead to the following response:
     www.miek.nl.            3600    IN      CNAME   a.miek.nl.
     a.miek.nl.              3600    IN      A       176.58.119.54
 
-The first CNAME is generated from within SkyDNS, the other two are from the recursive server.
+The first CNAME is generated from within SkyDNS, the other CNANE is returned from the remote name server.
+
+#### TXT Records
+
+SkyDNS also allows you to query for TXT records. Just register a json with the 'text' field set.
 
 #### NS Records
 
@@ -413,18 +414,20 @@ see [RFC7129](http://tools.ietf.org/html/rfc7129), Appendix B.
 
 #### Host Local Values
 
-SkyDNS supports storing values which are specific for that instance of SkyDNS.
+SkyDNS supports storing values which are specific for that *instance* of SkyDNS.
 
-This can be useful when you have SkyDNS running on each host and want to store values that are specific
-for that host. For example the public IP-address of the host or the IP-address on the tenant network.
+This can be useful when you have SkyDNS running on multiple hosts, but want to store values that are specific
+for a single host. For example the public IP-address of the host or the IP-address on the tenant network.
 
 To do that you need to specify a unique value for that host with `-local`. A good unique value for that
-would be to use a tool like `uuidgen` to generate an UUID.
+would be an UUID which you can generate with `uuidgen` for instance.
 
 That unique value is used as a path in etcd to store the values separately from the normal values. It is still stored
 in the etcd backend so a restart of SkyDNS with the same unique value will give it access to the old data.
 
-    % skydns -local public.addresses.skydns.local
+In the example here, we don't use an UUID, we use `public.addresses`:
+
+    % skydns -local public.addresses.skydns.local &
 
     % curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/local/addresses/public \
         -d value='{"host":"192.0.2.1"}'
