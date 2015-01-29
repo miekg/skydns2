@@ -106,9 +106,6 @@ func split255(s string) []string {
 		return []string{s}
 	}
 	sx := []string{}
-	for p, i := 0, 255; i < len(s); p, i = p+255, i+255 {
-		sx = append(sx, s[p:i])
-	}
 	p, i := 0, 255
 	for {
 		if i <= len(s) {
