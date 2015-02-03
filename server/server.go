@@ -431,6 +431,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 	path, star := msg.PathWithWildcard(name)
 	r, err := get(s.client, path, true)
 	if err != nil {
+		s.logNoConnection(err)
 		return nil, err
 	}
 	if !r.Node.Dir { // single element
@@ -538,6 +539,7 @@ func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra
 	path, star := msg.PathWithWildcard(name)
 	r, err := get(s.client, path, true)
 	if err != nil {
+		s.logNoConnection(err)
 		return nil, nil, err
 	}
 	if !r.Node.Dir { // single element
@@ -593,6 +595,7 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 	path, star := msg.PathWithWildcard(name)
 	r, err := get(s.client, path, true)
 	if err != nil {
+		s.logNoConnection(err)
 		return nil, nil, err
 	}
 	if !r.Node.Dir { // single element
@@ -705,6 +708,7 @@ func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, er
 	path, _ := msg.PathWithWildcard(name) // no wildcards here
 	r, err := get(s.client, path, true)
 	if err != nil {
+		s.logNoConnection(err)
 		return nil, err
 	}
 	if !r.Node.Dir {
@@ -728,6 +732,7 @@ func (s *server) TXTRecords(q dns.Question, name string) (records []dns.RR, err 
 	path, star := msg.PathWithWildcard(name)
 	r, err := get(s.client, path, true)
 	if err != nil {
+		s.logNoConnection(err)
 		return nil, err
 	}
 	if !r.Node.Dir {
@@ -771,6 +776,7 @@ func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
 	r, err := get(s.client, path, false)
 	if err != nil {
 		// if server has a forward, forward the query
+		s.logNoConnection(err)
 		return nil, err
 	}
 	if r.Node.Dir {
@@ -917,4 +923,11 @@ func (s *server) NoDataError(m, req *dns.Msg) {
 
 func (s *server) UpdateClient(client *etcd.Client) {
 	s.client = client
+}
+
+func (s *server) logNoConnection(e error) {
+	// TODO(miek): implement some ratelimiting here
+	if e.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
+		s.config.log.Errorf("failure to connect to etcd: %s", e)
+	}
 }

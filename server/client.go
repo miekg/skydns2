@@ -4,9 +4,7 @@
 
 package server
 
-import (
-	"github.com/coreos/go-etcd/etcd"
-)
+import "github.com/coreos/go-etcd/etcd"
 
 // get is a wrapper for client.Get that uses SingleInflight to suppress multiple
 // outstanding queries.
