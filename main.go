@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
 
@@ -24,15 +23,13 @@ import (
 )
 
 var (
-	tlskey       = ""
-	tlspem       = ""
-	cacert       = ""
-	config       = &server.Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
-	nameserver   = ""
-	machine      = ""
-	discover     = false
-	kubernetes   = false
-	clientConfig = &kclient.Config{}
+	tlskey     = ""
+	tlspem     = ""
+	cacert     = ""
+	config     = &server.Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
+	nameserver = ""
+	machine    = ""
+	discover   = false
 )
 
 func env(key, def string) string {
@@ -57,7 +54,6 @@ func init() {
 	flag.BoolVar(&discover, "discover", false, "discover new machines by watching /v2/_etcd/machines")
 	flag.BoolVar(&config.Verbose, "verbose", false, "log queries")
 	flag.BoolVar(&config.Systemd, "systemd", false, "bind to socket(s) activated by systemd (ignore -addr)")
-	flag.BoolVar(&kubernetes, "kubernetes", false, "read endpoints from a kubernetes master")
 
 	// TTl
 	// Minttl
@@ -66,7 +62,6 @@ func init() {
 	flag.IntVar(&config.RCache, "rcache", 0, "capacity of the response cache") // default to 0 for now
 	flag.IntVar(&config.RCacheTtl, "rcache-ttl", server.RCacheTtl, "TTL of the response cache")
 
-	kclient.BindClientConfigFlags(flag.CommandLine, clientConfig)
 }
 
 func main() {
@@ -122,9 +117,6 @@ func main() {
 	}
 
 	server.StatsCollect()
-	if kubernetes {
-		go server.WatchKubernetes(config, clientConfig, client)
-	}
 	if err := s.Run(); err != nil {
 		log.Fatal(err)
 	}
