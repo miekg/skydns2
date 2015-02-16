@@ -176,11 +176,12 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				m1.Truncated = true
 			}
 			// Still round-robin even with hits from the cache.
+			// Only shuffle A and AAAA records with each other.
 			if s.config.RoundRobin && (req.Question[0].Qtype == dns.TypeA ||
 				req.Question[0].Qtype == dns.TypeAAAA) {
 				switch l := len(m1.Answer); l {
 				case 2:
-					if dns.Id()%2 == 0 {
+					if dns.Id()%2 == 0 && isAddress(m1.Answer[0]) && isAddress(m1.Answer[1]) {
 						m1.Answer[0], m1.Answer[1] = m1.Answer[1], m1.Answer[0]
 					}
 				default:
@@ -191,7 +192,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 						if q == p {
 							p = (p + 1) % l
 						}
-						m1.Answer[q], m1.Answer[p] = m1.Answer[p], m1.Answer[q]
+						if isAddress(m1.Answer[q]) && isAddress(m1.Answer[q]) {
+							m1.Answer[q], m1.Answer[p] = m1.Answer[p], m1.Answer[q]
+						}
 					}
 				}
 
@@ -930,4 +933,12 @@ func (s *server) logNoConnection(e error) {
 	if e.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
 		s.config.log.Errorf("failure to connect to etcd: %s", e)
 	}
+}
+
+// isAddress return true when r is either an A or AAAA record.
+func isAddress(r dns.RR) bool {
+	if r.Header().Rrtype == dns.TypeA || r.Header().Rrtype == dns.TypeAAAA {
+		return true
+	}
+	return false
 }
