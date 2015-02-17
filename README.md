@@ -63,6 +63,7 @@ may be set:
 * `local`: optional unique value for this skydns instance, default is none. This is returned
     when queried for `local.dns.skydns.local`.
 * `round_robin`: enable round-robin sorting for A and AAAA responses, defaults to true.
+    Note that packets containing more than one CNAME are excempt from this (see issue #128 on Github).
 * `nameservers`: forward DNS requests to these nameservers (array of IP:port combination), when not
     authoritative for a domain.
 * `read_timeout`: network read timeout, for DNS and talking with etcd.
@@ -88,7 +89,7 @@ You can also use the command line options, however the settings in etcd take pre
 * `-addr`: used to specify the address to listen on (note: this will be changed into `-dns_addr` to match the json.
 * `-local`: used to specify a unique service for this SkyDNS instance. This should point to a (unique) domain into etcd, when
     SkyDNS receives a query for the name `local.dns.skydns.local` it will fetch this service and return it.
-    For instance: `-local e2016c14-fbba-11e3-ae08-10604b7efbe2.dockerhosts.skydns.local` and then 
+    For instance: `-local e2016c14-fbba-11e3-ae08-10604b7efbe2.dockerhosts.skydns.local` and then
 
         curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dockerhosts/2016c14-fbba-11e3-ae08-10604b7efbe2 \
             -d value='{"host":"10.1.1.16"}'
@@ -441,7 +442,7 @@ SkyDNS now has primitive support for watching the API of a Kubernetes master and
 inserting DNS records to represent the services running in a Kubernetes cluster.
 
 The service name in Kubernetes will be registered as a host (A) record under the SkyDNS
-domain.  For example, if you use the default `skydns.local` configuration, a service called 
+domain.  For example, if you use the default `skydns.local` configuration, a service called
 `redismaster` will be available at `redismaster.skydns.local`.  Additionally, SRV records
 are created for each service that is registered, so queries for SRV records will return all
 information necessary to connect to your service:
@@ -455,7 +456,7 @@ by SkyDNS.
 
 Kubernets support is experimental and will improve with time.  To enable it, start SkyDNS
 with the `-kubernetes` flag and the client configuration parameters that you would use to connect
-to an APIServer instance.  At a minimum you need to pass the -master flag.  A common example to 
+to an APIServer instance.  At a minimum you need to pass the -master flag.  A common example to
 start a SkyDNS server:
 
 ```
