@@ -906,31 +906,32 @@ func (s *server) RoundRobin(rrs []dns.RR) {
 	if !s.config.RoundRobin {
 		return
 	}
+	// If we have more than 1 CNAME don't touch the packet, because some stub resolver (=glibc)
+	// can't deal with the returned packet if the CNAMEs need to be accesses in the reverse order.
+	cname := 0
+	for _, r := range rrs {
+		if r.Header().Rrtype == dns.TypeCNAME {
+			cname++
+			if cname > 1 {
+				return
+			}
+		}
+	}
+
 	switch l := len(rrs); l {
 	case 2:
-		if dns.Id()%2 == 0 && isAddress(rrs[0]) && isAddress(rrs[1]) {
+		if dns.Id()%2 == 0 {
 			rrs[0], rrs[1] = rrs[1], rrs[0]
 		}
 	default:
-		// Do a minimum of l swap, maximum of 4l swaps
 		for j := 0; j < l*(int(dns.Id())%4+1); j++ {
 			q := int(dns.Id()) % l
 			p := int(dns.Id()) % l
 			if q == p {
 				p = (p + 1) % l
 			}
-			if isAddress(rrs[q]) && isAddress(rrs[q]) {
-				rrs[q], rrs[p] = rrs[p], rrs[q]
-			}
+			rrs[q], rrs[p] = rrs[p], rrs[q]
 		}
 	}
 
-}
-
-// isAddress return true when r is either an A or AAAA record.
-func isAddress(r dns.RR) bool {
-	if r.Header().Rrtype == dns.TypeA || r.Header().Rrtype == dns.TypeAAAA {
-		return true
-	}
-	return false
 }
