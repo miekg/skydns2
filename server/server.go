@@ -176,26 +176,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				m1.Truncated = true
 			}
 			// Still round-robin even with hits from the cache.
-			if s.config.RoundRobin && (req.Question[0].Qtype == dns.TypeA ||
-				req.Question[0].Qtype == dns.TypeAAAA) {
-				switch l := len(m1.Answer); l {
-				case 2:
-					if dns.Id()%2 == 0 {
-						m1.Answer[0], m1.Answer[1] = m1.Answer[1], m1.Answer[0]
-					}
-				default:
-					// Do a minimum of l swap, maximum of 4l swaps
-					for j := 0; j < l*(int(dns.Id())%4+1); j++ {
-						q := int(dns.Id()) % l
-						p := int(dns.Id()) % l
-						if q == p {
-							p = (p + 1) % l
-						}
-						m1.Answer[q], m1.Answer[p] = m1.Answer[p], m1.Answer[q]
-					}
-				}
-
+			// Only shuffle A and AAAA records with each other.
+			if req.Question[0].Qtype == dns.TypeA || req.Question[0].Qtype == dns.TypeAAAA {
+				s.RoundRobin(m1.Answer)
 			}
+
 			if err := w.WriteMsg(m1); err != nil {
 				s.config.log.Errorf("failure to return reply %q", err)
 			}
@@ -514,22 +499,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 		}
 	}
 	if s.config.RoundRobin {
-		switch l := len(records); l {
-		case 2:
-			if dns.Id()%2 == 0 {
-				records[0], records[1] = records[1], records[0]
-			}
-		default:
-			// Do a minimum of l swap, maximum of 4l swaps
-			for j := 0; j < l*(int(dns.Id())%4+1); j++ {
-				q := int(dns.Id()) % l
-				p := int(dns.Id()) % l
-				if q == p {
-					p = (p + 1) % l
-				}
-				records[q], records[p] = records[p], records[q]
-			}
-		}
+		s.RoundRobin(records)
 	}
 	return records, nil
 }
@@ -930,4 +900,38 @@ func (s *server) logNoConnection(e error) {
 	if e.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
 		s.config.log.Errorf("failure to connect to etcd: %s", e)
 	}
+}
+
+func (s *server) RoundRobin(rrs []dns.RR) {
+	if !s.config.RoundRobin {
+		return
+	}
+	// If we have more than 1 CNAME don't touch the packet, because some stub resolver (=glibc)
+	// can't deal with the returned packet if the CNAMEs need to be accesses in the reverse order.
+	cname := 0
+	for _, r := range rrs {
+		if r.Header().Rrtype == dns.TypeCNAME {
+			cname++
+			if cname > 1 {
+				return
+			}
+		}
+	}
+
+	switch l := len(rrs); l {
+	case 2:
+		if dns.Id()%2 == 0 {
+			rrs[0], rrs[1] = rrs[1], rrs[0]
+		}
+	default:
+		for j := 0; j < l*(int(dns.Id())%4+1); j++ {
+			q := int(dns.Id()) % l
+			p := int(dns.Id()) % l
+			if q == p {
+				p = (p + 1) % l
+			}
+			rrs[q], rrs[p] = rrs[p], rrs[q]
+		}
+	}
+
 }
