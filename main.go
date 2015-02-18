@@ -67,7 +67,7 @@ func init() {
 func main() {
 	flag.Parse()
 	machines := strings.Split(machine, ",")
-	client := newClient(machines, tlskey, tlspem, cacert)
+	client := newClient(machines, tlspem, tlskey, cacert)
 	if nameserver != "" {
 		for _, hostPort := range strings.Split(nameserver, ",") {
 			if err := validateHostPort(hostPort); err != nil {
