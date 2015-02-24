@@ -71,18 +71,18 @@ func main() {
 	if nameserver != "" {
 		for _, hostPort := range strings.Split(nameserver, ",") {
 			if err := validateHostPort(hostPort); err != nil {
-				log.Fatalf("nameserver is invalid: %s\n", err)
+				log.Fatalf("skydns: nameserver is invalid: %s\n", err)
 			}
 			config.Nameservers = append(config.Nameservers, hostPort)
 		}
 	}
 	if err := validateHostPort(config.DnsAddr); err != nil {
-		log.Fatalf("addr is invalid: %s\n", err)
+		log.Fatalf("skydns: addr is invalid: %s\n", err)
 	}
 
 	config, err := server.LoadConfig(client, config)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("skydns:", err)
 	}
 	if config.Local != "" {
 		config.Local = dns.Fqdn(config.Local)
@@ -104,7 +104,7 @@ func main() {
 						duration = 1 * time.Second // reset
 					} else {
 						// we can see an n == nil, probably when we can't connect to etcd.
-						log.Printf("ectd machine cluster update failed, sleeping %s + ~3s", duration)
+						log.Printf("skydns: ectd machine cluster update failed, sleeping %s + ~3s", duration)
 						time.Sleep(duration + (time.Duration(rand.Float32() * 3e9))) // Add some random.
 						duration *= 2
 						if duration > 32*time.Second {
@@ -118,7 +118,7 @@ func main() {
 
 	server.StatsCollect()
 	if err := s.Run(); err != nil {
-		log.Fatal(err)
+		log.Fatalf("skydns:", err)
 	}
 }
 
@@ -147,7 +147,7 @@ func newClient(machines []string, tlsCert, tlsKey, tlsCACert string) (client *et
 		// TODO(miek): machines is local, the rest is global, ugly.
 		if client, err = etcd.NewTLSClient(machines, tlsCert, tlsKey, tlsCACert); err != nil {
 			// TODO(miek): would be nice if this wasn't a fatal error
-			log.Fatalf("failure to connect: %s\n", err)
+			log.Fatalf("skydns: failure to connect: %s\n", err)
 		}
 		client.SyncCluster()
 	} else {
@@ -182,7 +182,7 @@ func updateClient(resp *etcd.Response, tlsCert, tlsKey, tlsCACert string) (clien
 	// Keep the old ones and hope they still work and wait for another update
 	// in the future.
 	if len(machines) > 0 {
-		log.Printf("setting new etcd cluster to %v", machines)
+		log.Printf("skydns: setting new etcd cluster to %v", machines)
 		return newClient(machines, tlsCert, tlsKey, tlsCACert)
 	}
 	return nil

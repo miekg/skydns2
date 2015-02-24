@@ -50,9 +50,9 @@ func (s *server) Run() error {
 
 	dnsReadyMsg := func(addr, net string) {
 		if s.config.DNSSEC == "" {
-			log.Printf("ready for queries on %s for %s://%s [rcache %d]", s.config.Domain, net, addr, s.config.RCache)
+			log.Printf("skydns: ready for queries on %s for %s://%s [rcache %d]", s.config.Domain, net, addr, s.config.RCache)
 		} else {
-			log.Printf("ready for queries on %s for %s://%s [rcache %d], signing with %s [scache %d]", s.config.Domain, net, addr, s.config.RCache, s.config.DNSSEC, s.config.SCache)
+			log.Printf("skydns: ready for queries on %s for %s://%s [rcache %d], signing with %s [scache %d]", s.config.Domain, net, addr, s.config.RCache, s.config.DNSSEC, s.config.SCache)
 		}
 	}
 
@@ -74,7 +74,7 @@ func (s *server) Run() error {
 				go func() {
 					defer s.group.Done()
 					if err := dns.ActivateAndServe(nil, u, mux); err != nil {
-						log.Fatal(err)
+						log.Fatalf("skydns: %s", err)
 					}
 				}()
 				dnsReadyMsg(u.LocalAddr().String(), "udp")
@@ -86,7 +86,7 @@ func (s *server) Run() error {
 				go func() {
 					defer s.group.Done()
 					if err := dns.ActivateAndServe(t, nil, mux); err != nil {
-						log.Fatal(err)
+						log.Fatalf("skydns: %s", err)
 					}
 				}()
 				dnsReadyMsg(t.Addr().String(), "tcp")
@@ -97,7 +97,7 @@ func (s *server) Run() error {
 		go func() {
 			defer s.group.Done()
 			if err := dns.ListenAndServe(s.config.DnsAddr, "tcp", mux); err != nil {
-				log.Fatal(err)
+				log.Fatalf("skydns: %s", err)
 			}
 		}()
 		dnsReadyMsg(s.config.DnsAddr, "tcp")
@@ -105,7 +105,7 @@ func (s *server) Run() error {
 		go func() {
 			defer s.group.Done()
 			if err := dns.ListenAndServe(s.config.DnsAddr, "udp", mux); err != nil {
-				log.Fatal(err)
+				log.Fatalf("skydns: %s", err)
 			}
 		}()
 		dnsReadyMsg(s.config.DnsAddr, "udp")
@@ -183,7 +183,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 
 			if err := w.WriteMsg(m1); err != nil {
-				log.Printf("failure to return reply %q", err)
+				log.Printf("skydns: failure to return reply %q", err)
 			}
 			return
 		}
@@ -195,7 +195,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	name := strings.ToLower(q.Name)
 	StatsRequestCount.Inc(1)
 	if s.config.Verbose {
-		log.Printf("received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
+		log.Printf("skydns: received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 	}
 	// If the qname is local.dns.skydns.local. and s.config.Local != "", substitute that name.
 	if s.config.Local != "" && name == s.config.localDomain {
@@ -215,7 +215,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	defer func() {
 		if m.Rcode == dns.RcodeServerFailure {
 			if err := w.WriteMsg(m); err != nil {
-				log.Printf("failure to return reply %q", err)
+				log.Printf("skydns: failure to return reply %q", err)
 			}
 			return
 		}
@@ -248,7 +248,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			m.Truncated = true
 		}
 		if err := w.WriteMsg(m); err != nil {
-			log.Printf("failure to return reply %q", err)
+			log.Printf("skydns: failure to return reply %q", err)
 		}
 	}()
 
@@ -348,13 +348,13 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					}
 				}
 				if target == "" {
-					log.Printf("incomplete CNAME chain for %s", name)
+					log.Printf("skydns: incomplete CNAME chain for %s", name)
 					s.NoDataError(m, req)
 					return
 				}
 				m1, e1 := s.Lookup(target, req.Question[0].Qtype, bufsize, dnssec)
 				if e1 != nil {
-					log.Printf("%q", err)
+					log.Printf("skydns: %q", err)
 					s.NoDataError(m, req)
 					return
 				}
@@ -423,7 +423,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 	if !r.Node.Dir { // single element
 		serv := new(msg.Service)
 		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
-			log.Printf("failed to parse json: %s", err.Error())
+			log.Printf("skydns: failed to parse json: %s", err.Error())
 			return nil, err
 		}
 		ip := net.ParseIP(serv.Host)
@@ -435,11 +435,11 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 			// Try to resolve as CNAME if it's not an IP.
 			newRecord := serv.NewCNAME(q.Name, dns.Fqdn(serv.Host))
 			if len(previousRecords) > 7 {
-				log.Printf("CNAME lookup limit of 8 exceeded for %s", newRecord)
+				log.Printf("skydns: CNAME lookup limit of 8 exceeded for %s", newRecord)
 				return nil, fmt.Errorf("exceeded CNAME lookup limit")
 			}
 			if s.isDuplicateCNAME(newRecord, previousRecords) {
-				log.Printf("CNAME loop detected for record %s", newRecord)
+				log.Printf("skydns: CNAME loop detected for record %s", newRecord)
 				return nil, fmt.Errorf("detected CNAME loop")
 			}
 
@@ -463,7 +463,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 	}
 	nodes, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.Path(name), "/"), star, nil)
 	if err != nil {
-		log.Printf("failed to parse json: %s", err.Error())
+		log.Printf("skydns: failed to parse json: %s", err.Error())
 		return nil, err
 	}
 	for _, serv := range nodes {
@@ -474,11 +474,11 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 			// Try to resolve as CNAME if it's not an IP.
 			newRecord := serv.NewCNAME(q.Name, dns.Fqdn(serv.Host))
 			if len(previousRecords) > 7 {
-				log.Printf("CNAME lookup limit of 8 exceeded for %s", newRecord)
+				log.Printf("skydns: CNAME lookup limit of 8 exceeded for %s", newRecord)
 				return nil, fmt.Errorf("exceeded CNAME lookup limit")
 			}
 			if s.isDuplicateCNAME(newRecord, previousRecords) {
-				log.Printf("CNAME loop detected for record %s", newRecord)
+				log.Printf("skydns: CNAME loop detected for record %s", newRecord)
 				return nil, fmt.Errorf("detected CNAME loop")
 			}
 
@@ -516,7 +516,7 @@ func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra
 	if !r.Node.Dir { // single element
 		serv := new(msg.Service)
 		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
-			log.Printf("failed to parse json: %s", err.Error())
+			log.Printf("skydns: failed to parse json: %s", err.Error())
 			return nil, nil, err
 		}
 		ip := net.ParseIP(serv.Host)
@@ -572,7 +572,7 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 	if !r.Node.Dir { // single element
 		serv := new(msg.Service)
 		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
-			log.Printf("failed to parse json: %s", err.Error())
+			log.Printf("skydns: failed to parse json: %s", err.Error())
 			return nil, nil, err
 		}
 		ip := net.ParseIP(serv.Host)
@@ -685,7 +685,7 @@ func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, er
 	if !r.Node.Dir {
 		serv := new(msg.Service)
 		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
-			log.Printf("failed to parse json: %s", err.Error())
+			log.Printf("skydns: failed to parse json: %s", err.Error())
 			return nil, err
 		}
 		ip := net.ParseIP(serv.Host)
@@ -709,7 +709,7 @@ func (s *server) TXTRecords(q dns.Question, name string) (records []dns.RR, err 
 	if !r.Node.Dir {
 		serv := new(msg.Service)
 		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
-			log.Printf("failed to parse json: %s", err.Error())
+			log.Printf("skydns: failed to parse json: %s", err.Error())
 			return nil, err
 		}
 		// empty txt
@@ -755,7 +755,7 @@ func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
 	}
 	serv := new(msg.Service)
 	if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
-		log.Printf("failed to parse json: %s", err.Error())
+		log.Printf("skydns: failed to parse json: %s", err.Error())
 		return nil, err
 	}
 	ttl := uint32(r.Node.TTL)
@@ -898,7 +898,7 @@ func (s *server) UpdateClient(client *etcd.Client) {
 
 func (s *server) logNoConnection(e error) {
 	if e.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
-		log.Printf("failure to connect to etcd: %s", e)
+		log.Printf("skydns: failure to connect to etcd: %s", e)
 	}
 }
 
