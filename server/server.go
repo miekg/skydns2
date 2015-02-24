@@ -163,6 +163,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		// Cache hit! \o/
 		if time.Since(exp) < 0 {
 			m1.Id = m.Id
+			m.Compress = true
 			if dnssec {
 				StatsDnssecOkCount.Inc(1)
 				// The key for DNS/DNSSEC in cache is different, no
