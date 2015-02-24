@@ -6,6 +6,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"net"
 
 	"github.com/miekg/dns"
@@ -15,7 +16,7 @@ import (
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	StatsForwardCount.Inc(1)
 	if len(s.config.Nameservers) == 0 || dns.CountLabel(req.Question[0].Name) < s.config.Ndots {
-		s.config.log.Infof("no nameservers defined or name too short, can not forward")
+		log.Printf("no nameservers defined or name too short, can not forward")
 		m := new(dns.Msg)
 		m.SetReply(req)
 		m.SetRcode(req, dns.RcodeServerFailure)
@@ -56,7 +57,7 @@ Redo:
 		goto Redo
 	}
 
-	s.config.log.Errorf("failure to forward request %q", err)
+	log.Printf("failure to forward request %q", err)
 	m := new(dns.Msg)
 	m.SetReply(req)
 	m.SetRcode(req, dns.RcodeServerFailure)
@@ -76,7 +77,7 @@ func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) {
 		// TODO(miek): Reverse DNSSEC. We should sign this, but requires a key....and more
 		// Probably not worth the hassle?
 		if err := w.WriteMsg(m); err != nil {
-			s.config.log.Errorf("failure to return reply %q", err)
+			log.Printf("failure to return reply %q", err)
 		}
 	}
 	// Always forward if not found locally.
