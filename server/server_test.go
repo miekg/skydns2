@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/coreos/go-etcd/etcd"
-	"github.com/coreos/go-log/log"
 	"github.com/miekg/dns"
 	"github.com/skynetservices/skydns/cache"
 	"github.com/skynetservices/skydns/msg"
@@ -75,9 +74,6 @@ func newTestServer(t *testing.T, c bool) *server {
 	s.config.RCacheTtl = RCacheTtl
 	s.config.Ttl = 3600
 	s.config.Ndots = 2
-	s.config.log = log.New("skydns", false, log.NullSink())
-	// Leave this in as enabling this aids in debugging.
-	//s.config.log = log.New("skydns", false, log.WriterSink(os.Stderr, log.BasicFormat, log.BasicFields))
 
 	s.dnsUDPclient = &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
 	s.dnsTCPclient = &dns.Client{Net: "tcp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}

@@ -5,6 +5,7 @@
 package server
 
 import (
+	"log"
 	"os"
 	"time"
 
@@ -100,7 +101,7 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 		}
 		s.scache.Remove(key)
 	}
-	s.config.log.Infof("scache miss for %s type %d", r[0].Header().Name, r[0].Header().Rrtype)
+	log.Printf("skydns: scache miss for %s type %d", r[0].Header().Name, r[0].Header().Rrtype)
 	StatsDnssecCacheMiss.Inc(1)
 	sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
 		sig1 := s.NewRRSIG(incep, expir)
@@ -110,7 +111,7 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 		}
 		e := sig1.Sign(s.config.PrivKey, r)
 		if e != nil {
-			s.config.log.Errorf("failed to sign: %s", e.Error())
+			log.Printf("skydns: failed to sign: %s", e.Error())
 		}
 		return sig1, e
 	})

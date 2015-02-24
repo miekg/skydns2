@@ -7,13 +7,12 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/coreos/go-etcd/etcd"
-	"github.com/coreos/go-log/log"
 	"github.com/miekg/dns"
 )
 
@@ -65,21 +64,16 @@ type Config struct {
 
 	Verbose bool `json:"-"`
 
-	log *log.Logger
-
 	// some predefined string "constants"
 	localDomain string // "local.dns." + config.Domain
 	dnsDomain   string // "dns". + config.Domain
 }
 
 func LoadConfig(client *etcd.Client, config *Config) (*Config, error) {
-	config.log = log.New("skydns", false,
-		log.CombinedSink(os.Stderr, "[%s] %s %-9s | %s\n", []string{"prefix", "time", "priority", "message"}))
-
 	// Override wat isn't set yet from the command line.
 	n, err := client.Get("/skydns/config", false, false)
 	if err != nil {
-		config.log.Info("falling back to default configuration, could not read from etcd:", err)
+		log.Printf("skydns: falling back to default configuration, could not read from etcd: %s", err)
 		if err := setDefaults(config); err != nil {
 			return nil, err
 		}
