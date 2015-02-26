@@ -79,7 +79,7 @@ func LoadConfig(client *etcd.Client, config *Config) (*Config, error) {
 		return config, nil
 	}
 	if err := json.Unmarshal([]byte(n.Node.Value), &config); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal config: %s", err.Error())
 	}
 	if err := setDefaults(config); err != nil {
 		return nil, err
