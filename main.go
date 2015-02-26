@@ -71,18 +71,18 @@ func main() {
 	if nameserver != "" {
 		for _, hostPort := range strings.Split(nameserver, ",") {
 			if err := validateHostPort(hostPort); err != nil {
-				log.Fatalf("skydns: nameserver is invalid: %s\n", err)
+				log.Fatalf("skydns: nameserver is invalid: %s", err)
 			}
 			config.Nameservers = append(config.Nameservers, hostPort)
 		}
 	}
 	if err := validateHostPort(config.DnsAddr); err != nil {
-		log.Fatalf("skydns: addr is invalid: %s\n", err)
+		log.Fatalf("skydns: addr is invalid: %s", err)
 	}
 
 	config, err := server.LoadConfig(client, config)
 	if err != nil {
-		log.Fatalf("skydns:", err)
+		log.Fatalf("skydns: %s", err)
 	}
 	if config.Local != "" {
 		config.Local = dns.Fqdn(config.Local)
@@ -118,7 +118,7 @@ func main() {
 
 	server.StatsCollect()
 	if err := s.Run(); err != nil {
-		log.Fatalf("skydns:", err)
+		log.Fatalf("skydns: %s", err)
 	}
 }
 
@@ -147,7 +147,7 @@ func newClient(machines []string, tlsCert, tlsKey, tlsCACert string) (client *et
 		// TODO(miek): machines is local, the rest is global, ugly.
 		if client, err = etcd.NewTLSClient(machines, tlsCert, tlsKey, tlsCACert); err != nil {
 			// TODO(miek): would be nice if this wasn't a fatal error
-			log.Fatalf("skydns: failure to connect: %s\n", err)
+			log.Fatalf("skydns: failure to connect: %s", err)
 		}
 		client.SyncCluster()
 	} else {
