@@ -16,7 +16,11 @@ import (
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	StatsForwardCount.Inc(1)
 	if len(s.config.Nameservers) == 0 || dns.CountLabel(req.Question[0].Name) < s.config.Ndots {
-		log.Printf("skydns: no nameservers defined or name too short, can not forward")
+		if len(s.config.Nameservers) == 0 {
+			log.Printf("skydns: can not forward, no nameservers defined")
+		} else {
+			log.Printf("skydns: can not forward, name too short (less than %d labels)", s.config.Ndots)
+		}
 		m := new(dns.Msg)
 		m.SetReply(req)
 		m.SetRcode(req, dns.RcodeServerFailure)
