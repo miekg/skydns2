@@ -354,7 +354,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				}
 				m1, e1 := s.Lookup(target, req.Question[0].Qtype, bufsize, dnssec)
 				if e1 != nil {
-					log.Printf("skydns: %q", err)
+					log.Printf("skydns: %s", err)
 					s.NoDataError(m, req)
 					return
 				}
