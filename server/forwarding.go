@@ -50,6 +50,7 @@ Redo:
 	}
 	if err == nil {
 		r.Compress = true
+		r.Id = req.Id
 		w.WriteMsg(r)
 		return
 	}
