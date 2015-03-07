@@ -5,14 +5,11 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
 )
 
@@ -68,26 +65,7 @@ type Config struct {
 	dnsDomain   string // "dns". + config.Domain
 }
 
-func LoadConfig(client *etcd.Client, config *Config) (*Config, error) {
-	// Override wat isn't set yet from the command line.
-	n, err := client.Get("/skydns/config", false, false)
-	if err != nil {
-		log.Printf("skydns: falling back to default configuration, could not read from etcd: %s", err)
-		if err := setDefaults(config); err != nil {
-			return nil, err
-		}
-		return config, nil
-	}
-	if err := json.Unmarshal([]byte(n.Node.Value), &config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %s", err.Error())
-	}
-	if err := setDefaults(config); err != nil {
-		return nil, err
-	}
-	return config, nil
-}
-
-func setDefaults(config *Config) error {
+func SetDefaults(config *Config) error {
 	if config.ReadTimeout == 0 {
 		config.ReadTimeout = 2 * time.Second
 	}
