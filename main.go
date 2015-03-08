@@ -22,6 +22,7 @@ import (
 
 	backendetcd "github.com/skynetservices/skydns/backends/etcd"
 	"github.com/skynetservices/skydns/server"
+	"github.com/skynetservices/skydns/stats"
 )
 
 var (
@@ -125,7 +126,7 @@ func main() {
 		}()
 	}
 
-	server.StatsCollect()
+	stats.Collect()
 	if err := s.Run(); err != nil {
 		log.Fatalf("skydns: %s", err)
 	}
