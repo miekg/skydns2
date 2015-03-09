@@ -17,6 +17,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
+	backendetcd "github.com/skynetservices/skydns/backends/etcd"
 	"github.com/skynetservices/skydns/cache"
 	"github.com/skynetservices/skydns/msg"
 )
@@ -33,7 +34,7 @@ func addService(t *testing.T, s *server, k string, ttl uint64, m *msg.Service) {
 	}
 	path, _ := msg.PathWithWildcard(k)
 	t.Logf("Adding path %s:", path)
-	_, err = s.client.Create(path, string(b), ttl)
+	_, err = s.backend.(*backendetcd.Backend).Client().Create(path, string(b), ttl)
 	if err != nil {
 		// TODO(miek): allow for existing keys...
 		t.Fatal(err)
@@ -42,7 +43,7 @@ func addService(t *testing.T, s *server, k string, ttl uint64, m *msg.Service) {
 
 func delService(t *testing.T, s *server, k string) {
 	path, _ := msg.PathWithWildcard(k)
-	_, err := s.client.Delete(path, false)
+	_, err := s.backend.(*backendetcd.Backend).Client().Delete(path, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +58,6 @@ func newTestServer(t *testing.T, c bool) *server {
 
 	// TODO(miek): why don't I use NewServer??
 	s.group = new(sync.WaitGroup)
-	s.client = client
 	s.scache = cache.New(100, 0)
 	s.rcache = cache.New(100, 0)
 	if c {
@@ -67,7 +67,7 @@ func newTestServer(t *testing.T, c bool) *server {
 	s.config.Domain = "skydns.test."
 	s.config.DnsAddr = "127.0.0.1:" + StrPort
 	s.config.Nameservers = []string{"8.8.4.4:53"}
-	setDefaults(s.config)
+	SetDefaults(s.config)
 	s.config.Local = "104.server1.development.region1.skydns.test."
 	s.config.Priority = 10
 	s.config.RCacheTtl = RCacheTtl
@@ -76,6 +76,11 @@ func newTestServer(t *testing.T, c bool) *server {
 
 	s.dnsUDPclient = &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
 	s.dnsTCPclient = &dns.Client{Net: "tcp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
+
+	s.backend = backendetcd.NewBackend(client, &backendetcd.Config{
+		Ttl:      s.config.Ttl,
+		Priority: s.config.Priority,
+	})
 
 	go s.Run()
 	// Yeah, yeah, should do a proper fix.

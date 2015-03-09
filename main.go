@@ -5,6 +5,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -19,7 +20,9 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
 
+	backendetcd "github.com/skynetservices/skydns/backends/etcd"
 	"github.com/skynetservices/skydns/server"
+	"github.com/skynetservices/skydns/stats"
 )
 
 var (
@@ -68,6 +71,7 @@ func main() {
 	flag.Parse()
 	machines := strings.Split(machine, ",")
 	client := newClient(machines, tlspem, tlskey, cacert)
+
 	if nameserver != "" {
 		for _, hostPort := range strings.Split(nameserver, ",") {
 			if err := validateHostPort(hostPort); err != nil {
@@ -80,14 +84,20 @@ func main() {
 		log.Fatalf("skydns: addr is invalid: %s", err)
 	}
 
-	config, err := server.LoadConfig(client, config)
-	if err != nil {
+	if err := loadConfig(client, config); err != nil {
 		log.Fatalf("skydns: %s", err)
 	}
+	server.SetDefaults(config)
+
 	if config.Local != "" {
 		config.Local = dns.Fqdn(config.Local)
 	}
-	s := server.New(config, client)
+
+	backend := backendetcd.NewBackend(client, &backendetcd.Config{
+		Ttl:      config.Ttl,
+		Priority: config.Priority,
+	})
+	s := server.New(backend, config)
 
 	if discover {
 		go func() {
@@ -99,7 +109,7 @@ func main() {
 				case n := <-recv:
 					if n != nil {
 						if client := updateClient(n, tlskey, tlspem, cacert); client != nil {
-							s.UpdateClient(client)
+							backend.UpdateClient(client)
 						}
 						duration = 1 * time.Second // reset
 					} else {
@@ -116,10 +126,23 @@ func main() {
 		}()
 	}
 
-	server.StatsCollect()
+	stats.Collect()
 	if err := s.Run(); err != nil {
 		log.Fatalf("skydns: %s", err)
 	}
+}
+
+func loadConfig(client *etcd.Client, config *server.Config) error {
+	// Override what isn't set yet from the command line.
+	n, err := client.Get("/skydns/config", false, false)
+	if err != nil {
+		log.Printf("skydns: falling back to default configuration, could not read from etcd: %s", err)
+		return nil
+	}
+	if err := json.Unmarshal([]byte(n.Node.Value), config); err != nil {
+		return fmt.Errorf("failed to unmarshal config: %s", err.Error())
+	}
+	return nil
 }
 
 func validateHostPort(hostPort string) error {

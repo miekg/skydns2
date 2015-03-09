@@ -5,7 +5,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -24,18 +23,62 @@ import (
 const Version = "2.0.1b"
 
 type server struct {
-	client       *etcd.Client
+	backend Backend
+	config  *Config
+
+	group        *sync.WaitGroup
 	dnsUDPclient *dns.Client // used for forwarding queries
 	dnsTCPclient *dns.Client // used for forwarding queries
-	config       *Config
-	group        *sync.WaitGroup
 	scache       *cache.Cache
 	rcache       *cache.Cache
 }
 
+type Backend interface {
+	Records(name string, exact bool) ([]msg.Service, error)
+	ReverseRecord(name string) (*msg.Service, error)
+}
+
+// FirstBackend exposes the Backend interface over multiple Backends, returning
+// the first Backend that answers the provided record request. If no Backend answers
+// a record request, the last error seen will be returned.
+type FirstBackend []Backend
+
+// FirstBackend implements Backend
+var _ Backend = FirstBackend{}
+
+func (g FirstBackend) Records(name string, exact bool) (records []msg.Service, err error) {
+	var lastError error
+	for _, backend := range g {
+		if records, err = backend.Records(name, exact); err == nil && len(records) > 0 {
+			return records, nil
+		}
+		if err != nil {
+			lastError = err
+		}
+	}
+	return nil, lastError
+}
+
+func (g FirstBackend) ReverseRecord(name string) (record *msg.Service, err error) {
+	var lastError error
+	for _, backend := range g {
+		if record, err = backend.ReverseRecord(name); err == nil && record != nil {
+			return record, nil
+		}
+		if err != nil {
+			lastError = err
+		}
+	}
+	return nil, lastError
+}
+
 // New returns a new SkyDNS server.
-func New(config *Config, client *etcd.Client) *server {
-	return &server{client: client, config: config, group: new(sync.WaitGroup),
+func New(backend Backend, config *Config) *server {
+	return &server{
+		backend: backend,
+		config:  config,
+
+		group:        new(sync.WaitGroup),
 		scache:       cache.New(config.SCache, 0),
 		rcache:       cache.New(config.RCache, config.RCacheTtl),
 		dnsUDPclient: &dns.Client{Net: "udp", ReadTimeout: 2 * config.ReadTimeout, WriteTimeout: 2 * config.ReadTimeout, SingleInflight: true},
@@ -414,59 +457,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 }
 
 func (s *server) AddressRecords(q dns.Question, name string, previousRecords []dns.RR) (records []dns.RR, err error) {
-	path, star := msg.PathWithWildcard(name)
-	r, err := get(s.client, path, true)
+	services, err := s.backend.Records(name, false)
 	if err != nil {
-		s.logNoConnection(err)
 		return nil, err
 	}
-	if !r.Node.Dir { // single element
-		serv := new(msg.Service)
-		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
-			log.Printf("skydns: failed to parse json: %s", err.Error())
-			return nil, err
-		}
-		ip := net.ParseIP(serv.Host)
-		ttl := s.calculateTtl(r.Node, serv)
-		serv.Ttl = ttl
-		serv.Key = r.Node.Key
-		switch {
-		case ip == nil:
-			// Try to resolve as CNAME if it's not an IP.
-			newRecord := serv.NewCNAME(q.Name, dns.Fqdn(serv.Host))
-			if len(previousRecords) > 7 {
-				log.Printf("skydns: CNAME lookup limit of 8 exceeded for %s", newRecord)
-				return nil, fmt.Errorf("exceeded CNAME lookup limit")
-			}
-			if s.isDuplicateCNAME(newRecord, previousRecords) {
-				log.Printf("skydns: CNAME loop detected for record %s", newRecord)
-				return nil, fmt.Errorf("detected CNAME loop")
-			}
-
-			records = append(records, newRecord)
-			nextRecords, err := s.AddressRecords(dns.Question{Name: dns.Fqdn(serv.Host), Qtype: q.Qtype, Qclass: q.Qclass}, strings.ToLower(dns.Fqdn(serv.Host)), append(previousRecords, newRecord))
-			if err != nil {
-				// This means we can not complete the CNAME, this is OK, but
-				// if we return an error this will trigger an NXDOMAIN.
-				// We also don't want to return the CNAME, because of the
-				// no other data rule. So return nothing and let NODATA
-				// kick in (via a hack).
-				return records, fmt.Errorf("incomplete CNAME chain")
-			}
-			records = append(records, nextRecords...)
-		case ip.To4() != nil && q.Qtype == dns.TypeA:
-			records = append(records, serv.NewA(q.Name, ip.To4()))
-		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
-			records = append(records, serv.NewAAAA(q.Name, ip.To16()))
-		}
-		return records, nil
-	}
-	nodes, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.Path(name), "/"), star, nil)
-	if err != nil {
-		log.Printf("skydns: failed to parse json: %s", err.Error())
-		return nil, err
-	}
-	for _, serv := range nodes {
+	for _, serv := range services {
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
@@ -507,42 +502,12 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 
 // NSRecords returns NS records from etcd.
 func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra []dns.RR, err error) {
-	path, star := msg.PathWithWildcard(name)
-	r, err := get(s.client, path, true)
+	services, err := s.backend.Records(name, false)
 	if err != nil {
-		s.logNoConnection(err)
 		return nil, nil, err
-	}
-	if !r.Node.Dir { // single element
-		serv := new(msg.Service)
-		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
-			log.Printf("skydns: failed to parse json: %s", err.Error())
-			return nil, nil, err
-		}
-		ip := net.ParseIP(serv.Host)
-		ttl := s.calculateTtl(r.Node, serv)
-		serv.Key = r.Node.Key
-		serv.Ttl = ttl
-		switch {
-		case ip == nil:
-			return nil, nil, fmt.Errorf("NS record must be an IP address")
-		case ip.To4() != nil:
-			serv.Host = msg.Domain(serv.Key)
-			records = append(records, serv.NewNS(q.Name, serv.Host))
-			extra = append(extra, serv.NewA(serv.Host, ip.To4()))
-		case ip.To4() == nil:
-			serv.Host = msg.Domain(serv.Key)
-			records = append(records, serv.NewNS(q.Name, serv.Host))
-			extra = append(extra, serv.NewAAAA(serv.Host, ip.To16()))
-		}
-		return records, extra, nil
 	}
 
-	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.Path(name), "/"), star, nil)
-	if err != nil || len(sx) == 0 {
-		return nil, nil, err
-	}
-	for _, serv := range sx {
+	for _, serv := range services {
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
@@ -563,63 +528,14 @@ func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra
 // SRVRecords returns SRV records from etcd.
 // If the Target is not an name but an IP address, an name is created .
 func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec bool) (records []dns.RR, extra []dns.RR, err error) {
-	path, star := msg.PathWithWildcard(name)
-	r, err := get(s.client, path, true)
+	services, err := s.backend.Records(name, false)
 	if err != nil {
-		s.logNoConnection(err)
 		return nil, nil, err
-	}
-	if !r.Node.Dir { // single element
-		serv := new(msg.Service)
-		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
-			log.Printf("skydns: failed to parse json: %s", err.Error())
-			return nil, nil, err
-		}
-		ip := net.ParseIP(serv.Host)
-		ttl := s.calculateTtl(r.Node, serv)
-		if serv.Priority == 0 {
-			serv.Priority = int(s.config.Priority)
-		}
-		serv.Key = r.Node.Key
-		serv.Ttl = ttl
-		switch {
-		case ip == nil:
-			srv := serv.NewSRV(q.Name, uint16(100))
-			records = append(records, srv)
-			if !dns.IsSubDomain(s.config.Domain, srv.Target) {
-				m1, e1 := s.Lookup(srv.Target, dns.TypeA, bufsize, dnssec)
-				if e1 == nil {
-					extra = append(extra, m1.Answer...)
-				}
-				m1, e1 = s.Lookup(srv.Target, dns.TypeAAAA, bufsize, dnssec)
-				if e1 == nil {
-					// If we have seen CNAME's we *assume* that they already added.
-					for _, a := range m1.Answer {
-						if _, ok := a.(*dns.CNAME); !ok {
-							extra = append(extra, a)
-						}
-					}
-				}
-			}
-		case ip.To4() != nil:
-			serv.Host = msg.Domain(serv.Key)
-			records = append(records, serv.NewSRV(q.Name, uint16(100)))
-			extra = append(extra, serv.NewA(serv.Host, ip.To4()))
-		case ip.To4() == nil:
-			serv.Host = msg.Domain(serv.Key)
-			records = append(records, serv.NewSRV(q.Name, uint16(100)))
-			extra = append(extra, serv.NewAAAA(serv.Host, ip.To16()))
-		}
-		return records, extra, nil
 	}
 
-	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.Path(name), "/"), star, nil)
-	if err != nil || len(sx) == 0 {
-		return nil, nil, err
-	}
 	// Looping twice to get the right weight vs priority
 	w := make(map[int]int)
-	for _, serv := range sx {
+	for _, serv := range services {
 		weight := 100
 		if serv.Weight != 0 {
 			weight = serv.Weight
@@ -631,7 +547,7 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 		w[serv.Priority] += weight
 	}
 	lookup := make(map[string]bool)
-	for _, serv := range sx {
+	for _, serv := range services {
 		w1 := 100.0 / float64(w[serv.Priority])
 		if serv.Weight == 0 {
 			w1 *= 100
@@ -676,23 +592,14 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 }
 
 func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, err error) {
-	path, _ := msg.PathWithWildcard(name) // no wildcards here
-	r, err := get(s.client, path, true)
+	services, err := s.backend.Records(name, true)
 	if err != nil {
-		s.logNoConnection(err)
 		return nil, err
 	}
-	if !r.Node.Dir {
-		serv := new(msg.Service)
-		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
-			log.Printf("skydns: failed to parse json: %s", err.Error())
-			return nil, err
-		}
-		ip := net.ParseIP(serv.Host)
-		ttl := s.calculateTtl(r.Node, serv)
-		serv.Key = r.Node.Key
-		serv.Ttl = ttl
-		if ip == nil {
+
+	if len(services) > 0 {
+		serv := services[0]
+		if ip := net.ParseIP(serv.Host); ip == nil {
 			records = append(records, serv.NewCNAME(q.Name, dns.Fqdn(serv.Host)))
 		}
 	}
@@ -700,39 +607,15 @@ func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, er
 }
 
 func (s *server) TXTRecords(q dns.Question, name string) (records []dns.RR, err error) {
-	path, star := msg.PathWithWildcard(name)
-	r, err := get(s.client, path, true)
+	services, err := s.backend.Records(name, false)
 	if err != nil {
-		s.logNoConnection(err)
 		return nil, err
 	}
-	if !r.Node.Dir {
-		serv := new(msg.Service)
-		if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
-			log.Printf("skydns: failed to parse json: %s", err.Error())
-			return nil, err
-		}
-		// empty txt
-		if serv.Text == "" {
-			return nil, nil
-		}
-		ttl := s.calculateTtl(r.Node, serv)
-		serv.Key = r.Node.Key
-		serv.Ttl = ttl
-		records = append(records, serv.NewTXT(q.Name))
-		return records, nil
-	}
-	sx, err := s.loopNodes(&r.Node.Nodes, strings.Split(msg.Path(name), "/"), star, nil)
-	if err != nil || len(sx) == 0 {
-		return nil, err
-	}
-	for _, serv := range sx {
+
+	for _, serv := range services {
 		if serv.Text == "" {
 			continue
 		}
-		ttl := s.calculateTtl(r.Node, serv)
-		serv.Key = r.Node.Key
-		serv.Ttl = ttl
 		records = append(records, serv.NewTXT(q.Name))
 	}
 	return records, nil
@@ -740,32 +623,14 @@ func (s *server) TXTRecords(q dns.Question, name string) (records []dns.RR, err 
 
 func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
 	name := strings.ToLower(q.Name)
-	path, star := msg.PathWithWildcard(name)
-	if star {
-		return nil, fmt.Errorf("reverse can not contain wildcards")
-	}
-	r, err := get(s.client, path, false)
+	serv, err := s.backend.ReverseRecord(name)
 	if err != nil {
-		// if server has a forward, forward the query
-		s.logNoConnection(err)
 		return nil, err
 	}
-	if r.Node.Dir {
-		return nil, fmt.Errorf("reverse should not be a directory")
-	}
-	serv := new(msg.Service)
-	if err := json.Unmarshal([]byte(r.Node.Value), serv); err != nil {
-		log.Printf("skydns: failed to parse json: %s", err.Error())
-		return nil, err
-	}
-	ttl := uint32(r.Node.TTL)
-	if ttl == 0 {
-		ttl = s.config.Ttl
-	}
-	serv.Key = r.Node.Key
+
 	// If serv.Host is parseble as a IP address we should not return anything.
 	// TODO(miek).
-	records = append(records, serv.NewPTR(q.Name, ttl))
+	records = append(records, serv.NewPTR(q.Name, serv.Ttl))
 	return records, nil
 }
 
@@ -782,70 +647,6 @@ func (s *server) NewSOA() dns.RR {
 	}
 }
 
-type bareService struct {
-	Host     string
-	Port     int
-	Priority int
-	Weight   int
-	Text     string
-}
-
-// skydns/local/skydns/east/staging/web
-// skydns/local/skydns/west/production/web
-//
-// skydns/local/skydns/*/*/web
-// skydns/local/skydns/*/web
-
-// loopNodes recursively loops through the nodes and returns all the values. The nodes' keyname
-// will be match against any wildcards when star is true.
-func (s *server) loopNodes(n *etcd.Nodes, nameParts []string, star bool, bx map[bareService]bool) (sx []*msg.Service, err error) {
-	if bx == nil {
-		bx = make(map[bareService]bool)
-	}
-Nodes:
-	for _, n := range *n {
-		if n.Dir {
-			nodes, err := s.loopNodes(&n.Nodes, nameParts, star, bx)
-			if err != nil {
-				return nil, err
-			}
-			sx = append(sx, nodes...)
-			continue
-		}
-		if star {
-			keyParts := strings.Split(n.Key, "/")
-			for i, n := range nameParts {
-				if i > len(keyParts)-1 {
-					// name is longer than key
-					continue Nodes
-				}
-				if n == "*" {
-					continue
-				}
-				if keyParts[i] != n {
-					continue Nodes
-				}
-			}
-		}
-		serv := new(msg.Service)
-		if err := json.Unmarshal([]byte(n.Value), serv); err != nil {
-			return nil, err
-		}
-		b := bareService{serv.Host, serv.Port, serv.Priority, serv.Weight, serv.Text}
-		if _, ok := bx[b]; ok {
-			continue
-		}
-		bx[b] = true
-		serv.Ttl = s.calculateTtl(n, serv)
-		if serv.Priority == 0 {
-			serv.Priority = int(s.config.Priority)
-		}
-		serv.Key = n.Key
-		sx = append(sx, serv)
-	}
-	return sx, nil
-}
-
 func (s *server) isDuplicateCNAME(r *dns.CNAME, records []dns.RR) bool {
 	for _, rec := range records {
 		if v, ok := rec.(*dns.CNAME); ok {
@@ -855,27 +656,6 @@ func (s *server) isDuplicateCNAME(r *dns.CNAME, records []dns.RR) bool {
 		}
 	}
 	return false
-}
-
-// calculateTtl returns the smaller of the etcd TTL and the service's
-// TTL. If neither of these are set (have a zero value), the server
-// default is used.
-func (s *server) calculateTtl(node *etcd.Node, serv *msg.Service) uint32 {
-	etcdTtl := uint32(node.TTL)
-
-	if etcdTtl == 0 && serv.Ttl == 0 {
-		return s.config.Ttl
-	}
-	if etcdTtl == 0 {
-		return serv.Ttl
-	}
-	if serv.Ttl == 0 {
-		return etcdTtl
-	}
-	if etcdTtl < serv.Ttl {
-		return etcdTtl
-	}
-	return serv.Ttl
 }
 
 func (s *server) NameError(m, req *dns.Msg) {
@@ -890,10 +670,6 @@ func (s *server) NoDataError(m, req *dns.Msg) {
 	m.Ns = []dns.RR{s.NewSOA()}
 	m.Ns[0].Header().Ttl = s.config.MinTtl
 	//	StatsNoDataCount.Inc(1)
-}
-
-func (s *server) UpdateClient(client *etcd.Client) {
-	s.client = client
 }
 
 func (s *server) logNoConnection(e error) {
