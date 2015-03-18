@@ -7,5 +7,5 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 ADD . /go/src/github.com/skynetservices/skydns
 RUN go get github.com/skynetservices/skydns
 
-EXPOSE 53
+EXPOSE 53 53/udp
 ENTRYPOINT ["skydns"]
