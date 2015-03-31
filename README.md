@@ -1,6 +1,6 @@
-**DON'T USE**
+**THIS REPO IS DEPRECATED**
 
-Use <https://github.com/skynetservices/skydns>
+Use <https://github.com/skynetservices/skydns> instead
 
 #SkyDNS [![Build Status](https://travis-ci.org/skynetservices/skydns.png)](https://travis-ci.org/skynetservices/skydns)
 *Version 2.0.0*
