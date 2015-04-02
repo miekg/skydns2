@@ -429,7 +429,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.Answer = append(m.Answer, records...)
 	default:
 		fallthrough // also catch other types, so that they return NODATA
-	case dns.TypeSRV, dns.TypeANY:
+	case dns.TypeSRV:
 		records, extra, err := s.SRVRecords(q, name, bufsize, dnssec)
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
@@ -440,10 +440,10 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 		// if we are here again, check the types, because an answer may only
-		// be given for SRV or ANY. All other types should return NODATA, the
+		// be given for SRV. All other types should return NODATA, the
 		// NXDOMAIN part is handled in the above code. TODO(miek): yes this
 		// can be done in a more elegant manor.
-		if q.Qtype == dns.TypeSRV || q.Qtype == dns.TypeANY {
+		if q.Qtype == dns.TypeSRV {
 			m.Answer = append(m.Answer, records...)
 			m.Extra = append(m.Extra, extra...)
 		}
@@ -465,6 +465,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
+			/*
 			// TODO: deduplicate with above code
 			// Try to resolve as CNAME if it's not an IP.
 			newRecord := serv.NewCNAME(q.Name, dns.Fqdn(serv.Host))
@@ -488,6 +489,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 				return records, fmt.Errorf("incomplete CNAME chain")
 			}
 			records = append(records, nextRecords...)
+			*/
 		case ip.To4() != nil && q.Qtype == dns.TypeA:
 			records = append(records, serv.NewA(q.Name, ip.To4()))
 		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
@@ -579,11 +581,13 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 			}
 			lookup[srv.Target] = true
 		case ip.To4() != nil:
-			serv.Host = msg.Domain(serv.Key)
+			// use the q.Name to synthesize the target of this SRV record
+			serv.Host = q.Name
 			records = append(records, serv.NewSRV(q.Name, weight))
 			extra = append(extra, serv.NewA(serv.Host, ip.To4()))
 		case ip.To4() == nil:
-			serv.Host = msg.Domain(serv.Key)
+			// use the q.Name to synthesize the target of this SRV record
+			serv.Host = q.Name
 			records = append(records, serv.NewSRV(q.Name, weight))
 			extra = append(extra, serv.NewAAAA(serv.Host, ip.To16()))
 		}
