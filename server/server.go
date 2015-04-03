@@ -574,19 +574,11 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 			}
 			lookup[srv.Target] = true
 		case ip.To4() != nil:
-			if serv.TargetFromQuery {
-				serv.Host = q.Name
-			} else {
-				serv.Host = msg.Domain(serv.Key)
-			}
+			serv.Host = msg.Domain(serv.Key)
 			records = append(records, serv.NewSRV(q.Name, weight))
 			extra = append(extra, serv.NewA(serv.Host, ip.To4()))
 		case ip.To4() == nil:
-			if serv.TargetFromQuery {
-				serv.Host = q.Name
-			} else {
-				serv.Host = msg.Domain(serv.Key)
-			}
+			serv.Host = msg.Domain(serv.Key)
 			records = append(records, serv.NewSRV(q.Name, weight))
 			extra = append(extra, serv.NewAAAA(serv.Host, ip.To16()))
 		}

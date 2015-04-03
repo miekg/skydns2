@@ -389,8 +389,8 @@ var services = []*msg.Service{
 	{Host: "server4", Priority: 30, Key: "104.server4.region5.skydns.test."},
 
 	// A name: bar.skydns.test with 2 ports open and points to one ip: 192.168.0.1
-	{Host: "192.168.0.1", Port: 80, Key: "x.bar.skydns.test.", TargetFromQuery: true},
-	{Host: "bar.skydns.local", Port: 443, Key: "y.bar.skydns.test.", TargetFromQuery: true},
+	{Host: "192.168.0.1", Port: 80, Key: "x.bar.skydns.test.", TargetStrip: 1},
+	{Host: "bar.skydns.local", Port: 443, Key: "y.bar.skydns.test.", TargetStrip: 0},
 
 	// nameserver
 	{Host: "10.0.0.2", Key: "ns.dns.skydns.test."},
