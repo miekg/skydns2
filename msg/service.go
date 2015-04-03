@@ -22,7 +22,12 @@ type Service struct {
 	Weight   int    `json:"weight,omitempty"`
 	Text     string `json:"text,omitempty"`
 	Ttl      uint32 `json:"ttl,omitempty"`
-	// etcd key where we found this service and ignore from json un-/marshalling
+	// When a SRV record with a "Host: IP-address" is added, we synthesize a srv.Target. Normally
+	// we convert the Key where the record lives to a DNS name and use this as the srv.Target.
+	// When TargetFromQuery is true we use the query name as the srv.Target.
+	TargetFromQuery bool `json:"targetfromquery",omitempty"`
+
+	// Etcd key where we found this service and ignored from json un-/marshalling
 	Key string `json:"-"`
 }
 

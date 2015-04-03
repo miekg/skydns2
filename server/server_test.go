@@ -389,8 +389,8 @@ var services = []*msg.Service{
 	{Host: "server4", Priority: 30, Key: "104.server4.region5.skydns.test."},
 
 	// A name: bar.skydns.test with 2 ports open and points to one ip: 192.168.0.1
-	{Host: "192.168.0.1", Port: 80, Key: "x.bar.skydns.test."},
-	{Host: "bar.skydns.local", Port: 443, Key: "y.bar.skydns.test."},
+	{Host: "192.168.0.1", Port: 80, Key: "x.bar.skydns.test.", TargetFromQuery: true},
+	{Host: "bar.skydns.local", Port: 443, Key: "y.bar.skydns.test.", TargetFromQuery: true},
 
 	// nameserver
 	{Host: "10.0.0.2", Key: "ns.dns.skydns.test."},
@@ -769,10 +769,10 @@ var dnsTestCases = []dnsTestCase{
 		Answer: []dns.RR{
 			newSRV("bar.skydns.test. 3600 SRV 10 50 443 bar.skydns.local."),
 			// Issue 144 says x.bar.skydns.test should be bar.skydns.test
-			newSRV("bar.skydns.test. 3600 SRV 10 50 80 x.bar.skydns.test."),
+			newSRV("bar.skydns.test. 3600 SRV 10 50 80 bar.skydns.test."),
 		},
 		Extra: []dns.RR{
-			newA("x.bar.skydns.test. 3600 A 192.168.0.1"),
+			newA("bar.skydns.test. 3600 A 192.168.0.1"),
 		},
 	},
 }
