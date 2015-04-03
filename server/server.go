@@ -291,6 +291,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			m.Truncated = true
 		}
 		if err := w.WriteMsg(m); err != nil {
+				log.Printf("%s\n", m)
 			log.Printf("skydns: failure to return reply %q", err)
 		}
 	}()
@@ -574,12 +575,14 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 			lookup[srv.Target] = true
 		case ip.To4() != nil:
 			// use the q.Name to synthesize the target of this SRV record
-			serv.Host = q.Name
+			serv.Host = msg.Domain(serv.Key)
+			//serv.Host = q.Name
 			records = append(records, serv.NewSRV(q.Name, weight))
 			extra = append(extra, serv.NewA(serv.Host, ip.To4()))
 		case ip.To4() == nil:
 			// use the q.Name to synthesize the target of this SRV record
-			serv.Host = q.Name
+			serv.Host = msg.Domain(serv.Key)
+			//serv.Host = q.Name
 			records = append(records, serv.NewSRV(q.Name, weight))
 			extra = append(extra, serv.NewAAAA(serv.Host, ip.To16()))
 		}

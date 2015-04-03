@@ -760,14 +760,19 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "bar.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{
-
+			newA("bar.skydns.test. 3600 A 192.168.0.1"),
 		},
 	},
 	// Then ask for the SRV records.
 	{
 		Qname: "bar.skydns.test.", Qtype: dns.TypeSRV,
 		Answer: []dns.RR{
-
+			newSRV("bar.skydns.test. 3600 SRV 10 50 443 bar.skydns.local."),
+			// Issue 144 says x.bar.skydns.test should be bar.skydns.test
+			newSRV("bar.skydns.test. 3600 SRV 10 50 80 x.bar.skydns.test."),
+		},
+		Extra: []dns.RR{
+			newA("x.bar.skydns.test. 3600 A 192.168.0.1"),
 		},
 	},
 }
