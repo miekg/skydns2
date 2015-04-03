@@ -1,5 +1,5 @@
 # SkyDNS [![Build Status](https://travis-ci.org/skynetservices/skydns.png?branch=master)](https://travis-ci.org/skynetservices/skydns)
-*Version 2.1.0a*
+*Version 2.2.0a*
 
 SkyDNS is a distributed service for announcement and discovery of services built
 on top of [etcd](https://github.com/coreos/etcd). It utilizes DNS queries to
@@ -10,6 +10,7 @@ This is the original [announcement blog
 post](http://blog.gopheracademy.com/skydns) for version 1. Since then, SkyDNS
 has seen some changes, most notably the ability to use etcd as a backend.
 [Here you can find the SkyDNS2 announcement](http://miek.nl/posts/2014/Jun/08/announcing%20SkyDNS%20version%202/).
+
 
 # Changes since version 1
 
@@ -24,9 +25,6 @@ Note that bugs in SkyDNS1 will still be fixed, but the main development effort
 will be focussed on version 2. [Version 1 of SkyDNS can be found
 here](https://github.com/skynetservices/skydns1).
 
-# Future ideas
-
-* Abstract away the backend in an interface, so different backends can be used.
 
 ## Setup / Install
 Download/compile and run etcd. See the documentation for etcd at <https://github.com/coreos/etcd>.
@@ -56,7 +54,9 @@ Optionally (but recommended) give it a nameserver:
 
 Also see the section "NS Records".
 
+
 ## Configuration
+
 SkyDNS' configuration is stored in etcd as a JSON object under the key
 `/skydns/config`. The following parameters may be set:
 
@@ -90,6 +90,7 @@ signal.
 You can also use the command line options, however the settings in etcd take
 precedence.
 
+
 ### Commandline flags
 
 * `-addr`: used to specify the address to listen on (note: this will be changed into `-dns_addr` to match the json.
@@ -106,6 +107,7 @@ precedence.
     will be resolved.
 
     Also see the section Host Local Values.
+
 
 ### Environment Variables
 
@@ -126,6 +128,7 @@ And these are used for statistics:
 * `GRAPHITE_PREFIX`
 * `STATHAT_USER`
 
+
 ### SSL Usage and Authentication with Client Certificates
 
 In order to connect to an SSL-secured etcd, you will at least need to set
@@ -136,7 +139,9 @@ If the SSL-secured etcd expects client certificates to authorize connections,
 you also need to set ETCD_TLSKEY to the *private* key of the client, and
 ETCD_TLSPEM to the *public* key of the client.
 
+
 ## Service Announcements
+
 Announce your service by submitting JSON over HTTP to etcd with information
 about your service. This information will then be available for queries via DNS.
 We use the directory `/skydns` to anchor all names.
@@ -196,6 +201,7 @@ Note, all calculations are rounded down, so the sum total might be lower than
 When querying the DNS for services you can use wildcards or query for
 subdomains. See the section named "Wildcards" below for more information.
 
+
 ## Service Discovery via the DNS
 
 You can find services by querying SkyDNS via any DNS client or utility. It uses
@@ -224,11 +230,9 @@ Testing one of the names with `dig`:
 
     % dig @localhost SRV 1.rails.production.east.skydns.local
 
-    ;; QUESTION SECTION:
-    ;1.rails.production.east.skydns.local.      IN      SRV
-
     ;; ANSWER SECTION:
     1.rails.production.east.skydns.local. 3600 IN SRV 10 0 8080 service1.example.com.
+
 
 ### Wildcards
 
@@ -240,9 +244,6 @@ If we are interested in all the servers in the `east` region, we simply omit the
 rightmost labels from our query:
 
     % dig @localhost SRV east.skydns.local
-
-    ;; QUESTION SECTION
-    ; east.skydns.local.    IN      SRV
 
     ;; ANSWER SECTION:
     east.skydns.local.      3600    IN      SRV     10 20 8080 service1.example.com.
@@ -270,18 +271,17 @@ you even put the wildcard (the `*`) in the middle of a name
 `staging.*.skydns.local` is a valid query, which returns all name in staging,
 regardless of the region. Multiple wildcards per name are also permitted.
 
+
 ### Examples
 
 Now we can try some of our example DNS lookups:
+
 
 #### SRV Records
 
 Get all Services in staging.east:
 
     % dig @localhost staging.east.skydns.local. SRV
-
-    ;; QUESTION SECTION:
-    ;staging.east.skydns.local. IN  SRV
 
     ;; ANSWER SECTION:
     staging.east.skydns.local. 3600 IN  SRV 10 50 8080 4.rails.staging.east.skydns.local.
@@ -291,6 +291,38 @@ Get all Services in staging.east:
     4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
     6.rails.staging.east.skydns.local. 3600 IN AAAA 2003::8:1
 
+If you ask for a service who's Host value is an IP address you would (in theory) get
+back a SRV record such as:
+
+    % dig @localhost 4.rails.staging.east.skydns.local SRV
+
+    ;; ANSWER SECTION:
+    4.rails.staging.east.skydns.local 3600 IN SRV 10 100 8080 10.0.1.125.
+
+Where the target of the SRV is an IP address. This is not how SRV records work.
+SkyDNS will in this case synthesize an domain name and adds the actual IP
+address to the additional section of the response:
+
+    % dig @localhost 4.rails.staging.east.skydns.local SRV
+
+    ;; ANSWER SECTION:
+    4.rails.staging.east.skydns.local 3600 IN SRV 10 100 4.rails.staging.east.skydns.local.
+
+    ;; ADDITIONAL SECTION:
+    4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
+
+Which conveys the same information and is legal in the DNS. To have some control on how
+the target names look you can register a service with `TargetStrip` set to a none-zero
+value. This tells SkyDNS to strip `TargetStrip` labels from the left-side of the generated
+Target domain name. Support `TargetStrip` is 2 for this service, to above response would be:
+
+    ;; ANSWER SECTION:
+    4.rails.staging.east.skydns.local 3600 IN SRV 10 100 staging.east.skydns.local.
+
+    ;; ADDITIONAL SECTION:
+    staging.east.skydns.local. 3600 IN A    10.0.1.125
+
+
 #### A/AAAA Records
 To return A records, simply run a normal DNS query for a service matching the
 above patterns.
@@ -298,9 +330,6 @@ above patterns.
 Now do a normal DNS query:
 
     % dig @localhost staging.east.skydns.local. A
-
-    ;; QUESTION SECTION:
-    ;staging.east.skydns.local. IN  A
 
     ;; ANSWER SECTION:
     staging.east.skydns.local. 3600 IN  A   10.0.1.125
@@ -311,6 +340,7 @@ the east area.
 Because we're returning A records and not SRV records, there are no ports
 listed, so this is only useful when you're querying for services running on
 ports known to you in advance.
+
 
 #### CNAME Records
 If for an A or AAAA query the IP address can not be parsed, SkyDNS will try to
@@ -334,6 +364,7 @@ We have created the following CNAME chain:
     1.rails.production.east.skydns.local. 3600  IN  CNAME   service1.skydns.local.
     service1.skydns.local.                 3600  IN  A       10.0.2.15
 
+
 ##### External Names
 
 If the CNAME chains leads to a name that falls outside of the domain (i.e. does
@@ -354,10 +385,12 @@ Doing an A/AAAA query for this will lead to the following response:
 The first CNAME is generated from within SkyDNS, the other CNANE is returned
 from the remote name server.
 
+
 #### TXT Records
 
 SkyDNS also allows you to query for TXT records. Just register a json with the
 'text' field set.
+
 
 #### NS Records
 
@@ -373,9 +406,6 @@ Registers `ns.dns.skydns.local` as a nameserver with IP address 172.16.0.1:
 
     % dig @localhost NS skydns.local
 
-    ;; QUESTION SECTION:
-    ;skydns.local.          IN  NS
-
     ;; ANSWER SECTION:
     skydns.local.       3600    IN  NS  ns.dns.skydns.local.
 
@@ -386,6 +416,7 @@ The first nameserver should have the hostname `ns`  (as this is used in the SOA
 record). Having the nameserver(s) in etcd make sense because usualy it is hard
 for SkyDNS to figure this out by itself, espcially when running behind NAT or
 running on 127.0.0.1:53 and being forwarded packets IPv6 packets, etc. etc.
+
 
 #### PTR Records: Reverse Addresses
 
@@ -415,6 +446,7 @@ recursor (if so configured), otherwise SERVFAIL is returned.
 
 This also works for IPv6 addresses, except that the reverse path is quite long.
 
+
 #### DNS Forwarding
 
 By specifying nameservers in SkyDNS's config, for instance
@@ -425,6 +457,7 @@ Requests for which SkyDNS isn't authoritative will be forwarded and proxied back
 to the client. This means that you can set SkyDNS as the primary DNS server in
 `/etc/resolv.conf` and use it for both service discovery and normal DNS
 operations.
+
 
 #### DNSSEC
 
@@ -448,6 +481,7 @@ options):
 If you then query with `dig +dnssec` you will get signatures, keys and NSEC3
 records returned. Authenticated denial of existence is implemented using NSEC3
 white lies, see [RFC7129](http://tools.ietf.org/html/rfc7129), Appendix B.
+
 
 #### Host Local Values
 
@@ -474,11 +508,9 @@ In the example here, we don't use an UUID, we use `public.addresses`:
 
     % dig @127.0.0.1 local.dns.skydns.local. A
 
-    ;; QUESTION SECTION:
-    ;local.dns.skydns.local. IN  A
-
     ;; ANSWER SECTION:
     local.dns.skydns.local. 3600 IN  A   192.0.2.1
+
 
 ## Implementing a custom DNS backend
 
@@ -494,7 +526,9 @@ your custom implementation for certain subsets of the namespace, the
 order. The first backend that answers a `Records` or `ReverseRecord` call with
 a record and with no error will be served.
 
+
 # FAQ
+
 
 ## How Do I Create an Address Pool and Round Robin Between Them
 
@@ -504,14 +538,61 @@ You have 3 machines with 3 different IP addresses and you want to have
   create the hosts named `x{1,2,3}.db.skydns.local` in etcd:
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/db/x1 -d \
-        value='{"Host":"127.0.0.1"}'
+        value='{"host":"127.0.0.1"}'
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/db/x2 -d \
-        value='{"Host": "127.0.0.2"'}
+        value='{"host": "127.0.0.2"'}
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/db/x3 -d \
-        value='{"Host": "127.0.0.3"'}
+        value='{"host": "127.0.0.3"'}
 
 Now the name `db.skydns.local` is the "load balanced" name for the database, SkyDNS
 will round-robin by default in this case unless `-round-robin=false` is enabled.
+
+
+## How I Do Create Multiple SRV Records For the Same Name
+
+You want this response from SkyDNS, which says there are 2 open
+ports on bar.skydns.local and this name has IP addres 192.168.0.1:
+
+    ;; ANSWER SECTION:
+    bar.skydns.local.   3600    IN  SRV 10 50 80 bar.skydns.local.
+    bar.skydns.local.   3600    IN  SRV 10 50 443 bar.skydns.local.
+
+    ;; ADDITIONAL SECTION:
+    bar.skydns.local. 3600    IN  A   192.168.0.1
+
+So you register:
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/bar/x1 -d \
+        value='{"host":"192.168.0.1","port":80}'
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/bar/x2 -d \
+        value='{"host": "bar.skydns.local","port":443}'
+
+And try it out:
+
+    ;; ANSWER SECTION:
+    bar.skydns.local.   3600    IN  SRV 10 50 80 x1.bar.skydns.local.
+    bar.skydns.local.   3600    IN  SRV 10 50 443 bar.skydns.local.
+
+    ;; ADDITIONAL SECTION:
+    x1.bar.skydns.local. 3600    IN  A   192.168.0.1
+
+Which has `x1` in the name, which is not the name you wanted to see there, and
+worse does not match the name in the other SRV record. To makes this work you'll
+need `TargetStrip` which allows you to tell SkyDNS to strip labels from the name
+it makes up:
+
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/bar/x1 -d \
+        value='{"host":"192.168.0.1","port":80,"targetstrip":1}'
+
+    % dig @127.0.0.1 bar.skydns.local. SRV
+
+    ;; ANSWER SECTION:
+    bar.skydns.local.   3600    IN  SRV 10 50 80 bar.skydns.local.
+    bar.skydns.local.   3600    IN  SRV 10 50 443 bar.skydns.local.
+
+    ;; ADDITIONAL SECTION:
+    bar.skydns.local. 3600    IN  A   192.168.0.1
+
 
 # Docker
 Official Docker images are at the [Docker Hub](https://registry.hub.docker.com/u/skynetservices/skydns/):
