@@ -387,6 +387,11 @@ var services = []*msg.Service{
 	{Host: "server2", Weight: 80, Key: "101.server2.region5.skydns.test."},
 	{Host: "server3", Weight: 150, Key: "103.server3.region5.skydns.test."},
 	{Host: "server4", Priority: 30, Key: "104.server4.region5.skydns.test."},
+
+	// A name: bar.skydns.test with 2 ports open and points to one ip: 192.168.0.1
+	{Host: "192.168.0.1", Port: 80, Key: "x.bar.skydns.test."},
+	{Host: "bar.skydns.local", Port: 443, Key: "y.bar.skydns.test."},
+
 	// nameserver
 	{Host: "10.0.0.2", Key: "ns.dns.skydns.test."},
 	{Host: "10.0.0.3", Key: "ns2.dns.skydns.test."},
@@ -749,6 +754,21 @@ var dnsTestCases = []dnsTestCase{
 		Qname: "local.dns.skydns.test.", Qtype: dns.TypeA,
 		Rcode: dns.RcodeServerFailure,
 		chaos: true,
+	},
+
+	// One IP, two ports open, ask for the IP only.
+	{
+		Qname: "bar.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{
+
+		},
+	},
+	// Then ask for the SRV records.
+	{
+		Qname: "bar.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{
+
+		},
 	},
 }
 

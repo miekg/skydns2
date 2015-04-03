@@ -454,11 +454,14 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 				continue
 			}
 
-			records = append(records, newRecord)
 			nextRecords, err := s.AddressRecords(dns.Question{Name: dns.Fqdn(serv.Host), Qtype: q.Qtype, Qclass: q.Qclass},
 				strings.ToLower(dns.Fqdn(serv.Host)), append(previousRecords, newRecord), bufsize, dnssec)
 			if err == nil {
-				records = append(records, nextRecords...)
+				// Only have we found something we should add the CNAME and the IP addresses.
+				if len(nextRecords) > 0 {
+					records = append(records, newRecord)
+					records = append(records, nextRecords...)
+				}
 				continue
 			}
 			// This means we can not complete the CNAME, try to look else where.
@@ -469,9 +472,11 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 			}
 			m1, e1 := s.Lookup(target, q.Qtype, bufsize, dnssec)
 			if e1 != nil {
-				log.Printf("skydns: %s", err)
+				log.Printf("skydns: incomplete CNAME chain: %s", e1)
 				continue
 			}
+			// Len(m1.Answer) > 0 here is well?
+			records = append(records, newRecord)
 			records = append(records, m1.Answer...)
 			continue
 
