@@ -437,8 +437,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 		ip := net.ParseIP(serv.Host)
 		switch {
 		case ip == nil:
-			// Try to resolve as CNAME if it's not an IP, but only is we don't
-			// create loops.
+			// Try to resolve as CNAME if it's not an IP, but only if we don't create loops.
 			if q.Name == dns.Fqdn(serv.Host) {
 				// x CNAME x is a direct loop, don't add those
 				continue

@@ -561,7 +561,7 @@ ports on bar.skydns.local and this name has IP addres 192.168.0.1:
     ;; ADDITIONAL SECTION:
     bar.skydns.local. 3600    IN  A   192.168.0.1
 
-So you register:
+So you register a "dummy" host named `x1`:
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/bar/x1 -d \
         value='{"host":"192.168.0.1","port":80}'
