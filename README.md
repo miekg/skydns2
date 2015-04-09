@@ -512,6 +512,8 @@ In the example here, we don't use an UUID, we use `public.addresses`:
     ;; ANSWER SECTION:
     local.dns.skydns.local. 3600 IN  A   192.0.2.1
 
+The name `local.dns.skydns.local.` is fixed, i.e. you can retrieve the Host Local Value by
+querying for `local.dns.<your domain>`.
 
 ## Implementing a custom DNS backend
 
