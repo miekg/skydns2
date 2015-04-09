@@ -36,7 +36,7 @@ Then get and compile SkyDNS:
     go build -v
 
 SkyDNS' configuration is stored *in* etcd: but there are also flags and
-environment variabes you can set. To start SkyDNS, set the etcd machines with
+environment variables you can set. To start SkyDNS, set the etcd machines with
 the environment variable ETCD_MACHINES:
 
     export ETCD_MACHINES='http://192.168.0.1:4001,http://192.168.0.2:4001'
@@ -67,7 +67,7 @@ SkyDNS' configuration is stored in etcd as a JSON object under the key
 * `local`: optional unique value for this skydns instance, default is none. This is returned
     when queried for `local.dns.skydns.local`.
 * `round_robin`: enable round-robin sorting for A and AAAA responses, defaults to true.
-    Note that packets containing more than one CNAME are excempt from this (see issue #128 on Github).
+    Note that packets containing more than one CNAME are exempt from this (see issue #128 on Github).
 * `nameservers`: forward DNS requests to these nameservers (array of IP:port combination), when not
     authoritative for a domain.
 * `read_timeout`: network read timeout, for DNS and talking with etcd.
@@ -258,8 +258,9 @@ Here all three entries of the `east` are returned.
 
 There is one other feature at play here. The second and third names,
 `{4,6}.rails.staging.east.skydns.local`, only had an IP record configured. Here
-SkyDNS used the ectd path to construct a target name and then puts the actual IP
-address in the additional section. Directly querying for the A records of
+SkyDNS used the ectd path (also see `TargetStrip`) to
+construct a target name and then puts the actual IP address in the additional
+section. Directly querying for the A records of
 `4.rails.staging.east.skydns.local.` of course also works:
 
     % dig @localhost -p 5354 +noall +answer A 4.rails.staging.east.skydns.local.
@@ -297,10 +298,10 @@ back a SRV record such as:
     % dig @localhost 4.rails.staging.east.skydns.local SRV
 
     ;; ANSWER SECTION:
-    4.rails.staging.east.skydns.local 3600 IN SRV 10 100 8080 10.0.1.125.
+    4.rails.staging.east.skydns.local 3600 IN SRV 10 100 8080 10.0.1.125
 
 Where the target of the SRV is an IP address. This is not how SRV records work.
-SkyDNS will in this case synthesize an domain name and adds the actual IP
+SkyDNS will in this case synthesize a domain name and add the actual IP
 address to the additional section of the response:
 
     % dig @localhost 4.rails.staging.east.skydns.local SRV
@@ -413,8 +414,8 @@ Registers `ns.dns.skydns.local` as a nameserver with IP address 172.16.0.1:
     ns.dns.skydns.local.    3600    IN  A   172.16.0.1
 
 The first nameserver should have the hostname `ns`  (as this is used in the SOA
-record). Having the nameserver(s) in etcd make sense because usualy it is hard
-for SkyDNS to figure this out by itself, espcially when running behind NAT or
+record). Having the nameserver(s) in etcd make sense because usually it is hard
+for SkyDNS to figure this out by itself, especially when running behind NAT or
 running on 127.0.0.1:53 and being forwarded packets IPv6 packets, etc. etc.
 
 
