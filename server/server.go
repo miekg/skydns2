@@ -240,6 +240,15 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	if s.config.Verbose {
 		log.Printf("skydns: received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 	}
+
+	for zone, ns := range *s.config.stub {
+		// or dns.IsSubDomain
+		if dns.IsSubDomain(zone, name) {
+			s.ServeDNSStubForward(w, req, ns)
+			return
+		}
+	}
+
 	// If the qname is local.dns.skydns.local. and s.config.Local != "", substitute that name.
 	if s.config.Local != "" && name == s.config.localDomain {
 		name = s.config.Local

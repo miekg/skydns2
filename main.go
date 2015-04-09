@@ -21,6 +21,7 @@ import (
 	"github.com/miekg/dns"
 
 	backendetcd "github.com/skynetservices/skydns/backends/etcd"
+	"github.com/skynetservices/skydns/msg"
 	"github.com/skynetservices/skydns/server"
 	"github.com/skynetservices/skydns/stats"
 )
@@ -33,6 +34,7 @@ var (
 	nameserver = ""
 	machine    = ""
 	discover   = false
+	stub       = false
 )
 
 func env(key, def string) string {
@@ -55,6 +57,7 @@ func init() {
 	flag.DurationVar(&config.ReadTimeout, "rtimeout", 2*time.Second, "read timeout")
 	flag.BoolVar(&config.RoundRobin, "round-robin", true, "round robin A/AAAA replies")
 	flag.BoolVar(&discover, "discover", false, "discover new machines by watching /v2/_etcd/machines")
+	flag.BoolVar(&stub, "stubzones", false, "support stub zones")
 	flag.BoolVar(&config.Verbose, "verbose", false, "log queries")
 	flag.BoolVar(&config.Systemd, "systemd", false, "bind to socket(s) activated by systemd (ignore -addr)")
 
@@ -115,6 +118,32 @@ func main() {
 					} else {
 						// we can see an n == nil, probably when we can't connect to etcd.
 						log.Printf("skydns: ectd machine cluster update failed, sleeping %s + ~3s", duration)
+						time.Sleep(duration + (time.Duration(rand.Float32() * 3e9))) // Add some random.
+						duration *= 2
+						if duration > 32*time.Second {
+							duration = 32 * time.Second
+						}
+					}
+				}
+			}
+		}()
+	}
+
+	if stub {
+		s.UpdateStubZones()
+		go func() {
+			recv := make(chan *etcd.Response)
+			go client.Watch(msg.Path(config.Domain)+"/dns/stub/", 0, true, recv, nil)
+			duration := 1 * time.Second
+			for {
+				select {
+				case n := <-recv:
+					if n != nil {
+						s.UpdateStubZones()
+						duration = 1 * time.Second // reset
+					} else {
+						// we can see an n == nil, probably when we can't connect to etcd.
+						log.Printf("skydns: ectd stubzone update failed, sleeping %s + ~3s", duration)
 						time.Sleep(duration + (time.Duration(rand.Float32() * 3e9))) // Add some random.
 						duration *= 2
 						if duration > 32*time.Second {
