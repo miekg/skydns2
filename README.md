@@ -313,7 +313,7 @@ address to the additional section of the response:
     4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
 
 Which conveys the same information and is legal in the DNS. To have some control on how
-the target names look you can register a service with `TargetStrip` set to a none-zero
+the target names look you can register a service with `TargetStrip` set to a non-zero
 value. This tells SkyDNS to strip `TargetStrip` labels from the left-side of the generated
 Target domain name. Support `TargetStrip` is 2 for this service, to above response would be:
 
