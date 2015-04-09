@@ -242,8 +242,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	for zone, ns := range *s.config.stub {
-		// or dns.IsSubDomain
-		if dns.IsSubDomain(zone, name) {
+		if strings.HasSuffix(name, zone) {
 			s.ServeDNSStubForward(w, req, ns)
 			return
 		}

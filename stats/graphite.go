@@ -31,6 +31,9 @@ func init() {
 	server.StatsForwardCount = metrics.NewCounter()
 	metrics.Register("skydns-forward-requests", server.StatsForwardCount)
 
+	server.StatsStubForwardCount = metrics.NewCounter()
+	metrics.Register("skydns-stub-forward-requests", server.StatsStubForwardCount)
+
 	server.StatsDnssecOkCount = metrics.NewCounter()
 	metrics.Register("skydns-dnssecok-requests", server.StatsDnssecOkCount)
 
