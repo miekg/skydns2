@@ -801,6 +801,27 @@ func newNSEC3(rr string) *dns.NSEC3   { r, _ := dns.NewRR(rr); return r.(*dns.NS
 func newPTR(rr string) *dns.PTR       { r, _ := dns.NewRR(rr); return r.(*dns.PTR) }
 func newTXT(rr string) *dns.TXT       { r, _ := dns.NewRR(rr); return r.(*dns.TXT) }
 
+func TestDedup(t *testing.T) {
+	m := new(dns.Msg)
+	m.Answer = []dns.RR{
+		newA("svc.ns.kubernetes.local. IN A 3.3.3.3"),
+		newA("svc.ns.kubernetes.local. IN A 2.2.2.2"),
+		newA("svc.ns.kubernetes.local. IN A 3.3.3.3"),
+		newA("svc.ns.kubernetes.local. IN A 2.2.2.2"),
+		newA("svc.ns.kubernetes.local. IN A 1.1.1.1"),
+		newA("svc.ns.kubernetes.local. IN A 1.1.1.1"),
+	}
+	m = dedup(m)
+	sort.Sort(rrSet(m.Answer))
+	if len(m.Answer) != 3 {
+		t.Fatalf("failing dedup: should have collapsed it to 3 records")
+	}
+	if dns.Field(m.Answer[0], 1) != "1.1.1.1" || dns.Field(m.Answer[1], 1) != "2.2.2.2" ||
+		dns.Field(m.Answer[2], 1) != "3.3.3.3" {
+		t.Fatalf("failing dedup: %s", m)
+	}
+}
+
 func BenchmarkDNSSingleCache(b *testing.B) {
 	b.StopTimer()
 	t := new(testing.T)
