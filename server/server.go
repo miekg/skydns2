@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -262,7 +263,10 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 			return
 		}
-		// Set TTL to the minimum of the RRset.
+		// Set TTL to the minimum of the RRset and dedup the message, i.e.
+		// remove idential RRs.
+		m = dedup(m)
+
 		minttl := s.config.Ttl
 		if len(m.Answer) > 1 {
 			for _, r := range m.Answer {
@@ -704,4 +708,54 @@ func (s *server) RoundRobin(rrs []dns.RR) {
 		}
 	}
 
+}
+
+// dedup will de-duplicate a message on a per section basis.
+// Multiple identical (same name, class, type and rdata) RRs will be coalesced into one.
+func dedup(m *dns.Msg) *dns.Msg {
+	// Answer section
+	ma := make(map[string]dns.RR)
+	for _, a := range m.Answer {
+		// Or use Pack()... Think this function also could be places in go dns.
+		s := a.Header().Name
+		s += strconv.Itoa(int(a.Header().Class))
+		s += strconv.Itoa(int(a.Header().Rrtype))
+		for i := 1; i <= dns.NumField(a); i++ {
+			s += dns.Field(a, i)
+		}
+		ma[s] = a
+	}
+	// Only is our map is smaller than the #RR in the answer section we should reset the RRs
+	// in the section it self
+	if len(ma) < len(m.Answer) {
+		i := 0
+		for _, v := range ma {
+			m.Answer[i] = v
+			i++
+		}
+		m.Answer = m.Answer[:len(ma)]
+	}
+
+	// Additional section
+	me := make(map[string]dns.RR)
+	for _, e := range m.Extra {
+		s := e.Header().Name
+		s += strconv.Itoa(int(e.Header().Class))
+		s += strconv.Itoa(int(e.Header().Rrtype))
+		for i := 1; i <= dns.NumField(e); i++ {
+			s += dns.Field(e, i)
+		}
+		me[s] = e
+	}
+
+	if len(me) < len(m.Extra) {
+		i := 0
+		for _, v := range me {
+			m.Extra[i] = v
+			i++
+		}
+		m.Extra = m.Extra[:len(me)]
+	}
+
+	return m
 }

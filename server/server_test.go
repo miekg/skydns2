@@ -398,6 +398,9 @@ var services = []*msg.Service{
 	// txt
 	{Text: "abc", Key: "a1.txt.skydns.test."},
 	{Text: "abc abc", Key: "a2.txt.skydns.test."},
+	// duplicate ip address
+	{Host: "10.11.11.10", Key: "http.multiport.http.skydns.test.", Port: 80},
+	{Host: "10.11.11.10", Key: "https.multiport.http.skydns.test.", Port: 443},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -778,6 +781,11 @@ var dnsTestCases = []dnsTestCase{
 		Extra: []dns.RR{
 			newA("bar.skydns.test. 3600 A 192.168.0.1"),
 		},
+	},
+	// Duplicate IP address test
+	{
+		Qname: "multiport.http.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{newA("multiport.http.skydns.test. IN A 10.11.11.10")},
 	},
 }
 
