@@ -636,12 +636,15 @@ it makes up:
 
 
 # Docker
+
 Official Docker images are at the [Docker Hub](https://registry.hub.docker.com/u/skynetservices/skydns/):
 
 * master -> skynetservices/skydns:latest
 * latest tag -> skynetservices/skydns:latest-tagged
 
+
 # License
+
 The MIT License (MIT)
 
 Copyright © 2014 The SkyDNS Authors

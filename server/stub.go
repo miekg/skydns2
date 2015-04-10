@@ -5,30 +5,48 @@
 package server
 
 import (
-	"fmt"
 	"log"
 	"net"
+	"strconv"
+	"strings"
 
 	"github.com/miekg/dns"
+	"github.com/miekg/skydns/msg"
 )
 
 // Look in .../dns/stub/<domain>/xx for msg.Services. Loop through them
 // extract <domain> and add them as forwarders (ip:port-combos) for
-// the stubzones. Hosts that point to names will not be used.
+// the stubzones. Only numeric (i.e. IP address) hosts are used.
 func (s *server) UpdateStubZones() {
-	// do some fakery here in the beginning
 	stubmap := make(map[string][]string)
-	stubmap["miek.nl."] = []string{"172.16.0.1:54", "176.58.119.54:53"}
 
-	// We can just uses the backend interface to get these records.
 	services, err := s.backend.Records("stub.dns."+s.config.Domain, false)
 	if err != nil {
 		log.Printf("skydns: stubzone update failed: %s", err)
 		return
 	}
 	for _, serv := range services {
-		fmt.Printf("%+v\n", serv)
-		//		ip := net.ParseIP(serv.Host)
+		if serv.Port == 0 {
+			serv.Port = 53
+		}
+		ip := net.ParseIP(serv.Host)
+		if ip == nil {
+			log.Printf("skydns: stubzone non-address %s seen for: %s", serv.Key, serv.Host)
+			continue
+		}
+
+		domain := msg.Domain(serv.Key)
+		// Chop of left most label, because that is used as the nameserver place holder
+		// and drop the right most labels that belong to localDomain.
+		labels := dns.SplitDomainName(domain)
+		domain = dns.Fqdn(strings.Join(labels[1:len(labels)-dns.CountLabel(s.config.localDomain)], "."))
+
+		// if domain if the remaining name equals s.config.LocalDomain we ignore it.
+		if domain == s.config.localDomain {
+			log.Printf("skydns: not adding stub zone for my own domain")
+			continue
+		}
+		stubmap[domain] = append(stubmap[domain], net.JoinHostPort(serv.Host, strconv.Itoa(serv.Port)))
 	}
 
 	s.config.stub = &stubmap
