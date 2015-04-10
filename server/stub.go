@@ -5,6 +5,7 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"net"
 
@@ -13,13 +14,22 @@ import (
 
 // Look in .../dns/stub/<domain>/xx for msg.Services. Loop through them
 // extract <domain> and add them as forwarders (ip:port-combos) for
-// the stubzones.
+// the stubzones. Hosts that point to names will not be used.
 func (s *server) UpdateStubZones() {
 	// do some fakery here in the beginning
 	stubmap := make(map[string][]string)
 	stubmap["miek.nl."] = []string{"172.16.0.1:54", "176.58.119.54:53"}
 
 	// We can just uses the backend interface to get these records.
+	services, err := s.backend.Records("stub.dns."+s.config.Domain, false)
+	if err != nil {
+		log.Printf("skydns: stubzone update failed: %s", err)
+		return
+	}
+	for _, serv := range services {
+		fmt.Printf("%+v\n", serv)
+		//		ip := net.ParseIP(serv.Host)
+	}
 
 	s.config.stub = &stubmap
 }

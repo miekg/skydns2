@@ -143,7 +143,7 @@ func main() {
 						duration = 1 * time.Second // reset
 					} else {
 						// we can see an n == nil, probably when we can't connect to etcd.
-						log.Printf("skydns: ectd stubzone update failed, sleeping %s + ~3s", duration)
+						log.Printf("skydns: stubzone update failed, sleeping %s + ~3s", duration)
 						time.Sleep(duration + (time.Duration(rand.Float32() * 3e9))) // Add some random.
 						duration *= 2
 						if duration > 32*time.Second {
