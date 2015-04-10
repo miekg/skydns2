@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/miekg/dns"
-	"github.com/miekg/skydns/msg"
+	"github.com/skynetservices/skydns/msg"
 )
 
 // Look in .../dns/stub/<domain>/xx for msg.Services. Loop through them
