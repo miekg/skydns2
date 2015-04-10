@@ -536,7 +536,8 @@ Stub Zones are pointers that point to *another set* of servers which should
 provide an answer for the current query. This is similar to the (recursive)
 forwarding SkyDNS does, but different in that you need to specify a domain name
 and a set of authoritative servers. Also this can be dynamically controlled by
-writing values into Etcd.
+writing values into Etcd. Note, that when enabled SkyDNS will *first* consult
+the stub configuration, potentially bypassing any configured local records.
 
 The stub zone configuration lives under `stub.dns.skydns.local.`. The following
 example shows on how to set this up. Suppose we want to create a stub zone for
