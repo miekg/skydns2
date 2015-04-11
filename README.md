@@ -422,7 +422,7 @@ running on 127.0.0.1:53 and being forwarded packets IPv6 packets, etc. etc.
 #### PTR Records: Reverse Addresses
 
 When registering a service with an IP address only, you might also want to
-register the reverse (the hostname the address points to). In the DNS these
+register the reverse (adding a hostname the address points to). In the DNS these
 records are called PTR records.
 
 So looking back at some of the services in the section "Service Discovery via
@@ -430,15 +430,21 @@ the DNS", we register these IP only ones:
 
     4.rails.staging.east.skydns.local. 10.0.1.125
 
-To add the reverse of these address you need to add the following names and
-values:
+To add the reverse of this address you need to add the DNS name that will be used
+when doing a reverse lookup. With `dig -x <IP address>` you can easiliy find
+what the reverse name should be:
 
-    125.1.0.10.in-addr.arpa. service1.example.com.
+    % dig -x 10.0.1.125 +noall +question
+    ;125.1.0.10.in-addr.arpa.   IN  PTR
 
-These can be added with:
+So the name must be `125.1.0.10.in-addr.arpa` which should point to
+`4.rails.staging.east.skydns.local`.
+
+These can be added with the following command. Note that the IP address is
+reversed *again* and is actually back in its original form.
 
     curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/arpa/in-addr/10/0/1/125 \
-        -d value='{"host":"service1.example.com}'
+        -d value='{"host":"4.rails.staging.east.skydns.local"}'
 
 If SkyDNS receives a PTR query it will check these paths and will return the
 contents. Note that these replies are sent with the AA (Authoritative Answer)
