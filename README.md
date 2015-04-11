@@ -568,6 +568,8 @@ When SkyDNS reveives a query for `skydns.com` it will *not* forward it to the re
 instead will query 172.16.1.1 on port 54 and if that fails will query 10.10.244.1 (on 53) to get
 an answer. That answer will then given back to the original client.
 
+DO NOT. I repeat *DO NOT* forward from one SkyDNS instance to another.
+
 # FAQ
 
 
