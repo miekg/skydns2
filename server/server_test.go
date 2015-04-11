@@ -126,7 +126,7 @@ func TestDNSForward(t *testing.T) {
 		}
 	}
 	if len(resp.Answer) == 0 || resp.Rcode != dns.RcodeSuccess {
-		t.Fatal("Answer expected to have A records or rcode not equal to RcodeSuccess")
+		t.Fatal("answer expected to have A records or rcode not equal to RcodeSuccess")
 	}
 	// TCP
 	c.Net = "tcp"
@@ -135,9 +135,57 @@ func TestDNSForward(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(resp.Answer) == 0 || resp.Rcode != dns.RcodeSuccess {
-		t.Fatal("Answer expected to have A records or rcode not equal to RcodeSuccess")
+		t.Fatal("answer expected to have A records or rcode not equal to RcodeSuccess")
 	}
 }
+
+func TestDNSStubForward(t *testing.T) {
+	s := newTestServer(t, false)
+	defer s.Stop()
+
+	c := new(dns.Client)
+	m := new(dns.Msg)
+
+	stubEx := &msg.Service{
+		// IP address of a.iana-servers.net.
+		Host: "199.43.132.53", Key: "a.example.com.stub.dns.skydns.test.",
+	}
+	stubBroken := &msg.Service{
+		Host: "127.0.0.1", Port: 5454, Key: "b.example.org.stub.dns.skydns.test.",
+	}
+	addService(t, s, stubEx.Key, 0, stubEx)
+	defer delService(t, s, stubEx.Key)
+	addService(t, s, stubBroken.Key, 0, stubBroken)
+	defer delService(t, s, stubBroken.Key)
+
+	s.UpdateStubZones()
+
+	m.SetQuestion("www.example.com.", dns.TypeA)
+	resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
+	if err != nil {
+		// try twice
+		resp, _, err = c.Exchange(m, "127.0.0.1:"+StrPort)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(resp.Answer) == 0 || resp.Rcode != dns.RcodeSuccess {
+		t.Fatal("answer expected to have A records or rcode not equal to RcodeSuccess")
+	}
+	// The main diff. here is that we expect the AA bit to be set, because we directly
+	// queried the authoritative servers.
+	if resp.Authoritative != true {
+		t.Fatal("answer expected to have AA bit set")
+	}
+
+	// This should fail.
+	m.SetQuestion("www.example.org.", dns.TypeA)
+	resp, _, err = c.Exchange(m, "127.0.0.1:"+StrPort)
+	if len(resp.Answer) != 0 || resp.Rcode != dns.RcodeServerFailure {
+		t.Fatal("answer expected to fail")
+	}
+}
+
 func TestDNSTtlRRset(t *testing.T) {
 	s := newTestServerDNSSEC(t, false)
 	defer s.Stop()
