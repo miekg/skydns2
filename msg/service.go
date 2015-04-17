@@ -27,8 +27,18 @@ type Service struct {
 	// domain name.
 	// Normally we convert the full Key where the record lives to a DNS name and use
 	// this as the srv.Target.
-	// When TargetStrip > 0 we strip the left most TargetStrip labels from the DNS name.
+	// When TargetStrip > 0 we strip the left most TargetStrip labels from this
+	// synthesized DNS name.
 	TargetStrip int `json:"targetstrip",omitempty"`
+
+	// Group is used to group (or *not* to group) different services together for services
+	// sharing a Key. Services with an identical Group are returned in the same answer.
+	// Say we have "bar.skydns.local, group: 'A'" and "foo.bar.skydns.local, group: 'A'"
+	// and "bar.bar.skydns.local, group: 'B'", then without Groups a query for "bar.skydns.local",
+	// would return all three records, when groups are enabled the highest level group (in this
+	// case 'A') is used to only match records that have that group as well. So that would
+	// only return "bar.skydns.local" and "foo.bar.skydns.local".
+	Group	string `json:"group,omitempty"`
 
 	// Etcd key where we found this service and ignored from json un-/marshalling
 	Key string `json:"-"`
