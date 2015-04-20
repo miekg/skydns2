@@ -523,6 +523,8 @@ var services = []*msg.Service{
 	{Host: "127.0.0.2", Key: "b.gr.skydns.test.", Group: "apex"},
 	{Host: "127.0.0.3", Key: "c.sub.gr.skydns.test."},
 	{Host: "127.0.0.4", Key: "d.sub.gr.skydns.test.", Group: "sib"},
+	{Host: "127.0.0.5", Key: "a.sub1.gr.skydns.test.", Group: "a"},
+	{Host: "127.0.0.6", Key: "b.sub1.gr.skydns.test.", Group: "b"},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -947,11 +949,21 @@ var dnsTestCases = []dnsTestCase{
 		},
 	},
 	{
-		// One has group, the other has not...
+		// One has group, the other has not...  Include the non-group always.
 		Qname: "sub.gr.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{
-			newA("gr.skydns.test. IN A 127.0.0.1"),
-			newA("gr.skydns.test. IN A 127.0.0.2"),
+			newA("sub.gr.skydns.test. IN A 127.0.0.3"),
+			newA("sub.gr.skydns.test. IN A 127.0.0.4"),
+		},
+	},
+	{
+		// The groups differ for names that have the same length
+		// so there is no definitive group to match on, include
+		// everything.
+		Qname: "sub1.gr.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{
+			newA("sub1.gr.skydns.test. IN A 127.0.0.5"),
+			newA("sub1.gr.skydns.test. IN A 127.0.0.6"),
 		},
 	},
 }
