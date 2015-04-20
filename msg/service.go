@@ -126,12 +126,60 @@ func Domain(s string) string {
 }
 
 // Group checks the services in sx, looks for a Group attribute in the first
-// ones and (if found) selects services with the same group.
+// ones (i.e. all services with same path length) and (if found) selects only
+// those services with the same group.
 func Group(sx []Service) []Service {
-	group := sx[0].Group
-	slashes := strings.Count(sx[0].Key, "/")
+	if len(sx) == 0 {
+		return sx
+	}
 
-	return sx
+	slashes := strings.Count(sx[0].Key, "/")
+	group := ""
+	count := true
+
+	ret := []Service{} // with slice-tricks in sx we can save this allocation (TODO)
+
+	// Now now want to look at the first N services of length slashes
+	// that either share Group or are empty
+	for i, s := range sx {
+		if count && strings.Count(s.Key, "/") == slashes {
+			if s.Group == "" {
+				continue
+			}
+			if group == "" {
+				group = s.Group
+				continue
+			}
+
+			if s.Group != group {
+				// one of the groups on the same level does not
+				// agree with 'group'. The Group thing does not
+				// apply to these set of services.
+				return sx
+			}
+		}
+		// Now we are decending a level. If group is still empty, we
+		// are not doing groups.
+		if group == "" {
+			return sx
+		}
+		// We've established a group, this means all services up to i
+		// should be included, but only if count=true (i.e. the first time)
+		if count {
+			ret = sx[:i+1]
+			continue
+		}
+
+		count = false
+
+		// If group is not empty, we *are* doing groups and should only
+		// include service that have the group set to the correct value.
+		if s.Group == group {
+			ret = append(ret, s)
+		}
+	}
+
+	return ret
 }
 
 // Split255 splits a string into 255 byte chunks.
