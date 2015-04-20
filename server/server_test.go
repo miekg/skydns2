@@ -401,6 +401,11 @@ var services = []*msg.Service{
 	// duplicate ip address
 	{Host: "10.11.11.10", Key: "http.multiport.http.skydns.test.", Port: 80},
 	{Host: "10.11.11.10", Key: "https.multiport.http.skydns.test.", Port: 443},
+	// groups
+	{Host: "127.0.0.1", Key: "a.gr.skydns.test.", Group: "apex"},
+	{Host: "127.0.0.2", Key: "b.gr.skydns.test.", Group: "apex"},
+	{Host: "127.0.0.3", Key: "c.sub.gr.skydns.test."},
+	{Host: "127.0.0.4", Key: "d.sub.gr.skydns.test.", Group: "sib"},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -786,6 +791,23 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "multiport.http.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{newA("multiport.http.skydns.test. IN A 10.11.11.10")},
+	},
+	// Groups
+	{
+		// hits the group 'apex' and only includes those records
+		Qname: "gr.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{
+			newA("gr.skydns.test. IN A 127.0.0.1"),
+			newA("gr.skydns.test. IN A 127.0.0.2"),
+		},
+	},
+	{
+		// One has group, the other has not...
+		Qname: "sub.gr.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{
+			newA("gr.skydns.test. IN A 127.0.0.1"),
+			newA("gr.skydns.test. IN A 127.0.0.2"),
+		},
 	},
 }
 

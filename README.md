@@ -164,7 +164,7 @@ values.
   key also has a TTL, the minimum of this value and the etcd TTL is used.
 * TargetStrip - when synthesising a name for an IP only SRV record, take the path
   name and strip `TargetStrip` labels from the ride hand side.
-* Group - limit recursion and only return service that share the Group's value.
+* Group - limit recursion and only return services that share the Group's value.
 
 Path is the only mandatory field.
 
