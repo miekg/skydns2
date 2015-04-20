@@ -31,14 +31,8 @@ type Service struct {
 	TargetStrip int `json:"targetstrip",omitempty"`
 
 	// Group is used to group (or *not* to group) different services
-	// together.  Services with an identical Group are returned in the same
-	// answer.  Say we have "bar.skydns.local, group: 'A'" and
-	// "foo.bar.skydns.local, group: 'A'" and "bar.bar.skydns.local, group:
-	// 'B'", then without Groups a query for "bar.skydns.local", would
-	// return all three records, when groups are enabled the highest level
-	// group (in this case 'A') is used to only match records that have
-	// that group as well. So that would only return "bar.skydns.local" and
-	// "foo.bar.skydns.local".
+	// together. Services with an identical Group are returned in the same
+	// answer.
 	Group string `json:"group,omitempty"`
 
 	// Etcd key where we found this service and ignored from json un-/marshalling
@@ -93,11 +87,11 @@ func (s *Service) NewPTR(name string, ttl uint32) *dns.PTR {
 	return &dns.PTR{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: ttl}, Ptr: dns.Fqdn(s.Host)}
 }
 
-// As Path, but
-// if a name contains wildcards (*), the name will be chopped of before the (first) wildcard, and
-// we do a highler evel search and later find the matching names.
-// So service.*.skydns.local, will look for all services under skydns.local and will later check
-// for names that match service.*.skydns.local.  If a wildcard is found the returned bool is true.
+// As Path, but if a name contains wildcards (*), the name will be chopped of
+// before the (first) wildcard, and we do a highler evel search and later find
+// the matching names.  So service.*.skydns.local, will look for all services
+// under skydns.local and will later check for names that match
+// service.*.skydns.local.  If a wildcard is found the returned bool is true.
 func PathWithWildcard(s string) (string, bool) {
 	l := dns.SplitDomainName(s)
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
@@ -129,6 +123,15 @@ func Domain(s string) string {
 		l[i], l[j] = l[j], l[i]
 	}
 	return dns.Fqdn(strings.Join(l[1:len(l)-1], "."))
+}
+
+// Group checks the services in sx, looks for a Group attribute in the first
+// ones and (if found) selects services with the same group.
+func Group(sx []Service) []Service {
+	group := sx[0].Group
+	slashes := strings.Count(sx[0].Key, "/")
+
+	return sx
 }
 
 // Split255 splits a string into 255 byte chunks.
