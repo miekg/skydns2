@@ -404,8 +404,10 @@ var services = []*msg.Service{
 	// groups
 	{Host: "127.0.0.1", Key: "a.gr.skydns.test.", Group: "apex"},
 	{Host: "127.0.0.2", Key: "b.gr.skydns.test.", Group: "apex"},
+
 	{Host: "127.0.0.3", Key: "c.sub.gr.skydns.test."},
 	{Host: "127.0.0.4", Key: "d.sub.gr.skydns.test.", Group: "sib"},
+
 	{Host: "127.0.0.5", Key: "a.sub1.gr.skydns.test.", Group: "a"},
 	{Host: "127.0.0.6", Key: "b.sub1.gr.skydns.test.", Group: "b"},
 }
