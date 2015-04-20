@@ -163,6 +163,9 @@ values.
 * Text - text you want to add (this returned when doing a TXT query);
 * TTL - the time-to-live of the service, overriding the default TTL. If the etcd
   key also has a TTL, the minimum of this value and the etcd TTL is used.
+* TargetStrip - when synthesising a name for an IP only SRV record, take the path
+  name and strip `TargetStrip` labels from the ride hand side.
+* Group - limit recursion and only return service that share the Group's value.
 
 Path is the only mandatory field. The lookups into Etcd will be done with
 a *lower* cased path name.
@@ -645,6 +648,12 @@ it makes up:
 
     ;; ADDITIONAL SECTION:
     bar.skydns.local. 3600    IN  A   192.168.0.1
+
+
+## How do you limit recursion?
+
+By default SkyDNS will returns *all* records under a name. Suppose you want we have
+`bar.skydns.local`... TODO.
 
 
 # Docker
