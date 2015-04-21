@@ -51,7 +51,7 @@ func init() {
 	flag.StringVar(&config.Local, "local", "", "optional unique value for this skydns instance")
 	flag.StringVar(&tlskey, "tls-key", env("ETCD_TLSKEY", ""), "TLS Private Key path")
 	flag.StringVar(&tlspem, "tls-pem", env("ETCD_TLSPEM", ""), "X509 Certificate")
-	flag.StringVar(&cacert, "ca-cert", env("ECTD_CACERT", ""), "CA Certificate")
+	flag.StringVar(&cacert, "ca-cert", env("ETCD_CACERT", ""), "CA Certificate")
 	flag.DurationVar(&config.ReadTimeout, "rtimeout", 2*time.Second, "read timeout")
 	flag.BoolVar(&config.RoundRobin, "round-robin", true, "round robin A/AAAA replies")
 	flag.BoolVar(&discover, "discover", false, "discover new machines by watching /v2/_etcd/machines")
@@ -114,7 +114,7 @@ func main() {
 						duration = 1 * time.Second // reset
 					} else {
 						// we can see an n == nil, probably when we can't connect to etcd.
-						log.Printf("skydns: ectd machine cluster update failed, sleeping %s + ~3s", duration)
+						log.Printf("skydns: etcd machine cluster update failed, sleeping %s + ~3s", duration)
 						time.Sleep(duration + (time.Duration(rand.Float32() * 3e9))) // Add some random.
 						duration *= 2
 						if duration > 32*time.Second {
@@ -199,7 +199,7 @@ func updateClient(resp *etcd.Response, tlsCert, tlsKey, tlsCACert string) (clien
 		}
 		machines = append(machines, ms[0][5:])
 	}
-	// When CoreOS (and thus ectd) crash this call back seems to also trigger, but we
+	// When CoreOS (and thus etcd) crash this call back seems to also trigger, but we
 	// don't have any machines. Don't trigger this update then, as a) it
 	// crashes SkyDNS and b) potentially leaves with no machines to connect to.
 	// Keep the old ones and hope they still work and wait for another update
