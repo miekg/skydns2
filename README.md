@@ -258,7 +258,7 @@ Here all three entries of the `east` are returned.
 
 There is one other feature at play here. The second and third names,
 `{4,6}.rails.staging.east.skydns.local`, only had an IP record configured. Here
-SkyDNS used the ectd path (also see `TargetStrip`) to
+SkyDNS used the etcd path (also see `TargetStrip`) to
 construct a target name and then puts the actual IP address in the additional
 section. Directly querying for the A records of
 `4.rails.staging.east.skydns.local.` of course also works:
