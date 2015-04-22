@@ -536,7 +536,49 @@ order. The first backend that answers a `Records` or `ReverseRecord` call with
 a record and with no error will be served.
 
 
-# FAQ
+## Stub Zones
+
+Stub Zones are pointers that point to *another set* of servers which should
+provide an answer for the current query. This is similar to the (recursive)
+forwarding SkyDNS does, but different in that you need to specify a domain name
+and a set of authoritative servers. Also this can be dynamically controlled by
+writing values into Etcd. Note, that when enabled SkyDNS will *first* consult
+the stub configuration, potentially bypassing any configured local records.
+
+The stub zone configuration lives under `stub.dns.skydns.local.`. The following
+example shows on how to set this up. Suppose we want to create a stub zone for
+`skydns.com` and point to the nameservers reachable by following address *and*
+(optional) ports:
+
+* 172.16.1.1, port 54
+* 10.10.244.1, port 53 (53 is the default that will be used if there isn't one
+    specified)
+
+We should then register 2 services under the name `skydns.com.stub.dns.skydns.local`
+
+    % curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dns/stub/com/skydns/ns1 \
+        -d value='{"host":"172.16.1.1", "port":54}'
+    % curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dns/stub/com/skydns/ns2 \
+        -d value='{"host":"10.10.244.1"}'
+
+So the *leaves* should have the nameserver information.
+
+    xxx.<domain name>.stub.dns.skydns.local
+    |           |
+    v           |
+    nameservers |
+                v
+          stub domain name
+
+When SkyDNS receives a query for `skydns.com` it will *not* forward it to the
+recursors, but instead will query 172.16.1.1 on port 54 and if that fails will
+query 10.10.244.1 (on 53) to get an answer. That answer will then be given back
+to the original client.
+
+When forwarding to a stub, SkyDNS adds a EDNS0 meta data RR to the packet
+telling the remote server (if its a SkyDNS instance) that this is a stub request.
+SkyDNS will not (stub)forward packets with this EDNS0 meta data, instead the request
+will be dropped and logged.
 
 
 ## How Do I Create an Address Pool and Round Robin Between Them
@@ -604,12 +646,15 @@ it makes up:
 
 
 # Docker
+
 Official Docker images are at the [Docker Hub](https://registry.hub.docker.com/u/skynetservices/skydns/):
 
 * master -> skynetservices/skydns:latest
 * latest tag -> skynetservices/skydns:latest-tagged
 
+
 # License
+
 The MIT License (MIT)
 
 Copyright © 2014 The SkyDNS Authors
