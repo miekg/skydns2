@@ -14,6 +14,21 @@ import (
 	"github.com/skynetservices/skydns/msg"
 )
 
+const ednsStubCode = dns.EDNS0LOCALSTART + 10
+
+// ednsStub is the EDNS0 record we add to stub queries. Queries which have this record are
+// not forwarded again.
+var ednsStub = func() *dns.OPT {
+	o := new(dns.OPT)
+	o.Hdr.Name = "."
+	o.Hdr.Rrtype = dns.TypeOPT
+	e := new(dns.EDNS0_LOCAL)
+	e.Code = ednsStubCode
+	e.Data = []byte{1}
+	o.Option = append(o.Option, e)
+	return o
+}()
+
 // Look in .../dns/stub/<domain>/xx for msg.Services. Loop through them
 // extract <domain> and add them as forwarders (ip:port-combos) for
 // the stubzones. Only numeric (i.e. IP address) hosts are used.
@@ -56,11 +71,29 @@ func (s *server) UpdateStubZones() {
 func (s *server) ServeDNSStubForward(w dns.ResponseWriter, req *dns.Msg, ns []string) {
 	StatsStubForwardCount.Inc(1)
 
-	// Very similar to ServeDNSForward. Maybe refactor them both.
+	// Check EDNS0 Stub option, if set drop the packet.
+	option := req.IsEdns0()
+	if option != nil {
+		for _, o := range option.Option {
+			if o.Option() == ednsStubCode && len(o.(*dns.EDNS0_LOCAL).Data) == 1 &&
+				o.(*dns.EDNS0_LOCAL).Data[0] == 1 {
+				// Maybe log source IP here?
+				log.Printf("skydns: not fowarding stub request to another stub")
+				return
+			}
+		}
+	}
 
 	tcp := false
 	if _, ok := w.RemoteAddr().(*net.TCPAddr); ok {
 		tcp = true
+	}
+	// Add a custom EDNS0 option to the packet, so we can detect loops
+	// when 2 stubs are forwarding to each other.
+	if option != nil {
+		option.Option = append(option.Option, &dns.EDNS0_LOCAL{ednsStubCode, []byte{1}})
+	} else {
+		req.Extra = append(req.Extra, ednsStub)
 	}
 
 	var (
@@ -68,6 +101,7 @@ func (s *server) ServeDNSStubForward(w dns.ResponseWriter, req *dns.Msg, ns []st
 		err error
 		try int
 	)
+
 	// Use request Id for "random" nameserver selection.
 	nsid := int(req.Id) % len(ns)
 Redo:

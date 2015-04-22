@@ -153,10 +153,15 @@ func TestDNSStubForward(t *testing.T) {
 	stubBroken := &msg.Service{
 		Host: "127.0.0.1", Port: 5454, Key: "b.example.org.stub.dns.skydns.test.",
 	}
+	stubLoop := &msg.Service{
+		Host: "127.0.0.1", Port: Port, Key: "b.example.net.stub.dns.skydns.test.",
+	}
 	addService(t, s, stubEx.Key, 0, stubEx)
 	defer delService(t, s, stubEx.Key)
 	addService(t, s, stubBroken.Key, 0, stubBroken)
 	defer delService(t, s, stubBroken.Key)
+	addService(t, s, stubLoop.Key, 0, stubLoop)
+	defer delService(t, s, stubLoop.Key)
 
 	s.UpdateStubZones()
 
@@ -182,7 +187,25 @@ func TestDNSStubForward(t *testing.T) {
 	m.SetQuestion("www.example.org.", dns.TypeA)
 	resp, _, err = c.Exchange(m, "127.0.0.1:"+StrPort)
 	if len(resp.Answer) != 0 || resp.Rcode != dns.RcodeServerFailure {
-		t.Fatal("answer expected to fail")
+		t.Fatal("answer expected to fail for example.org")
+	}
+
+	// This should really fail with a timeout.
+	m.SetQuestion("www.example.net.", dns.TypeA)
+	resp, _, err = c.Exchange(m, "127.0.0.1:"+StrPort)
+	if err == nil {
+		t.Fatal("answer expected to fail for example.net")
+	} else {
+		t.Logf("succesfully failing %s", err)
+	}
+
+	// Packet with EDNS0
+	m.SetEdns0(4096, true)
+	resp, _, err = c.Exchange(m, "127.0.0.1:"+StrPort)
+	if err == nil {
+		t.Fatal("answer expected to fail for example.net")
+	} else {
+		t.Logf("succesfully failing %s", err)
 	}
 }
 
