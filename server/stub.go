@@ -31,13 +31,13 @@ var ednsStub = func() *dns.OPT {
 
 // Look in .../dns/stub/<domain>/xx for msg.Services. Loop through them
 // extract <domain> and add them as forwarders (ip:port-combos) for
-// the stubzones. Only numeric (i.e. IP address) hosts are used.
+// the stub zones. Only numeric (i.e. IP address) hosts are used.
 func (s *server) UpdateStubZones() {
 	stubmap := make(map[string][]string)
 
 	services, err := s.backend.Records("stub.dns."+s.config.Domain, false)
 	if err != nil {
-		log.Printf("skydns: stubzone update failed: %s", err)
+		log.Printf("skydns: stub zone update failed: %s", err)
 		return
 	}
 	for _, serv := range services {
@@ -46,7 +46,7 @@ func (s *server) UpdateStubZones() {
 		}
 		ip := net.ParseIP(serv.Host)
 		if ip == nil {
-			log.Printf("skydns: stubzone non-address %s seen for: %s", serv.Key, serv.Host)
+			log.Printf("skydns: stub zone non-address %s seen for: %s", serv.Key, serv.Host)
 			continue
 		}
 
