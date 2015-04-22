@@ -56,7 +56,7 @@ func (s *server) UpdateStubZones() {
 		labels := dns.SplitDomainName(domain)
 		domain = dns.Fqdn(strings.Join(labels[1:len(labels)-dns.CountLabel(s.config.localDomain)], "."))
 
-		// if domain if the remaining name equals s.config.LocalDomain we ignore it.
+		// If the remaining name equals s.config.LocalDomain we ignore it.
 		if domain == s.config.localDomain {
 			log.Printf("skydns: not adding stub zone for my own domain")
 			continue
@@ -67,7 +67,7 @@ func (s *server) UpdateStubZones() {
 	s.config.stub = &stubmap
 }
 
-// ServeDNSForward forwards a request to a nameservers and returns the response.
+// ServeDNSStubForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSStubForward(w dns.ResponseWriter, req *dns.Msg, ns []string) {
 	StatsStubForwardCount.Inc(1)
 
