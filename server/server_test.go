@@ -472,6 +472,8 @@ var services = []*msg.Service{
 	// duplicate ip address
 	{Host: "10.11.11.10", Key: "http.multiport.http.skydns.test.", Port: 80},
 	{Host: "10.11.11.10", Key: "https.multiport.http.skydns.test.", Port: 443},
+	// uppercase name
+	{Host: "127.0.0.1", Key: "upper.skydns.test.", Port: 443},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -858,6 +860,17 @@ var dnsTestCases = []dnsTestCase{
 		Qname: "multiport.http.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{newA("multiport.http.skydns.test. IN A 10.11.11.10")},
 	},
+
+	// Casing test
+	{
+		Qname: "uppeR.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{newA("uppeR.skydns.test. IN A 127.0.0.1")},
+	},
+	{
+		Qname: "upper.skydns.test.", Qtype: dns.TypeA,
+		Answer: []dns.RR{newA("upper.skydns.test. IN A 127.0.0.1")},
+	},
+
 }
 
 func newA(rr string) *dns.A           { r, _ := dns.NewRR(rr); return r.(*dns.A) }

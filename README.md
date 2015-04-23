@@ -27,6 +27,7 @@ here](https://github.com/skynetservices/skydns1).
 
 
 ## Setup / Install
+
 Download/compile and run etcd. See the documentation for etcd at <https://github.com/coreos/etcd>.
 
 Then get and compile SkyDNS:
@@ -163,7 +164,8 @@ values.
 * TTL - the time-to-live of the service, overriding the default TTL. If the etcd
   key also has a TTL, the minimum of this value and the etcd TTL is used.
 
-Path is the only mandatory field.
+Path is the only mandatory field. The lookups into Etcd will be done with
+a *lower* cased path name.
 
 Adding the service can thus be done with:
 
