@@ -36,7 +36,9 @@ type Config struct {
 	// Round robin A/AAAA replies. Default is true.
 	RoundRobin bool `json:"round_robin,omitempty"`
 	// List of ip:port, seperated by commas of recursive nameservers to forward queries to.
-	Nameservers []string      `json:"nameservers,omitempty"`
+	Nameservers []string `json:"nameservers,omitempty"`
+	// Never provide a recursive service.
+	NoRec       bool          `json:norec,omitempty"`
 	ReadTimeout time.Duration `json:"read_timeout,omitempty"`
 	// Default priority on SRV records when none is given. Defaults to 10.
 	Priority uint16 `json:"priority"`

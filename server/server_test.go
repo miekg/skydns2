@@ -137,6 +137,17 @@ func TestDNSForward(t *testing.T) {
 	if len(resp.Answer) == 0 || resp.Rcode != dns.RcodeSuccess {
 		t.Fatal("answer expected to have A records or rcode not equal to RcodeSuccess")
 	}
+	// disable recursion and check
+	s.config.NoRec = true
+
+	m.SetQuestion("www.example.com.", dns.TypeA)
+	resp, _, err = c.Exchange(m, "127.0.0.1:"+StrPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Rcode != dns.RcodeServerFailure {
+		t.Fatal("answer expected to have rcode equal to RcodeFailure")
+	}
 }
 
 func TestDNSStubForward(t *testing.T) {

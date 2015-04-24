@@ -68,8 +68,9 @@ SkyDNS' configuration is stored in etcd as a JSON object under the key
     when queried for `local.dns.skydns.local`.
 * `round_robin`: enable round-robin sorting for A and AAAA responses, defaults to true.
     Note that packets containing more than one CNAME are exempt from this (see issue #128 on Github).
-* `nameservers`: forward DNS requests to these nameservers (array of IP:port combination), when not
-    authoritative for a domain.
+* `nameservers`: forward DNS requests to these (recursive) nameservers (array of IP:port combination),
+    when not authoritative for a domain.
+* `no-rec`: never (ever) provide a recursive service (i.e. forward to the servers provided in -nameservers).
 * `read_timeout`: network read timeout, for DNS and talking with etcd.
 * `ttl`: default TTL in seconds to use on replies when none is set in etcd, defaults to 3600.
 * `min_ttl`: minimum TTL in seconds to use on NXDOMAIN, defaults to 30.

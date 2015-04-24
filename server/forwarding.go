@@ -15,6 +15,17 @@ import (
 // ServeDNSForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	StatsForwardCount.Inc(1)
+
+	if s.config.NoRec {
+		m := new(dns.Msg)
+		m.SetReply(req)
+		m.SetRcode(req, dns.RcodeServerFailure)
+		m.Authoritative = false
+		m.RecursionAvailable = false
+		w.WriteMsg(m)
+		return
+	}
+
 	if len(s.config.Nameservers) == 0 || dns.CountLabel(req.Question[0].Name) < s.config.Ndots {
 		if len(s.config.Nameservers) == 0 {
 			log.Printf("skydns: can not forward, no nameservers defined")
