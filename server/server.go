@@ -437,6 +437,9 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 	if err != nil {
 		return nil, err
 	}
+
+	services = msg.Group(services)
+
 	for _, serv := range services {
 		ip := net.ParseIP(serv.Host)
 		switch {
@@ -505,6 +508,8 @@ func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra
 		return nil, nil, err
 	}
 
+	services = msg.Group(services)
+
 	for _, serv := range services {
 		ip := net.ParseIP(serv.Host)
 		switch {
@@ -530,6 +535,8 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 	if err != nil {
 		return nil, nil, err
 	}
+
+	services = msg.Group(services)
 
 	// Looping twice to get the right weight vs priority
 	w := make(map[int]int)
@@ -595,6 +602,8 @@ func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, er
 		return nil, err
 	}
 
+	services = msg.Group(services)
+
 	if len(services) > 0 {
 		serv := services[0]
 		if ip := net.ParseIP(serv.Host); ip == nil {
@@ -609,6 +618,8 @@ func (s *server) TXTRecords(q dns.Question, name string) (records []dns.RR, err 
 	if err != nil {
 		return nil, err
 	}
+
+	services = msg.Group(services)
 
 	for _, serv := range services {
 		if serv.Text == "" {

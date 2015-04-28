@@ -100,4 +100,24 @@ func TestGroup(t *testing.T) {
 	if len(sx) != 3 {
 		t.Fatalf("failure to group fith set: %v", sx)
 	}
+
+	// One group.
+	sx = Group(
+		[]Service{
+			{Host: "server1", Group: "g6", Key: "a/dom/region1/skydns/test"},
+		},
+	)
+	if len(sx) != 1 {
+		t.Fatalf("failure to group sixth set: %v", sx)
+	}
+
+	// No group, once service
+	sx = Group(
+		[]Service{
+			{Host: "server1", Key: "a/dom/region1/skydns/test"},
+		},
+	)
+	if len(sx) != 1 {
+		t.Fatalf("failure to group seventh set: %v", sx)
+	}
 }
