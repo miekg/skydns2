@@ -520,14 +520,15 @@ var services = []*msg.Service{
 	{Host: "127.0.0.1", Key: "upper.skydns.test.", Port: 443},
 
 	// groups
-	{Host: "127.0.0.1", Key: "a.gr.skydns.test.", Group: "apex"},
-	{Host: "127.0.0.2", Key: "b.gr.skydns.test.", Group: "apex"},
+	{Host: "127.0.0.1", Key: "a.dom.skydns.test.", Group: "g1"},
+	{Host: "127.0.0.2", Key: "b.sub.dom.skydns.test.", Group: "g1"},
 
-	{Host: "127.0.0.3", Key: "c.sub.gr.skydns.test."},
-	{Host: "127.0.0.4", Key: "d.sub.gr.skydns.test.", Group: "sib"},
+	{Host: "127.0.0.1", Key: "a.dom2.skydns.test.", Group: "g1"},
+	{Host: "127.0.0.2", Key: "b.sub.dom2.skydns.test.", Group: ""},
 
-	{Host: "127.0.0.5", Key: "a.sub1.gr.skydns.test.", Group: "a"},
-	{Host: "127.0.0.6", Key: "b.sub1.gr.skydns.test.", Group: "b"},
+	{Host: "127.0.0.1", Key: "a.dom1.skydns.test.", Group: "g1"},
+	{Host: "127.0.0.2", Key: "b.sub.dom1.skydns.test.", Group: "g2"},
+
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -944,29 +945,26 @@ var dnsTestCases = []dnsTestCase{
 
 	// Groups
 	{
-		// hits the group 'apex' and only includes those records
-		Qname: "gr.skydns.test.", Qtype: dns.TypeA,
+		// hits the group 'g1' and only includes those records
+		Qname: "dom.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{
-			newA("gr.skydns.test. IN A 127.0.0.1"),
-			newA("gr.skydns.test. IN A 127.0.0.2"),
+			newA("dom.skydns.test. IN A 127.0.0.1"),
+			newA("dom.skydns.test. IN A 127.0.0.2"),
 		},
 	},
 	{
 		// One has group, the other has not...  Include the non-group always.
-		Qname: "sub.gr.skydns.test.", Qtype: dns.TypeA,
+		Qname: "dom2.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{
-			newA("sub.gr.skydns.test. IN A 127.0.0.3"),
-			newA("sub.gr.skydns.test. IN A 127.0.0.4"),
+			newA("dom2.skydns.test. IN A 127.0.0.1"),
+			newA("dom2.skydns.test. IN A 127.0.0.2"),
 		},
 	},
 	{
-		// The groups differ for names that have the same length
-		// so there is no definitive group to match on, include
-		// everything.
-		Qname: "sub1.gr.skydns.test.", Qtype: dns.TypeA,
+		// The groups differ.
+		Qname: "dom1.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{
-			newA("sub1.gr.skydns.test. IN A 127.0.0.5"),
-			newA("sub1.gr.skydns.test. IN A 127.0.0.6"),
+			newA("dom1.skydns.test. IN A 127.0.0.1"),
 		},
 	},
 }

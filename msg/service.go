@@ -141,13 +141,15 @@ func Group(sx []Service) []Service {
 
 	// Now now want to look at the first N services of length slashes
 	// that either share Group or are empty
-	for i, s := range sx {
+	for _, s := range sx {
 		if count && strings.Count(s.Key, "/") == slashes {
 			if s.Group == "" {
+				ret = append(ret, s)
 				continue
 			}
 			if group == "" {
 				group = s.Group
+				ret = append(ret, s)
 				continue
 			}
 
@@ -158,24 +160,19 @@ func Group(sx []Service) []Service {
 				return sx
 			}
 		}
+
 		// Now we are decending a level. If group is still empty, we
 		// are not doing groups.
 		if group == "" {
 			return sx
 		}
 
-		// We've established a group, this means all services up to i
-		// should be included, but only if count=true (i.e. the first time)
-		if count {
-			ret = sx[:i]
-			count = false
-		}
+		count = !count
 
 		if s.Group == "" || s.Group == group {
 			ret = append(ret, s)
 		}
 	}
-
 	return ret
 }
 
