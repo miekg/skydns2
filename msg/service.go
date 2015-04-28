@@ -151,7 +151,7 @@ func Group(sx []Service) []Service {
 				continue
 			}
 
-			if s.Group != group {
+			if s.Group != "" && s.Group != group {
 				// one of the groups on the same level does not
 				// agree with 'group'. The Group thing does not
 				// apply to these set of services.
@@ -163,18 +163,15 @@ func Group(sx []Service) []Service {
 		if group == "" {
 			return sx
 		}
+
 		// We've established a group, this means all services up to i
 		// should be included, but only if count=true (i.e. the first time)
 		if count {
-			ret = sx[:i+1]
-			continue
+			ret = sx[:i]
+			count = false
 		}
 
-		count = false
-
-		// If group is not empty, we *are* doing groups and should only
-		// include service that have the group set to the correct value.
-		if s.Group == group {
+		if s.Group == "" || s.Group == group {
 			ret = append(ret, s)
 		}
 	}

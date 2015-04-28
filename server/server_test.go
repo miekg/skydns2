@@ -473,6 +473,7 @@ type dnsTestCase struct {
 	Extra  []dns.RR
 }
 
+// Note the key is encoded as dns name, while in "reality" it is a Etcd path.
 var services = []*msg.Service{
 	{Host: "server1", Port: 8080, Key: "100.server1.development.region1.skydns.test."},
 	{Host: "server2", Port: 80, Key: "101.server2.production.region1.skydns.test."},

@@ -41,35 +41,63 @@ func TestSplit255(t *testing.T) {
 }
 
 func TestGroup(t *testing.T) {
+	// Key are in the wrong order, but for this test it does not matter.
+
+	// Groups disagree, so we will not do anything.
 	sx := Group(
 		[]Service{
-			{Host: "server1", Group: "g1", Key: "region1.skydns.test."},
-			{Host: "server2", Group: "g2", Key: "region1.skydns.test."},
+			{Host: "server1", Group: "g1", Key: "region1/skydns/test"},
+			{Host: "server2", Group: "g2", Key: "region1/skydns/test"},
 		},
 	)
 	if len(sx) != 2 {
 		t.Fatalf("failure to group first set: %v", sx)
 	}
 
+	// Group is g1, include only the top-level one.
 	sx = Group(
 		[]Service{
-			{Host: "server1", Group: "g1", Key: "a.dom.region1.skydns.test."},
-			{Host: "server2", Group: "", Key: "b.dom.region1.skydns.test."},
-			{Host: "server2", Group: "g1", Key: "b.subdom.region1.skydns.test."},
+			{Host: "server1", Group: "g1", Key: "a/dom/region1/skydns/test"},
+			{Host: "server2", Group: "g2", Key: "a/subdom/dom/region1/skydns/test"},
 		},
 	)
-	if len(sx) != 3 {
+	if len(sx) != 1 {
 		t.Fatalf("failure to group second set: %v", sx)
 	}
 
+	// Groupless services must be included.
 	sx = Group(
 		[]Service{
-			{Host: "server1", Group: "g1", Key: "a.dom.region1.skydns.test."},
-			{Host: "server2", Group: "", Key: "b.dom.region1.skydns.test."},
-			{Host: "server2", Group: "g2", Key: "b.subdom.region1.skydns.test."},
+			{Host: "server1", Group: "g1", Key: "a/dom/region1/skydns/test"},
+			{Host: "server2", Group: "g2", Key: "a/subdom/dom/region1/skydns/test"},
+			{Host: "server2", Group: "", Key: "b/subdom/dom/region1/skydns/test"},
 		},
 	)
 	if len(sx) != 2 {
 		t.Fatalf("failure to group third set: %v", sx)
+	}
+
+	// Empty group on the highest level: include that one also.
+	sx = Group(
+		[]Service{
+			{Host: "server1", Group: "g1", Key: "a/dom/region1/skydns/test"},
+			{Host: "server1", Group: "", Key: "b/dom/region1/skydns/test"},
+			{Host: "server2", Group: "g2", Key: "a/subdom/dom/region1/skydns/test"},
+		},
+	)
+	if len(sx) != 2 {
+		t.Fatalf("failure to group fourth set: %v", sx)
+	}
+
+	// Empty group on the highest level: include that one also, and the rest.
+	sx = Group(
+		[]Service{
+			{Host: "server1", Group: "g5", Key: "a/dom/region1/skydns/test"},
+			{Host: "server1", Group: "", Key: "b/dom/region1/skydns/test"},
+			{Host: "server2", Group: "g5", Key: "a/subdom/dom/region1/skydns/test"},
+		},
+	)
+	if len(sx) != 3 {
+		t.Fatalf("failure to group fith set: %v", sx)
 	}
 }
