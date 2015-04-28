@@ -524,6 +524,23 @@ In the example here, we don't use an UUID, we use `public.addresses`:
 The name `local.dns.skydns.local.` is fixed, i.e. you can retrieve the Host Local Value by
 querying for `local.dns.<your domain>`.
 
+#### Groups
+
+Groups can be used to group set of services together. The main use of this is to limit
+recursion, i.e. don't give back *all* records, but only a subset.
+Say that I have configuration like this:
+
+    /skydns/local/domain/
+    /skydns/local/domain/a - IP1
+    /skydns/local/domain/b - IP2
+    /skydns/local/domain/subdom/
+    /skydns/local/domain/subdom/a - IP3
+    /skydns/local/domain/subdom/b - IP4
+
+And you want `domain.local` to return (IP1, IP2) and `subdom.domain.local` to return
+(IP3, IP4). For this the two domains, need to be in different group.
+
+ 
 ## Implementing a custom DNS backend
 
 The SkyDNS `server` package may be used as a library, which allows a custom
