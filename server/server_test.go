@@ -397,6 +397,14 @@ func TestDNS(t *testing.T) {
 					fatal = true
 					t.Fatalf("CNAME target should be %q, but is %q", x.Target, tt.Target)
 				}
+			case *dns.MX:
+				tt := tc.Answer[i].(*dns.MX)
+				if x.Mx != tt.Mx {
+					t.Fatalf("MX Mx should be %q, but is %q", x.Mx, tt.Mx)
+				}
+				if x.Preference != tt.Preference {
+					t.Fatalf("MX Preference should be %q, but is %q", x.Preference, tt.Preference)
+				}
 			}
 		}
 		if len(resp.Ns) != len(tc.Ns) {
@@ -516,6 +524,12 @@ var services = []*msg.Service{
 	{Host: "10.11.11.10", Key: "https.multiport.http.skydns.test.", Port: 443},
 	// uppercase name
 	{Host: "127.0.0.1", Key: "upper.skydns.test.", Port: 443},
+
+	// mx
+	{Host: "mx.skydns.test", Priority: 50, Mail: true, Key: "a.mail.skydns.test."},
+	{Host: "mx.miek.nl", Priority: 50, Mail: true, Key: "b.mail.skydns.test."},
+	{Host: "a.ipaddr.skydns.test", Priority: 30, Mail: true, Key: "a.mx.skydns.test."},
+	{Host: "b.ipaddr.skydns.test", Mail: true, Key: "b.mx.skydns.test."},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -923,9 +937,41 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "both.v4v6.test.skydns.test.", Qtype: dns.TypeSRV,
 		Answer: []dns.RR{newSRV("both.v4v6.test.skydns.test. IN SRV 10 100 0 ipaddr2.skydns.test.")},
-		Extra:  []dns.RR{
+		Extra: []dns.RR{
 			newA("ipaddr2.skydns.test. IN A	172.16.1.1"),
 			newAAAA("ipaddr2.skydns.test. IN AAAA 2001::8:8:8:8"),
+		},
+	},
+
+	// MX Tests
+	{
+		// NODATA as this is not an Mail: true record.
+		Qname: "100.server1.development.region1.skydns.test.", Qtype: dns.TypeMX,
+		Ns: []dns.RR{
+			newSOA("skydns.test. 3600 SOA ns.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0"),
+		},
+	},
+
+	{
+		Qname: "b.mail.skydns.test.", Qtype: dns.TypeMX,
+		Answer: []dns.RR{newMX("b.mail.skydns.test. IN MX 50 mx.miek.nl.")},
+	},
+
+	{
+		// Can't resolve to an IP - ignore
+		Qname: "a.mail.skydns.test.", Qtype: dns.TypeMX,
+		Answer: []dns.RR{newMX("a.mail.skydns.test. IN MX 50 mx.skydns.test.")},
+	},
+
+	{
+		Qname: "mx.skydns.test.", Qtype: dns.TypeMX,
+		Answer: []dns.RR{
+			newMX("mx.skydns.test. IN MX 10 b.ipaddr.skydns.test. "),
+			newMX("mx.skydns.test. IN MX 30 a.ipaddr.skydns.test. "),
+		},
+		Extra: []dns.RR{
+			// not working yet.
+			newA("bar.skydns.test. 3600 A 192.168.0.1"),
 		},
 	},
 }
@@ -941,6 +987,7 @@ func newRRSIG(rr string) *dns.RRSIG   { r, _ := dns.NewRR(rr); return r.(*dns.RR
 func newNSEC3(rr string) *dns.NSEC3   { r, _ := dns.NewRR(rr); return r.(*dns.NSEC3) }
 func newPTR(rr string) *dns.PTR       { r, _ := dns.NewRR(rr); return r.(*dns.PTR) }
 func newTXT(rr string) *dns.TXT       { r, _ := dns.NewRR(rr); return r.(*dns.TXT) }
+func newMX(rr string) *dns.MX         { r, _ := dns.NewRR(rr); return r.(*dns.MX) }
 
 func TestDedup(t *testing.T) {
 	m := new(dns.Msg)

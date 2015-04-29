@@ -54,7 +54,7 @@ func (s *Service) NewSRV(name string, weight uint16) *dns.SRV {
 }
 
 // NewMX returns a new MX record based on the Service.
-func (s *Service) NewMX(name string, weight uint16) *dns.MX {
+func (s *Service) NewMX(name string) *dns.MX {
 	host := dns.Fqdn(s.Host)
 
 	offset, end := 0, false
