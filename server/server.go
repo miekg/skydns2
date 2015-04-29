@@ -532,7 +532,7 @@ func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra
 }
 
 // SRVRecords returns SRV records from etcd.
-// If the Target is not an name but an IP address, an name is created .
+// If the Target is not an name but an IP address, a name is created.
 func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec bool) (records []dns.RR, extra []dns.RR, err error) {
 	services, err := s.backend.Records(name, false)
 	if err != nil {
@@ -634,9 +634,9 @@ func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
 		return nil, err
 	}
 
-	// If serv.Host is parseble as a IP address we should not return anything.
-	// TODO(miek).
-	records = append(records, serv.NewPTR(q.Name, serv.Ttl))
+	if ip := net.ParseIP(serv.Host); ip != nil {
+		records = append(records, serv.NewPTR(q.Name, serv.Ttl))
+	}
 	return records, nil
 }
 
