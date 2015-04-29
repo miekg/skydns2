@@ -21,13 +21,14 @@ type Service struct {
 	Priority int    `json:"priority,omitempty"`
 	Weight   int    `json:"weight,omitempty"`
 	Text     string `json:"text,omitempty"`
+	Mail     bool   `json:"mail,omitempty"` // Be an MX record. Priority becomes Preference.
 	Ttl      uint32 `json:"ttl,omitempty"`
 
-	// When a SRV record with a "Host: IP-address" is added, we synthesize a srv.Target
-	// domain name.
-	// Normally we convert the full Key where the record lives to a DNS name and use
-	// this as the srv.Target.
-	// When TargetStrip > 0 we strip the left most TargetStrip labels from the DNS name.
+	// When a SRV record with a "Host: IP-address" is added, we synthesize
+	// a srv.Target domain name.  Normally we convert the full Key where
+	// the record lives to a DNS name and use this as the srv.Target.  When
+	// TargetStrip > 0 we strip the left most TargetStrip labels from the
+	// DNS name.
 	TargetStrip int `json:"targetstrip",omitempty"`
 
 	// Etcd key where we found this service and ignored from json un-/marshalling
@@ -50,6 +51,24 @@ func (s *Service) NewSRV(name string, weight uint16) *dns.SRV {
 
 	return &dns.SRV{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: s.Ttl},
 		Priority: uint16(s.Priority), Weight: weight, Port: uint16(s.Port), Target: host}
+}
+
+// NewMX returns a new MX record based on the Service.
+func (s *Service) NewMX(name string, weight uint16) *dns.MX {
+	host := dns.Fqdn(s.Host)
+
+	offset, end := 0, false
+	for i := 0; i < s.TargetStrip; i++ {
+		offset, end = dns.NextLabel(host, offset)
+	}
+	if end {
+		// We overshot the name, use the orignal one.
+		offset = 0
+	}
+	host = host[offset:]
+
+	return &dns.MX{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: s.Ttl},
+		Preference: uint16(s.Priority), Mx: host}
 }
 
 // NewA returns a new A record based on the Service.
