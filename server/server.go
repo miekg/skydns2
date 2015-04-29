@@ -647,9 +647,7 @@ func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
 		return nil, err
 	}
 
-	if ip := net.ParseIP(serv.Host); ip != nil {
-		records = append(records, serv.NewPTR(q.Name, serv.Ttl))
-	}
+	records = append(records, serv.NewPTR(q.Name, serv.Ttl))
 	return records, nil
 }
 
