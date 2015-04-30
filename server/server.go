@@ -441,6 +441,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 }
 
 func (s *server) AddressRecords(q dns.Question, name string, previousRecords []dns.RR, bufsize uint16, dnssec bool) (records []dns.RR, err error) {
+	// if the q.Qtype is 0 we special case and return *all* records.
 	services, err := s.backend.Records(name, false)
 	if err != nil {
 		return nil, err
@@ -494,9 +495,9 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 
 			log.Printf("skydns: incomplete CNAME chain for %s", name)
 
-		case ip.To4() != nil && q.Qtype == dns.TypeA:
+		case ip.To4() != nil && (q.Qtype == dns.TypeA || q.Qtype == 0):
 			records = append(records, serv.NewA(q.Name, ip.To4()))
-		case ip.To4() == nil && q.Qtype == dns.TypeAAAA:
+		case ip.To4() == nil && (q.Qtype == dns.TypeAAAA || q.Qtype == 0):
 			records = append(records, serv.NewAAAA(q.Name, ip.To16()))
 		}
 	}
@@ -566,7 +567,10 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 		case ip == nil:
 			srv := serv.NewSRV(q.Name, weight)
 			records = append(records, srv)
+
 			if _, ok := lookup[srv.Target]; !ok {
+				lookup[srv.Target] = true
+
 				if !dns.IsSubDomain(s.config.Domain, srv.Target) {
 					m1, e1 := s.Lookup(srv.Target, dns.TypeA, bufsize, dnssec)
 					if e1 == nil {
@@ -581,9 +585,17 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 							}
 						}
 					}
+					break
+				}
+				// Internal name, we should have some info on them, either v4 or v6
+				// Clients expect a complete answer, because we are a recursor in their
+				// view. q.Qtype is special here (0), so we get both v4 and v6.
+				addr, e1 := s.AddressRecords(dns.Question{srv.Target, dns.ClassINET, 0},
+					srv.Target, nil, bufsize, dnssec)
+				if e1 == nil {
+					extra = append(extra, addr...)
 				}
 			}
-			lookup[srv.Target] = true
 		case ip.To4() != nil:
 			serv.Host = msg.Domain(serv.Key)
 			records = append(records, serv.NewSRV(q.Name, weight))

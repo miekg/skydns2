@@ -871,6 +871,14 @@ var dnsTestCases = []dnsTestCase{
 		Answer: []dns.RR{newA("upper.skydns.test. IN A 127.0.0.1")},
 	},
 
+	// SRV record with name that is internally resolvable.
+	{
+		Qname: "1.cname.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{newSRV("1.cname.skydns.test. IN SRV 10 100 0 104.server1.development.region1.skydns.test.")},
+		Extra:  []dns.RR{newA("104.server1.development.region1.skydns.test. IN A 10.0.0.1")},
+	},
+	// SRV record with name that is internally resolvable. Get v4 and v6 records.
+	{},
 }
 
 func newA(rr string) *dns.A           { r, _ := dns.NewRR(rr); return r.(*dns.A) }
