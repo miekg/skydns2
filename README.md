@@ -654,6 +654,11 @@ Official Docker images are at the [Docker Hub](https://registry.hub.docker.com/u
 * master -> skynetservices/skydns:latest
 * latest tag -> skynetservices/skydns:latest-tagged
 
+The supplied `Dockerfile` can be used to build an image as well. Build SkyDNS and then
+build the docker image:
+
+    % go build
+    % docker build -t $USER/skydns .
 
 # License
 
