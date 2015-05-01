@@ -1,8 +1,7 @@
-FROM google/debian:wheezy
+FROM accursoft/micro-jessie
 MAINTAINER Miek Gieben <miek@miek.nl> (@miekg)
 
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    dnsutils
+RUN apt-get update && apt-get install --no-install-recommends -y dnsutils
 
 ADD skydns skydns
 
