@@ -1,7 +1,7 @@
-FROM accursoft/micro-jessie
+FROM progrium/busybox
 MAINTAINER Miek Gieben <miek@miek.nl> (@miekg)
 
-RUN apt-get update && apt-get install --no-install-recommends -y dnsutils
+RUN opkg-install bind-dig
 
 ADD skydns skydns
 
