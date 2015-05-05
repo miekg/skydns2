@@ -528,7 +528,6 @@ var services = []*msg.Service{
 
 	{Host: "127.0.0.1", Key: "a.dom1.skydns.test.", Group: "g1"},
 	{Host: "127.0.0.2", Key: "b.sub.dom1.skydns.test.", Group: "g2"},
-
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -915,7 +914,6 @@ var dnsTestCases = []dnsTestCase{
 		Qname: "multiport.http.skydns.test.", Qtype: dns.TypeA,
 		Answer: []dns.RR{newA("multiport.http.skydns.test. IN A 10.11.11.10")},
 	},
-<<<<<<< HEAD
 
 	// Casing test
 	{
@@ -937,7 +935,7 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "both.v4v6.test.skydns.test.", Qtype: dns.TypeSRV,
 		Answer: []dns.RR{newSRV("both.v4v6.test.skydns.test. IN SRV 10 100 0 ipaddr2.skydns.test.")},
-		Extra:  []dns.RR{
+		Extra: []dns.RR{
 			newA("ipaddr2.skydns.test. IN A	172.16.1.1"),
 			newAAAA("ipaddr2.skydns.test. IN AAAA 2001::8:8:8:8"),
 		},
