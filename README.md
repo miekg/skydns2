@@ -526,6 +526,7 @@ In the example here, we don't use an UUID, we use `public.addresses`:
 The name `local.dns.skydns.local.` is fixed, i.e. you can retrieve the Host
 Local Value by querying for `local.dns.<your domain>`.
 
+
 #### Groups
 
 Groups can be used to group set of services together. The main use of this is to
@@ -533,18 +534,18 @@ limit recursion, i.e. don't give back *all* records, but only a subset. Say that
 I have configuration like this:
 
     /skydns/local/domain/
-    /skydns/local/domain/a - IP1
-    /skydns/local/domain/b - IP2
+    /skydns/local/domain/a - {"host": "127.0.0.1", "group": "g1"}
+    /skydns/local/domain/b - {"host": "127.0.0.2", "group": "g1"}
     /skydns/local/domain/subdom/
-    /skydns/local/domain/subdom/a - IP3
-    /skydns/local/domain/subdom/b - IP4
+    /skydns/local/domain/subdom/c - {"host": "127.0.0.3", "group": "g2"}
+    /skydns/local/domain/subdom/d - {"host": "127.0.0.4", "group": "g2"}
 
-And you want `domain.local` to return (IP1, IP2) and `subdom.domain.local` to
-return (IP3, IP4). For this the two domains, need to be in different groups.
-What those groups are does not matter, as long as IP1 and IP2 belong to the same
-group which is *different* from the group IP3 and IP4 belong to. If a service
-is found *without* a group it is *always included*.
-
+And you want `domain.local` to return (127.0.0.1 and 127.0.0.2) and
+`subdom.domain.local` to return (127.0.0.3 and 127.0.0.4). For this the two
+domains, need to be in different groups. What those groups are does not matter,
+as long as `a` and `b` belong to the same group which is *different* from the
+group `c` and `d` belong to. If a service is found *without* a group it is
+*always included*.
 
 ## Implementing a custom DNS backend
 
