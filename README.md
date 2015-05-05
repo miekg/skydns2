@@ -547,6 +547,7 @@ as long as `a` and `b` belong to the same group which is *different* from the
 group `c` and `d` belong to. If a service is found *without* a group it is
 *always included*.
 
+
 ## Implementing a custom DNS backend
 
 The SkyDNS `server` package may be used as a library, which allows a custom
