@@ -125,51 +125,48 @@ func Domain(s string) string {
 	return dns.Fqdn(strings.Join(l[1:len(l)-1], "."))
 }
 
-// Group checks the services in sx, looks for a Group attribute in the first
-// ones (i.e. all services with same path length) and (if found) selects only
-// those services with the same group.
+// Group checks the services in sx, it looks for a Group attribute on the shortest
+// keys. If there are multiple shortest keys *and* the group attribute disagrees (and
+// is not empty), we don't consider it a group.
 func Group(sx []Service) []Service {
 	if len(sx) == 0 {
 		return sx
 	}
 
+	// Shortest key with group attribute sets the group for this set.
+	group := sx[0].Group
 	slashes := strings.Count(sx[0].Key, "/")
-	group := ""
-	count := true
-
-	ret := []Service{} // with slice-tricks in sx we can save this allocation (TODO)
-
-	// Now now want to look at the first N services of length slashes
-	// that either share Group or are empty
-	for _, s := range sx {
-		if count && strings.Count(s.Key, "/") == slashes {
+	length := make([]int, len(sx))
+	for i, s := range sx {
+		x := strings.Count(s.Key, "/")
+		length[i] = x
+		if x < slashes {
 			if s.Group == "" {
-				ret = append(ret, s)
-				continue
+				break
 			}
-			if group == "" {
-				group = s.Group
-				ret = append(ret, s)
-				continue
-			}
+			slashes = x
+			group = s.Group
+		}
+	}
 
-			if s.Group != "" && s.Group != group {
-				// one of the groups on the same level does not
-				// agree with 'group'. The Group thing does not
-				// apply to these set of services.
-				return sx
-			}
+	if group == "" {
+		return sx
+	}
+
+	ret := []Service{} // with slice-tricks in sx we can prolly save this allocation (TODO)
+
+	for i, s := range sx {
+		if s.Group == "" {
+			ret = append(ret, s)
+			continue
 		}
 
-		// Now we are decending a level. If group is still empty, we
-		// are not doing groups.
-		if group == "" {
+		// Disagreement on the same level
+		if length[i] == slashes && s.Group != group {
 			return sx
 		}
 
-		count = !count
-
-		if s.Group == "" || s.Group == group {
+		if s.Group == group {
 			ret = append(ret, s)
 		}
 	}

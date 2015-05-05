@@ -43,8 +43,22 @@ func TestSplit255(t *testing.T) {
 func TestGroup(t *testing.T) {
 	// Key are in the wrong order, but for this test it does not matter.
 
-	// Groups disagree, so we will not do anything.
 	sx := Group(
+		[]Service{
+			{Host: "127.0.0.1", Group: "g1", Key: "b/sub/dom1/skydns/test"},
+			{Host: "127.0.0.2", Group: "g2", Key: "a/dom1/skydns/test"},
+		},
+	)
+	// Expecting to return the shortest key with a Group attribute.
+	if len(sx) != 1 {
+		t.Fatalf("failure to group zeroth set: %v", sx)
+	}
+	if sx[0].Key != "a/dom1/skydns/test" {
+		t.Fatalf("failure to group zeroth set: %v, wrong Key", sx)
+	}
+
+	// Groups disagree, so we will not do anything.
+	sx = Group(
 		[]Service{
 			{Host: "server1", Group: "g1", Key: "region1/skydns/test"},
 			{Host: "server2", Group: "g2", Key: "region1/skydns/test"},
