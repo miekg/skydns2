@@ -529,7 +529,8 @@ var services = []*msg.Service{
 	{Host: "mx.skydns.test", Priority: 50, Mail: true, Key: "a.mail.skydns.test."},
 	{Host: "mx.miek.nl", Priority: 50, Mail: true, Key: "b.mail.skydns.test."},
 	{Host: "a.ipaddr.skydns.test", Priority: 30, Mail: true, Key: "a.mx.skydns.test."},
-	{Host: "b.ipaddr.skydns.test", Mail: true, Key: "b.mx.skydns.test."},
+	// If this is added, we get a double CNAME, see issue #168
+	// {Host: "b.ipaddr.skydns.test", Mail: true, Key: "b.mx.skydns.test."},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -958,20 +959,23 @@ var dnsTestCases = []dnsTestCase{
 	},
 
 	{
-		// Can't resolve to an IP - ignore
+		// See issue #168
 		Qname: "a.mail.skydns.test.", Qtype: dns.TypeMX,
 		Answer: []dns.RR{newMX("a.mail.skydns.test. IN MX 50 mx.skydns.test.")},
+		Extra: []dns.RR{
+			newA("a.ipaddr.skydns.test. IN A 172.16.1.1"),
+			newCNAME("mx.skydns.tests. IN CNAME a.ipaddr.skydns.test."),
+		},
 	},
 
 	{
 		Qname: "mx.skydns.test.", Qtype: dns.TypeMX,
 		Answer: []dns.RR{
-			newMX("mx.skydns.test. IN MX 10 b.ipaddr.skydns.test. "),
 			newMX("mx.skydns.test. IN MX 30 a.ipaddr.skydns.test. "),
 		},
 		Extra: []dns.RR{
 			// not working yet.
-			newA("bar.skydns.test. 3600 A 192.168.0.1"),
+			newA("a.ipaddr.skydns.test. A 172.16.1.1"),
 		},
 	},
 }

@@ -640,24 +640,34 @@ func (s *server) MXRecords(q dns.Question, name string, bufsize uint16, dnssec b
 		case ip == nil:
 			mx := serv.NewMX(q.Name)
 			records = append(records, mx)
-			if _, ok := lookup[mx.Mx]; !ok {
-				if !dns.IsSubDomain(s.config.Domain, mx.Mx) {
-					m1, e1 := s.Lookup(mx.Mx, dns.TypeA, bufsize, dnssec)
-					if e1 == nil {
-						extra = append(extra, m1.Answer...)
-					}
-					m1, e1 = s.Lookup(mx.Mx, dns.TypeAAAA, bufsize, dnssec)
-					if e1 == nil {
-						// If we have seen CNAME's we *assume* that they are already added.
-						for _, a := range m1.Answer {
-							if _, ok := a.(*dns.CNAME); !ok {
-								extra = append(extra, a)
-							}
+			if _, ok := lookup[mx.Mx]; ok {
+				break
+			}
+
+			lookup[mx.Mx] = true
+
+			if !dns.IsSubDomain(s.config.Domain, mx.Mx) {
+				m1, e1 := s.Lookup(mx.Mx, dns.TypeA, bufsize, dnssec)
+				if e1 == nil {
+					extra = append(extra, m1.Answer...)
+				}
+				m1, e1 = s.Lookup(mx.Mx, dns.TypeAAAA, bufsize, dnssec)
+				if e1 == nil {
+					// If we have seen CNAME's we *assume* that they are already added.
+					for _, a := range m1.Answer {
+						if _, ok := a.(*dns.CNAME); !ok {
+							extra = append(extra, a)
 						}
 					}
 				}
+				break
 			}
-			lookup[mx.Mx] = true
+			// Internal name
+			addr, e1 := s.AddressRecords(dns.Question{mx.Mx, dns.ClassINET, dns.TypeA},
+				mx.Mx, nil, bufsize, dnssec, true)
+			if e1 == nil {
+				extra = append(extra, addr...)
+			}
 		case ip.To4() != nil:
 			serv.Host = msg.Domain(serv.Key)
 			records = append(records, serv.NewMX(q.Name))
