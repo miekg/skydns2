@@ -411,6 +411,18 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 		m.Answer = append(m.Answer, records...)
+	case dns.TypeMX:
+		records, extra, err := s.MXRecords(q, name, bufsize, dnssec)
+		if err != nil {
+			if e, ok := err.(*etcd.EtcdError); ok {
+				if e.ErrorCode == 100 {
+					s.NameError(m, req)
+					return
+				}
+			}
+		}
+		m.Answer = append(m.Answer, records...)
+		m.Extra = append(m.Extra, extra...)
 	default:
 		fallthrough // also catch other types, so that they return NODATA
 	case dns.TypeSRV:
@@ -532,7 +544,7 @@ func (s *server) NSRecords(q dns.Question, name string) (records []dns.RR, extra
 }
 
 // SRVRecords returns SRV records from etcd.
-// If the Target is not an name but an IP address, an name is created .
+// If the Target is not a name but an IP address, a name is created.
 func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec bool) (records []dns.RR, extra []dns.RR, err error) {
 	services, err := s.backend.Records(name, false)
 	if err != nil {
@@ -610,6 +622,65 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 	return records, extra, nil
 }
 
+// MXRecords returns MX records from etcd.
+// If the Target is not a name but an IP address, a name is created.
+func (s *server) MXRecords(q dns.Question, name string, bufsize uint16, dnssec bool) (records []dns.RR, extra []dns.RR, err error) {
+	services, err := s.backend.Records(name, false)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	lookup := make(map[string]bool)
+	for _, serv := range services {
+		if !serv.Mail {
+			continue
+		}
+		ip := net.ParseIP(serv.Host)
+		switch {
+		case ip == nil:
+			mx := serv.NewMX(q.Name)
+			records = append(records, mx)
+			if _, ok := lookup[mx.Mx]; ok {
+				break
+			}
+
+			lookup[mx.Mx] = true
+
+			if !dns.IsSubDomain(s.config.Domain, mx.Mx) {
+				m1, e1 := s.Lookup(mx.Mx, dns.TypeA, bufsize, dnssec)
+				if e1 == nil {
+					extra = append(extra, m1.Answer...)
+				}
+				m1, e1 = s.Lookup(mx.Mx, dns.TypeAAAA, bufsize, dnssec)
+				if e1 == nil {
+					// If we have seen CNAME's we *assume* that they are already added.
+					for _, a := range m1.Answer {
+						if _, ok := a.(*dns.CNAME); !ok {
+							extra = append(extra, a)
+						}
+					}
+				}
+				break
+			}
+			// Internal name
+			addr, e1 := s.AddressRecords(dns.Question{mx.Mx, dns.ClassINET, dns.TypeA},
+				mx.Mx, nil, bufsize, dnssec, true)
+			if e1 == nil {
+				extra = append(extra, addr...)
+			}
+		case ip.To4() != nil:
+			serv.Host = msg.Domain(serv.Key)
+			records = append(records, serv.NewMX(q.Name))
+			extra = append(extra, serv.NewA(serv.Host, ip.To4()))
+		case ip.To4() == nil:
+			serv.Host = msg.Domain(serv.Key)
+			records = append(records, serv.NewMX(q.Name))
+			extra = append(extra, serv.NewAAAA(serv.Host, ip.To16()))
+		}
+	}
+	return records, extra, nil
+}
+
 func (s *server) CNAMERecords(q dns.Question, name string) (records []dns.RR, err error) {
 	services, err := s.backend.Records(name, true)
 	if err != nil {
@@ -647,8 +718,6 @@ func (s *server) PTRRecords(q dns.Question) (records []dns.RR, err error) {
 		return nil, err
 	}
 
-	// If serv.Host is parseble as a IP address we should not return anything.
-	// TODO(miek).
 	records = append(records, serv.NewPTR(q.Name, serv.Ttl))
 	return records, nil
 }

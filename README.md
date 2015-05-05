@@ -345,7 +345,14 @@ listed, so this is only useful when you're querying for services running on
 ports known to you in advance.
 
 
+#### MX Records
+
+If a service is added with `"mail": true` it is *also* an MX record, the Priority
+doubles as the MX's Preference.
+
+
 #### CNAME Records
+
 If for an A or AAAA query the IP address can not be parsed, SkyDNS will try to
 see if there is a chain of names that will lead to an IP address. The chain can
 not be longer than 8. So for instance if the following services have been
