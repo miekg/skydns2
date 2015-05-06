@@ -217,8 +217,6 @@ func TestDNSStubForward(t *testing.T) {
 	defer s1.Stop()
 	s1.config.Domain = "skydns.com."
 
-	// internal.skydns.com
-
 	// Add forwarding IP for internal.skydns.com. Use Port to point to server s.
 	stubForward := &msg.Service{
 		Host: "127.0.0.1", Port: Port, Key: "b.internal.skydns.com.stub.dns.skydns.test.",
@@ -244,14 +242,35 @@ func TestDNSStubForward(t *testing.T) {
 		t.Fatalf("failed to get correct reply")
 	}
 
-	// adding an internal domain forward
-	oldStrPort := StrPort
+	// Adding an in baliwick internal domain forward.
+	s2 := newTestServer(t, false)
+	defer s2.Stop()
+	s2.config.Domain = "internal.skydns.net."
 
-	s1 := newTestServer(t, false)
-	defer s1.Stop()
-	s1.config.Domain = "skydns.com."
+	// Add forwarding IP for internal.skydns.net. Use Port to point to server s.
+	stubForward1 := &msg.Service{
+		Host: "127.0.0.1", Port: Port, Key: "b.internal.skydns.net.stub.dns.skydns.test.",
+	}
+	addService(t, s, stubForward1.Key, 0, stubForward1)
+	defer delService(t, s, stubForward1.Key)
+	s.UpdateStubZones()
 
+	// Add an answer for this in our "new" server.
+	stubReply1 := &msg.Service{
+		Host: "127.10.10.10", Key: "www.internal.skydns.net.",
+	}
+	addService(t, s2, stubReply1.Key, 0, stubReply1)
+	defer delService(t, s2, stubReply1.Key)
 
+	m = new(dns.Msg)
+	m.SetQuestion("www.internal.skydns.net.", dns.TypeA)
+	resp, _, err = c.Exchange(m, "127.0.0.1:"+oldStrPort)
+	if err != nil {
+		t.Fatalf("failed to forward %s", err)
+	}
+	if resp.Answer[0].(*dns.A).A.String() != "127.10.10.10" {
+		t.Fatalf("failed to get correct reply")
+	}
 }
 
 func TestDNSTtlRRset(t *testing.T) {
