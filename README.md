@@ -589,6 +589,8 @@ telling the remote server (if its a SkyDNS instance) that this is a stub request
 SkyDNS will not (stub)forward packets with this EDNS0 meta data, instead the request
 will be dropped and logged.
 
+Remember this will only work when SkyDNS is started with `-stubzones`.
+
 
 ## How Do I Create an Address Pool and Round Robin Between Them
 
