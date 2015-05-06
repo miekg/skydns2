@@ -71,6 +71,8 @@ func (s *server) UpdateStubZones() {
 func (s *server) ServeDNSStubForward(w dns.ResponseWriter, req *dns.Msg, ns []string) {
 	StatsStubForwardCount.Inc(1)
 
+	println("FORWARDING to", ns[0])
+
 	// Check EDNS0 Stub option, if set drop the packet.
 	option := req.IsEdns0()
 	if option != nil {
@@ -114,6 +116,7 @@ Redo:
 	if err == nil {
 		r.Compress = true
 		r.Id = req.Id
+		println("FOUND ONE, RETURNING", r.String())
 		w.WriteMsg(r)
 		return
 	}

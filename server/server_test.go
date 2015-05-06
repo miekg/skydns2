@@ -207,6 +207,51 @@ func TestDNSStubForward(t *testing.T) {
 	} else {
 		t.Logf("succesfully failing %s", err)
 	}
+
+	// Now start another SkyDNS instance on a different port,
+	// add a stubservice for it and check if the forwarding is
+	// actually working.
+	oldStrPort := StrPort
+
+	s1 := newTestServer(t, false)
+	defer s1.Stop()
+	s1.config.Domain = "skydns.com."
+
+	// internal.skydns.com
+
+	// Add forwarding IP for internal.skydns.com. Use Port to point to server s.
+	stubForward := &msg.Service{
+		Host: "127.0.0.1", Port: Port, Key: "b.internal.skydns.com.stub.dns.skydns.test.",
+	}
+	addService(t, s, stubForward.Key, 0, stubForward)
+	defer delService(t, s, stubForward.Key)
+	s.UpdateStubZones()
+
+	// Add an answer for this in our "new" server.
+	stubReply := &msg.Service{
+		Host: "127.1.1.1", Key: "www.internal.skydns.com.",
+	}
+	addService(t, s1, stubReply.Key, 0, stubReply)
+	defer delService(t, s1, stubReply.Key)
+
+	m = new(dns.Msg)
+	m.SetQuestion("www.internal.skydns.com.", dns.TypeA)
+	resp, _, err = c.Exchange(m, "127.0.0.1:"+oldStrPort)
+	if err != nil {
+		t.Fatalf("failed to forward %s", err)
+	}
+	if resp.Answer[0].(*dns.A).A.String() != "127.1.1.1" {
+		t.Fatalf("failed to get correct reply")
+	}
+
+	// adding an internal domain forward
+	oldStrPort := StrPort
+
+	s1 := newTestServer(t, false)
+	defer s1.Stop()
+	s1.config.Domain = "skydns.com."
+
+
 }
 
 func TestDNSTtlRRset(t *testing.T) {
