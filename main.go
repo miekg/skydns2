@@ -140,6 +140,7 @@ func main() {
 				case n := <-recv:
 					if n != nil {
 						s.UpdateStubZones()
+						log.Printf("skydns: stubzone update")
 						duration = 1 * time.Second // reset
 					} else {
 						// we can see an n == nil, probably when we can't connect to etcd.
