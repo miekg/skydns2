@@ -578,8 +578,8 @@ var services = []*msg.Service{
 	{Host: "bar.skydns.local", Port: 443, Key: "y.bar.skydns.test.", TargetStrip: 0},
 
 	// nameserver
-	{Host: "10.0.0.2", Key: "ns.dns.skydns.test."},
-	{Host: "10.0.0.3", Key: "ns2.dns.skydns.test."},
+	{Host: "10.0.0.2", Key: "a.ns.dns.skydns.test."},
+	{Host: "10.0.0.3", Key: "b.ns.dns.skydns.test."},
 	// txt
 	{Text: "abc", Key: "a1.txt.skydns.test."},
 	{Text: "abc abc", Key: "a2.txt.skydns.test."},
@@ -612,18 +612,21 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "skydns.test.", Qtype: dns.TypeNS,
 		Answer: []dns.RR{
-			newNS("skydns.test. 3600 NS ns1.dns.skydns.test."),
-			newNS("skydns.test. 3600 NS ns2.dns.skydns.test."),
+			newNS("skydns.test. 3600 NS a.ns.dns.skydns.test."),
+			newNS("skydns.test. 3600 NS b.ns.dns.skydns.test."),
 		},
 		Extra: []dns.RR{
-			newA("ns.dns.skydns.test. 3600 A 10.0.0.2"),
-			newA("ns2.dns.skydns.test. 3600 A 10.0.0.3"),
+			newA("a.ns.dns.skydns.test. 3600 A 10.0.0.2"),
+			newA("b.ns.dns.skydns.test. 3600 A 10.0.0.3"),
 		},
 	},
 	// A Record For NS Record Test
 	{
 		Qname: "ns.dns.skydns.test.", Qtype: dns.TypeA,
-		Answer: []dns.RR{newA("ns.dns.skydns.test. 3600 A 10.0.0.2")},
+		Answer: []dns.RR{
+			newA("ns.dns.skydns.test. 3600 A 10.0.0.2"),
+			newA("ns.dns.skydns.test. 3600 A 10.0.0.3"),
+		},
 	},
 	// A Record Test
 	{
