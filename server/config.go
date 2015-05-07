@@ -62,7 +62,7 @@ type Config struct {
 
 	// some predefined string "constants"
 	localDomain string // "local.dns." + config.Domain
-	dnsDomain   string // "dns". + config.Domain
+	dnsDomain   string // "ns.dns". + config.Domain
 
 	// Stub zones support. Pointer to a map that we refresh when we see
 	// an update. Map contains domainname -> nameserver:port
@@ -133,7 +133,7 @@ func SetDefaults(config *Config) error {
 		config.PrivKey = p
 	}
 	config.localDomain = appendDomain("local.dns", config.Domain)
-	config.dnsDomain = appendDomain("dns", config.Domain)
+	config.dnsDomain = appendDomain("ns.dns", config.Domain)
 	stubmap := make(map[string][]string)
 	config.stub = &stubmap
 	return nil

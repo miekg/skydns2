@@ -366,8 +366,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if name != s.config.Domain {
 			break
 		}
-		// Lookup "ns." + s.config.DnsDomain
-		records, extra, err := s.NSRecords(q, "ns." + s.config.dnsDomain)
+		// Lookup s.config.DnsDomain
+		records, extra, err := s.NSRecords(q, s.config.dnsDomain)
 		if err != nil {
 			if e, ok := err.(*etcd.EtcdError); ok {
 				if e.ErrorCode == 100 {
