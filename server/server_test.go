@@ -608,6 +608,7 @@ var services = []*msg.Service{
 	// Double CNAME, see issue #168
 	{Host: "mx2.skydns.test", Priority: 50, Mail: true, Key: "a.mail2.skydns.test."},
 	{Host: "a.ipaddr.skydns.test", Mail: true, Key: "a.mx2.skydns.test."},
+	// Sometimes we *do* get back a.ipaddr.skydns.test, making this test flaky.
 	{Host: "b.ipaddr.skydns.test", Mail: true, Key: "b.mx2.skydns.test."},
 }
 
@@ -764,6 +765,14 @@ var dnsTestCases = []dnsTestCase{
 		Answer: []dns.RR{
 			newSRV("production.*.skydns.test. 3600 IN SRV 10 50 0 105.server3.production.region2.skydns.test."),
 			newSRV("production.*.skydns.test. 3600 IN SRV 10 50 80 server2.")},
+		Extra: []dns.RR{newAAAA("105.server3.production.region2.skydns.test. 3600 IN AAAA 2001::8:8:8:8")},
+	},
+	// Wildcard Test
+	{
+		Qname: "production.any.skydns.test.", Qtype: dns.TypeSRV,
+		Answer: []dns.RR{
+			newSRV("production.any.skydns.test. 3600 IN SRV 10 50 0 105.server3.production.region2.skydns.test."),
+			newSRV("production.any.skydns.test. 3600 IN SRV 10 50 80 server2.")},
 		Extra: []dns.RR{newAAAA("105.server3.production.region2.skydns.test. 3600 IN AAAA 2001::8:8:8:8")},
 	},
 	// NXDOMAIN Test
@@ -1024,7 +1033,6 @@ var dnsTestCases = []dnsTestCase{
 			newAAAA("ipaddr2.skydns.test. IN AAAA 2001::8:8:8:8"),
 		},
 	},
-
 	// MX Tests
 	{
 		// NODATA as this is not an Mail: true record.
@@ -1033,12 +1041,10 @@ var dnsTestCases = []dnsTestCase{
 			newSOA("skydns.test. 3600 SOA ns.dns.skydns.test. hostmaster.skydns.test. 0 0 0 0 0"),
 		},
 	},
-
 	{
 		Qname: "b.mail.skydns.test.", Qtype: dns.TypeMX,
 		Answer: []dns.RR{newMX("b.mail.skydns.test. IN MX 50 mx.miek.nl.")},
 	},
-
 	{
 		// See issue #168
 		Qname: "a.mail.skydns.test.", Qtype: dns.TypeMX,
@@ -1048,7 +1054,6 @@ var dnsTestCases = []dnsTestCase{
 			newCNAME("mx.skydns.tests. IN CNAME a.ipaddr.skydns.test."),
 		},
 	},
-
 	{
 		Qname: "mx.skydns.test.", Qtype: dns.TypeMX,
 		Answer: []dns.RR{
@@ -1058,7 +1063,6 @@ var dnsTestCases = []dnsTestCase{
 			newA("a.ipaddr.skydns.test. A 172.16.1.1"),
 		},
 	},
-
 	// Double CNAMEs in the additional
 	{
 		Qname: "a.mail2.skydns.test.", Qtype: dns.TypeMX,

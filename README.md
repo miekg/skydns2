@@ -271,9 +271,12 @@ section. Directly querying for the A records of
     4.rails.staging.east.skydns.local. 3600 IN A    10.0.1.125
 
 Another way to leads to the same result it to query for `*.east.skydns.local`,
-you even put the wildcard (the `*`) in the middle of a name
-`staging.*.skydns.local` is a valid query, which returns all name in staging,
-regardless of the region. Multiple wildcards per name are also permitted.
+you even put the wildcard (the `*` or `any`) in the middle of a name
+`staging.*.skydns.local` or `staging.any.skydns.local` is a valid query, which
+returns all name in staging, regardless of the region. Multiple wildcards per
+name are also permitted.
+
+Note that `any` is synonymous for a `*`, as shown above.
 
 
 ### Examples
