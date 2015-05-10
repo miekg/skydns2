@@ -818,7 +818,6 @@ func (s *server) dedup(m *dns.Msg) *dns.Msg {
 					ma[s1] = a
 					continue
 				}
-
 			}
 			ma[s1] = a
 			continue
@@ -853,7 +852,6 @@ func (s *server) dedup(m *dns.Msg) *dns.Msg {
 					me[s1] = e
 					continue
 				}
-
 			}
 			me[s1] = e
 			continue
