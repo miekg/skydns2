@@ -604,8 +604,11 @@ var services = []*msg.Service{
 	{Host: "mx.skydns.test", Priority: 50, Mail: true, Key: "a.mail.skydns.test."},
 	{Host: "mx.miek.nl", Priority: 50, Mail: true, Key: "b.mail.skydns.test."},
 	{Host: "a.ipaddr.skydns.test", Priority: 30, Mail: true, Key: "a.mx.skydns.test."},
-	// If this is added, we get a double CNAME, see issue #168
-	// {Host: "b.ipaddr.skydns.test", Mail: true, Key: "b.mx.skydns.test."},
+
+	// Double CNAME, see issue #168
+	{Host: "mx2.skydns.test", Priority: 50, Mail: true, Key: "a.mail2.skydns.test."},
+	{Host: "a.ipaddr.skydns.test", Mail: true, Key: "a.mx2.skydns.test."},
+	{Host: "b.ipaddr.skydns.test", Mail: true, Key: "b.mx2.skydns.test."},
 }
 
 var dnsTestCases = []dnsTestCase{
@@ -1049,11 +1052,25 @@ var dnsTestCases = []dnsTestCase{
 	{
 		Qname: "mx.skydns.test.", Qtype: dns.TypeMX,
 		Answer: []dns.RR{
-			newMX("mx.skydns.test. IN MX 30 a.ipaddr.skydns.test. "),
+			newMX("mx.skydns.test. IN MX 30 a.ipaddr.skydns.test."),
 		},
 		Extra: []dns.RR{
-			// not working yet.
 			newA("a.ipaddr.skydns.test. A 172.16.1.1"),
+		},
+	},
+
+	// Double CNAMEs in the additional
+	{
+		Qname: "a.mail2.skydns.test.", Qtype: dns.TypeMX,
+		Answer: []dns.RR{
+			newMX("a.mail2.skydns.test. IN MX 50 mx2.skydns.test."),
+		},
+		Extra: []dns.RR{
+			newA("a.ipaddr.skydns.test. A 172.16.1.1"),
+			newA("b.ipaddr.skydns.test. A 172.16.1.2"),
+			// only one CNAME can be here, if we round-robin we randomly choose
+			// without it, pick the first
+			newCNAME("mx2.skydns.test. CNAME b.ipaddr.skydns.test."),
 		},
 	},
 }
@@ -1081,7 +1098,8 @@ func TestDedup(t *testing.T) {
 		newA("svc.ns.kubernetes.local. IN A 1.1.1.1"),
 		newA("svc.ns.kubernetes.local. IN A 1.1.1.1"),
 	}
-	m = dedup(m)
+	s := &server{}
+	m = s.dedup(m)
 	sort.Sort(rrSet(m.Answer))
 	if len(m.Answer) != 3 {
 		t.Fatalf("failing dedup: should have collapsed it to 3 records")
