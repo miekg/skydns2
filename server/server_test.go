@@ -608,6 +608,7 @@ var services = []*msg.Service{
 	// Double CNAME, see issue #168
 	{Host: "mx2.skydns.test", Priority: 50, Mail: true, Key: "a.mail2.skydns.test."},
 	{Host: "a.ipaddr.skydns.test", Mail: true, Key: "a.mx2.skydns.test."},
+	// Sometimes we *do* get back a.ipaddr.skydns.test, making this test flaky.
 	{Host: "b.ipaddr.skydns.test", Mail: true, Key: "b.mx2.skydns.test."},
 }
 
