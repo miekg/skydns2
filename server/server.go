@@ -273,7 +273,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 		// Set TTL to the minimum of the RRset and dedup the message, i.e.
 		// remove idential RRs.
-		m = dedup(m)
+		m = s.dedup(m)
 
 		minttl := s.config.Ttl
 		if len(m.Answer) > 1 {
@@ -802,18 +802,31 @@ func (s *server) RoundRobin(rrs []dns.RR) {
 
 // dedup will de-duplicate a message on a per section basis.
 // Multiple identical (same name, class, type and rdata) RRs will be coalesced into one.
-func dedup(m *dns.Msg) *dns.Msg {
+func (s *server) dedup(m *dns.Msg) *dns.Msg {
 	// Answer section
 	ma := make(map[string]dns.RR)
 	for _, a := range m.Answer {
-		// Or use Pack()... Think this function also could be places in go dns.
-		s := a.Header().Name
-		s += strconv.Itoa(int(a.Header().Class))
-		s += strconv.Itoa(int(a.Header().Rrtype))
-		for i := 1; i <= dns.NumField(a); i++ {
-			s += dns.Field(a, i)
+		// Or use Pack()... Think this function also could be placed in go dns.
+		s1 := a.Header().Name
+		s1 += strconv.Itoa(int(a.Header().Class))
+		s1 += strconv.Itoa(int(a.Header().Rrtype))
+		// there can only be one CNAME for an ownername
+		if a.Header().Rrtype == dns.TypeCNAME {
+			if _, ok := ma[s1]; ok {
+				// already exist, randomly overwrite if roundrobin is true
+				if s.config.RoundRobin && dns.Id()%2 == 0 {
+					ma[s1] = a
+					continue
+				}
+
+			}
+			ma[s1] = a
+			continue
 		}
-		ma[s] = a
+		for i := 1; i <= dns.NumField(a); i++ {
+			s1 += dns.Field(a, i)
+		}
+		ma[s1] = a
 	}
 	// Only is our map is smaller than the #RR in the answer section we should reset the RRs
 	// in the section it self
@@ -829,13 +842,26 @@ func dedup(m *dns.Msg) *dns.Msg {
 	// Additional section
 	me := make(map[string]dns.RR)
 	for _, e := range m.Extra {
-		s := e.Header().Name
-		s += strconv.Itoa(int(e.Header().Class))
-		s += strconv.Itoa(int(e.Header().Rrtype))
-		for i := 1; i <= dns.NumField(e); i++ {
-			s += dns.Field(e, i)
+		s1 := e.Header().Name
+		s1 += strconv.Itoa(int(e.Header().Class))
+		s1 += strconv.Itoa(int(e.Header().Rrtype))
+		// there can only be one CNAME for an ownername
+		if e.Header().Rrtype == dns.TypeCNAME {
+			if _, ok := me[s1]; ok {
+				// already exist, randomly overwrite if roundrobin is true
+				if s.config.RoundRobin && dns.Id()%2 == 0 {
+					me[s1] = e
+					continue
+				}
+
+			}
+			me[s1] = e
+			continue
 		}
-		me[s] = e
+		for i := 1; i <= dns.NumField(e); i++ {
+			s1 += dns.Field(e, i)
+		}
+		me[s1] = e
 	}
 
 	if len(me) < len(m.Extra) {
