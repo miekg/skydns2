@@ -814,6 +814,8 @@ func (s *server) dedup(m *dns.Msg) *dns.Msg {
 		if a.Header().Rrtype == dns.TypeCNAME {
 			if _, ok := ma[s1]; ok {
 				// already exist, randomly overwrite if roundrobin is true
+				// Note: even with roundrobin *off* this depends on the
+				// order we get the names.
 				if s.config.RoundRobin && dns.Id()%2 == 0 {
 					ma[s1] = a
 					continue
