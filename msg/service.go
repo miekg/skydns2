@@ -147,6 +147,7 @@ func Domain(s string) string {
 // Group checks the services in sx, it looks for a Group attribute on the shortest
 // keys. If there are multiple shortest keys *and* the group attribute disagrees (and
 // is not empty), we don't consider it a group.
+// If a group is found, only services with *that* group (or no group) will be returned.
 func Group(sx []Service) []Service {
 	if len(sx) == 0 {
 		return sx
