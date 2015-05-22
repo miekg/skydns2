@@ -705,6 +705,12 @@ build the docker image:
     % go build
     % docker build -t $USER/skydns .
 
+If you run it, SkyDNS needs to access Etcd (or whatever backend), which usually
+runs on the host server (i.e. when using CoreOS), to make that work, just run:
+
+    docker run --net host <image>
+
+
 # License
 
 The MIT License (MIT)
