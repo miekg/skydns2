@@ -118,6 +118,7 @@ func (s *server) Lookup(n string, t, bufsize uint16, dnssec bool) (*dns.Msg, err
 	nsid := int(m.Id) % len(s.config.Nameservers)
 	try := 0
 Redo:
+	// Move this to use s.udpClient/s.tcpClient code instead of allocating a new client for every query.
 	r, _, err := c.Exchange(m, s.config.Nameservers[nsid])
 	if err == nil {
 		if r.Rcode != dns.RcodeSuccess {
