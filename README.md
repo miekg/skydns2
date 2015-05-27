@@ -709,7 +709,6 @@ Build SkyDNS with:
 
 And then build the docker image:
 
-    % go build
     % docker build -t $USER/skydns .
 
 If you run it, SkyDNS needs to access Etcd (or whatever backend), which usually
