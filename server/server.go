@@ -303,7 +303,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			m.Truncated = true
 		}
 		if err := w.WriteMsg(m); err != nil {
-			log.Printf("%s\n", m)
 			log.Printf("skydns: failure to return reply %q", err)
 		}
 	}()
