@@ -699,8 +699,15 @@ Official Docker images are at the [Docker Hub](https://registry.hub.docker.com/u
 * master -> skynetservices/skydns:latest
 * latest tag -> skynetservices/skydns:latest-tagged
 
-The supplied `Dockerfile` can be used to build an image as well. Build SkyDNS and then
-build the docker image:
+The supplied `Dockerfile` can be used to build an image as well. Note that the image
+is based of Alpine Linux which used musl libc instead of glibc, so when building
+SkyDNS you must make sure if does not need glibc when run:
+
+Build SkyDNS with:
+
+    % go build -ldflags "-linkmode external -extldflags -static"
+
+And then build the docker image:
 
     % go build
     % docker build -t $USER/skydns .
