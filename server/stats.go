@@ -39,12 +39,16 @@ var (
 	PromForwardCount     prometheus.Counter
 	PromStubForwardCount prometheus.Counter
 	PromLookupCount      prometheus.Counter
-	PromRequestCount     prometheus.Counter
-	PromDnssecOkCount    prometheus.Counter
-	PromNameErrorCount   prometheus.Counter
-	PromNoDataCount      prometheus.Counter
-	PromRCacheSize       prometheus.Gauge
-	PromSCacheSize       prometheus.Gauge
-	PromRCacheMiss       prometheus.Counter
-	PromSCacheMiss       prometheus.Counter
+
+	PromRequestCountTotal prometheus.Counter
+	PromRequestCountTCP   prometheus.Counter
+	PromRequestCountUDP   prometheus.Counter
+
+	PromDnssecOkCount  prometheus.Counter
+	PromNameErrorCount prometheus.Counter
+	PromNoDataCount    prometheus.Counter
+	PromRCacheSize     prometheus.Gauge
+	PromSCacheSize     prometheus.Gauge
+	PromRCacheMiss     prometheus.Counter
+	PromSCacheMiss     prometheus.Counter
 )

@@ -50,11 +50,25 @@ func init() {
 		Help:      "Counter of DNS lookups performed.",
 	})
 
-	server.PromRequestCount = prometheus.NewCounter(prometheus.CounterOpts{
+	server.PromRequestCountTotal = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
 		Subsystem: prometheusSubsystem,
 		Name:      "dns_request_count",
-		Help:      "Counter of DNS requests made.",
+		Help:      "Counter of total DNS requests made.",
+	})
+
+	server.PromRequestCountTCP = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: prometheusNamespace,
+		Subsystem: prometheusSubsystem,
+		Name:      "dns_request_count_tcp",
+		Help:      "Counter of DNS requests made via TCP.",
+	})
+
+	server.PromRequestCountUDP = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: prometheusNamespace,
+		Subsystem: prometheusSubsystem,
+		Name:      "dns_request_count",
+		Help:      "Counter of DNS requests made via UDP.",
 	})
 
 	server.PromDnssecOkCount = prometheus.NewCounter(prometheus.CounterOpts{

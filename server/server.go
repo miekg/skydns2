@@ -200,6 +200,19 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		bufsize = dns.MaxMsgSize - 1
 		tcp = true
 	}
+
+	if tcp {
+		PromRequestCountTCP.Inc()
+	} else {
+		PromRequestCountUDP.Inc()
+	}
+	PromRequestCountTotal.Inc()
+	StatsRequestCount.Inc(1)
+
+	defer func() {
+		PromRCacheSize.Set(float64(s.rcache.Size()))
+	}()
+
 	// Check cache first.
 	key := cache.QuestionKey(req.Question[0], dnssec)
 	m1, exp, hit := s.rcache.Search(key)
@@ -210,6 +223,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			m1.Compress = true
 			if dnssec {
 				StatsDnssecOkCount.Inc(1)
+				PromDnssecOkCount.Inc()
+
 				// The key for DNS/DNSSEC in cache is different, no
 				// need to do Denial/Sign here.
 				//if s.config.PubKey != nil {
@@ -235,9 +250,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.rcache.Remove(key)
 	}
 
+	PromRCacheMiss.Inc()
+
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
-	StatsRequestCount.Inc(1)
+
 	if s.config.Verbose {
 		log.Printf("skydns: received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 	}
@@ -291,6 +308,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 
 		if dnssec {
 			StatsDnssecOkCount.Inc(1)
+			PromDnssecOkCount.Inc()
+
 			if s.config.PubKey != nil {
 				m.AuthenticatedData = true
 				s.Denial(m)
@@ -760,14 +779,18 @@ func (s *server) NameError(m, req *dns.Msg) {
 	m.SetRcode(req, dns.RcodeNameError)
 	m.Ns = []dns.RR{s.NewSOA()}
 	m.Ns[0].Header().Ttl = s.config.MinTtl
+
 	StatsNameErrorCount.Inc(1)
+	PromNameErrorCount.Inc()
 }
 
 func (s *server) NoDataError(m, req *dns.Msg) {
 	m.SetRcode(req, dns.RcodeSuccess)
 	m.Ns = []dns.RR{s.NewSOA()}
 	m.Ns[0].Header().Ttl = s.config.MinTtl
-	//	StatsNoDataCount.Inc(1)
+
+	StatsNoDataCount.Inc(1)
+	PromNoDataCount.Inc()
 }
 
 func (s *server) logNoConnection(e error) {

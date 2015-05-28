@@ -15,6 +15,7 @@ import (
 // ServeDNSForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	StatsForwardCount.Inc(1)
+	PromForwardCount.Inc()
 
 	if s.config.NoRec {
 		m := new(dns.Msg)
@@ -104,6 +105,8 @@ func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) {
 // in the server's config. If none defined it returns an error
 func (s *server) Lookup(n string, t, bufsize uint16, dnssec bool) (*dns.Msg, error) {
 	StatsLookupCount.Inc(1)
+	PromLookupCount.Inc()
+
 	if len(s.config.Nameservers) == 0 {
 		return nil, fmt.Errorf("no nameservers configured can not lookup name")
 	}
