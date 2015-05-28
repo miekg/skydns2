@@ -15,106 +15,108 @@ import (
 )
 
 var (
-	prometheusPort      = os.Getenv("PROMETHEUS_PORT")
-	prometheusPath      = os.Getenv("PROMETHEUS_PATH")
-	prometheusNamespace = os.Getenv("PROMETHEUS_NAMESPACE")
-	prometheusSubsystem = os.Getenv("PROMETHEUS_SUBSYSTEM")
+	PrometheusPort      = os.Getenv("PROMETHEUS_PORT")
+	PrometheusPath      = os.Getenv("PROMETHEUS_PATH")
+	PrometheusNamespace = os.Getenv("PROMETHEUS_NAMESPACE")
+	PrometheusSubsystem = os.Getenv("PROMETHEUS_SUBSYSTEM")
 )
 
 func init() {
-	if prometheusPath == "" {
-		prometheusPath = "/metrics"
+	println("init")
+	if PrometheusPath == "" {
+		PrometheusPath = "/metrics"
 	}
-	if prometheusNamespace == "" {
-		prometheusNamespace = "skydns"
+	if PrometheusNamespace == "" {
+		PrometheusNamespace = "skydns"
 	}
 
 	server.PromForwardCount = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
 		Name:      "dns_forward_count",
 		Help:      "Counter of DNS requests forwarded.",
 	})
 
 	server.PromStubForwardCount = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
 		Name:      "dns_stub_forward_count",
 		Help:      "Counter of DNS requests forwarded to stubs.",
 	})
 
+	// convert to VEC and use labels
 	server.PromLookupCount = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
 		Name:      "dns_lookup_count",
 		Help:      "Counter of DNS lookups performed.",
 	})
 
 	server.PromRequestCountTotal = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
 		Name:      "dns_request_count",
 		Help:      "Counter of total DNS requests made.",
 	})
 
 	server.PromRequestCountTCP = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
 		Name:      "dns_request_count_tcp",
 		Help:      "Counter of DNS requests made via TCP.",
 	})
 
 	server.PromRequestCountUDP = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
-		Name:      "dns_request_count",
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
+		Name:      "dns_request_count_udp",
 		Help:      "Counter of DNS requests made via UDP.",
 	})
 
 	server.PromDnssecOkCount = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
 		Name:      "dns_dnssec_ok_count",
 		Help:      "Counter of DNSSEC requests.",
 	})
 
 	server.PromNameErrorCount = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
 		Name:      "dns_name_error_count",
 		Help:      "Counter of DNS requests resulting in a name error.",
 	})
 
 	server.PromNoDataCount = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
 		Name:      "dns_no_data_count",
 		Help:      "Counter of DNS requests that contained no data.",
 	})
 
 	// Caches
 	server.PromRCacheSize = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
 		Name:      "rcache_total_size",
-		Help:      "The total size of all RRs in the rcache.",
+		Help:      "The total size of all DNS messages in the rcache.",
 	})
 	server.PromSCacheSize = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
 		Name:      "scache_total_size",
 		Help:      "The total size of all RRSIGs in the scache.",
 	})
 
 	server.PromRCacheMiss = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
 		Name:      "dns_rcache_miss_count",
 		Help:      "Counter of DNS requests that result in cache miss.",
 	})
 	server.PromSCacheMiss = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
+		Namespace: PrometheusNamespace,
+		Subsystem: PrometheusSubsystem,
 		Name:      "dns_scache_miss_count",
 		Help:      "Counter of signature requests that result in cache miss.",
 	})
@@ -122,7 +124,9 @@ func init() {
 	prometheus.MustRegister(server.PromForwardCount)
 	prometheus.MustRegister(server.PromStubForwardCount)
 	prometheus.MustRegister(server.PromLookupCount)
-	prometheus.MustRegister(server.PromRequestCount)
+	prometheus.MustRegister(server.PromRequestCountTotal)
+	prometheus.MustRegister(server.PromRequestCountTCP)
+	prometheus.MustRegister(server.PromRequestCountUDP)
 	prometheus.MustRegister(server.PromDnssecOkCount)
 	prometheus.MustRegister(server.PromNameErrorCount)
 	prometheus.MustRegister(server.PromNoDataCount)
@@ -133,18 +137,18 @@ func init() {
 }
 
 func Metrics() {
-	if prometheusPort == "" {
+	if PrometheusPort == "" {
 		return
 	}
-	_, err := strconv.Atoi(prometheusPort)
+	_, err := strconv.Atoi(PrometheusPort)
 	if err != nil {
-		log.Printf("skydns: PROMETHEUS_PORT is not a number: %s, not enabling metrics", prometheusPort)
+		log.Printf("skydns: PROMETHEUS_PORT is not a number: %s, not enabling metrics", PrometheusPort)
 		return
 	}
 
-	http.Handle(prometheusPath, prometheus.Handler())
+	http.Handle(PrometheusPath, prometheus.Handler())
 	go func() {
-		log.Fatalf("skydns: %s", http.ListenAndServe(":"+prometheusPort, nil))
+		log.Fatalf("skydns: %s", http.ListenAndServe(":"+PrometheusPort, nil))
 	}()
 	log.Printf("skydns: metrics enabled")
 }

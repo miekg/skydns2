@@ -8,6 +8,8 @@ package server
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,6 +19,7 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/miekg/dns"
+	"github.com/miekg/skydns/stats"
 	backendetcd "github.com/skynetservices/skydns/backends/etcd"
 	"github.com/skynetservices/skydns/cache"
 	"github.com/skynetservices/skydns/msg"
@@ -1280,4 +1283,40 @@ func BenchmarkDNSSECSingleNoCache(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		c.Exchange(m, "127.0.0.1:"+StrPort)
 	}
+}
+
+// Metric testing
+
+func newMetricServer(t *testing.T) *server {
+	s := newTestServer(t, false)
+
+	stats.PrometheusPort = "12300"
+	stats.PrometheusNamespace = "test"
+	stats.Metrics()
+	return s
+}
+
+func query(n string, t uint16) {
+	// qeury the local server to get some metrics
+	m := new(dns.Msg)
+	m.SetQuestion(n, t)
+	dns.Exchange(m, "127.0.0.1:"+StrPort)
+}
+
+func scrape(t *testing.T, key string) {
+	resp, err := http.Get("http://localhost:12300/metrics")
+	if err != nil {
+		t.Fatal("could not get metrics")
+	}
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	println(body)
+}
+
+func TestMetricRequests(t *testing.T) {
+	s := newMetricServer(t)
+	defer s.Stop()
+
+	query("miek.nl.", dns.TypeMX)
+	scrape(t, "dns_request_count_udp")
 }

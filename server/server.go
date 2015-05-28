@@ -209,6 +209,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	PromRequestCountTotal.Inc()
 	StatsRequestCount.Inc(1)
 
+	if dnssec {
+		StatsDnssecOkCount.Inc(1)
+		PromDnssecOkCount.Inc()
+	}
+
 	defer func() {
 		PromRCacheSize.Set(float64(s.rcache.Size()))
 	}()
@@ -222,9 +227,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			m1.Id = m.Id
 			m1.Compress = true
 			if dnssec {
-				StatsDnssecOkCount.Inc(1)
-				PromDnssecOkCount.Inc()
-
 				// The key for DNS/DNSSEC in cache is different, no
 				// need to do Denial/Sign here.
 				//if s.config.PubKey != nil {
@@ -307,9 +309,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.rcache.InsertMessage(cache.QuestionKey(req.Question[0], dnssec), m)
 
 		if dnssec {
-			StatsDnssecOkCount.Inc(1)
-			PromDnssecOkCount.Inc()
-
 			if s.config.PubKey != nil {
 				m.AuthenticatedData = true
 				s.Denial(m)
