@@ -131,6 +131,17 @@ And these are used for statistics:
 * `GRAPHITE_PREFIX`
 * `STATHAT_USER`
 
+And for [Prometheus](http://prometheus.io/) the following environment variables
+are available:
+
+* `PROMETHEUS_PORT`: port where the HTTP server for prometheus will run.
+* `PROMETHEUS_PATH`: path for the metrics, defaults to `/metrics`.
+* `PROMETHEUS_NAMESPACE`: namespace used in the metrics, no default.
+* `PROMETHEUS_SUBSYSTEM`: subsystem used in the metric, defaults to `skydns`
+
+if `PROMETHEUS_PORT` is set to an integer larger than 0, Prometheus support will
+be enabled.
+
 
 ### SSL Usage and Authentication with Client Certificates
 

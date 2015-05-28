@@ -157,7 +157,8 @@ func main() {
 		}()
 	}
 
-	stats.Collect()
+	stats.Collect() // Graphite
+	stats.Metrics()	// Prometheus
 	if err := s.Run(); err != nil {
 		log.Fatalf("skydns: %s", err)
 	}
