@@ -13,32 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Counter is the metric interface used by this package
-type Counter interface {
-	Inc(i int64)
-}
-
-type nopCounter struct{}
-
-func (nopCounter) Inc(_ int64) {}
-
-// These are the old stat variables defined by this package. This
-// used by graphite.
-var (
-	// Pondering deletion in favor of the better and more
-	// maintained (by me) prometheus reporting.
-
-	StatsForwardCount     Counter = nopCounter{}
-	StatsStubForwardCount Counter = nopCounter{}
-	StatsLookupCount      Counter = nopCounter{}
-	StatsRequestCount     Counter = nopCounter{}
-	StatsDnssecOkCount    Counter = nopCounter{}
-	StatsNameErrorCount   Counter = nopCounter{}
-	StatsNoDataCount      Counter = nopCounter{}
-
-	StatsDnssecCacheMiss Counter = nopCounter{}
-)
-
 var (
 	prometheusPort      = os.Getenv("PROMETHEUS_PORT")
 	prometheusPath      = os.Getenv("PROMETHEUS_PATH")
@@ -54,9 +28,9 @@ var (
 	promDnssecOkCount    prometheus.Counter
 	promNameErrorCount   prometheus.Counter
 	promNoDataCount      prometheus.Counter
-	promRCacheSize       prometheus.Gauge
+	promRCacheSize       prometheus.Gauge // Vec with rcache/scache
 	promSCacheSize       prometheus.Gauge
-	promRCacheMiss       prometheus.Counter
+	promRCacheMiss       prometheus.Counter // idem
 	promSCacheMiss       prometheus.Counter
 )
 
@@ -175,3 +149,29 @@ func Metrics() {
 		log.Fatalf("skydns: %s", http.ListenAndServe(":"+prometheusPort, nil))
 	}()
 }
+
+// Counter is the metric interface used by this package
+type Counter interface {
+	Inc(i int64)
+}
+
+type nopCounter struct{}
+
+func (nopCounter) Inc(_ int64) {}
+
+// These are the old stat variables defined by this package. This
+// used by graphite.
+var (
+	// Pondering deletion in favor of the better and more
+	// maintained (by me) prometheus reporting.
+
+	StatsForwardCount     Counter = nopCounter{}
+	StatsStubForwardCount Counter = nopCounter{}
+	StatsLookupCount      Counter = nopCounter{}
+	StatsRequestCount     Counter = nopCounter{}
+	StatsDnssecOkCount    Counter = nopCounter{}
+	StatsNameErrorCount   Counter = nopCounter{}
+	StatsNoDataCount      Counter = nopCounter{}
+
+	StatsDnssecCacheMiss Counter = nopCounter{}
+)
