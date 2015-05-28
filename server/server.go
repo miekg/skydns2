@@ -202,20 +202,21 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	if tcp {
-		PromRequestCountTCP.Inc()
+		promRequestCount.WithLabelValues("tcp").Inc()
 	} else {
-		PromRequestCountUDP.Inc()
+		promRequestCount.WithLabelValues("udp").Inc()
 	}
-	PromRequestCountTotal.Inc()
+	promRequestCount.WithLabelValues("total").Inc()
+
 	StatsRequestCount.Inc(1)
 
 	if dnssec {
 		StatsDnssecOkCount.Inc(1)
-		PromDnssecOkCount.Inc()
+		promDnssecOkCount.Inc()
 	}
 
 	defer func() {
-		PromRCacheSize.Set(float64(s.rcache.Size()))
+		promRCacheSize.Set(float64(s.rcache.Size()))
 	}()
 
 	// Check cache first.
@@ -252,7 +253,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.rcache.Remove(key)
 	}
 
-	PromRCacheMiss.Inc()
+	promRCacheMiss.Inc()
 
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
@@ -780,7 +781,7 @@ func (s *server) NameError(m, req *dns.Msg) {
 	m.Ns[0].Header().Ttl = s.config.MinTtl
 
 	StatsNameErrorCount.Inc(1)
-	PromNameErrorCount.Inc()
+	promNameErrorCount.Inc()
 }
 
 func (s *server) NoDataError(m, req *dns.Msg) {
@@ -789,7 +790,7 @@ func (s *server) NoDataError(m, req *dns.Msg) {
 	m.Ns[0].Header().Ttl = s.config.MinTtl
 
 	StatsNoDataCount.Inc(1)
-	PromNoDataCount.Inc()
+	promNoDataCount.Inc()
 }
 
 func (s *server) logNoConnection(e error) {

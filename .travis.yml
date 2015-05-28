@@ -9,6 +9,7 @@ install:
   - go get github.com/coreos/go-systemd/activation
   - go get github.com/miekg/dns
   - go get github.com/rcrowley/go-metrics
+  - go get github.com/prometheus/client_golang/prometheus
   - go get github.com/rcrowley/go-metrics/stathat
 
 before_script:
