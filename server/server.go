@@ -217,7 +217,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	defer func() {
-		promCacheSize.WithLabelValues("rr").Set(float64(s.rcache.Size()))
+		promCacheSize.WithLabelValues("response").Set(float64(s.rcache.Size()))
 	}()
 
 	// Check cache first.
@@ -255,7 +255,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.rcache.Remove(key)
 	}
 
-	promCacheMiss.WithLabelValues("rr").Inc()
+	promCacheMiss.WithLabelValues("response").Inc()
 
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)

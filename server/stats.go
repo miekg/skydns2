@@ -79,7 +79,7 @@ func Metrics() {
 		Subsystem: prometheusSubsystem,
 		Name:      "cache_total_size",
 		Help:      "The total size of all elements in the cache.",
-	}, []string{"type"}) // rr, sig
+	}, []string{"type"}) // response, signature
 	prometheus.MustRegister(promCacheSize)
 
 	promCacheMiss = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -87,7 +87,7 @@ func Metrics() {
 		Subsystem: prometheusSubsystem,
 		Name:      "dns_cache_miss_count",
 		Help:      "Counter of DNS requests that result in a cache miss.",
-	}, []string{"type"}) // rr, sig
+	}, []string{"type"}) // response, signature
 	prometheus.MustRegister(promCacheMiss)
 
 	_, err := strconv.Atoi(prometheusPort)

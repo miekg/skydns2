@@ -151,9 +151,9 @@ Current counters are:
    are also the labels used.
 *  promErrorCount, counts errors from authoritative answers only! Labels used are
    "nxomdain", "nodata", "truncated" and "refused"
-*  promCacheSize, current cache size in number of elements. Labels are "rr" and
-   "sig" (DNSSEC cache)
-*  promCacheMiss, counter for cache misses. Labels are "rr" and "sig".
+*  promCacheSize, current cache size in number of elements. Labels are "response" and
+   "signature" (DNSSEC cache)
+*  promCacheMiss, counter for cache misses. Labels are "response" and "signature".
 *  promDnssecOkCount, number of requests that have the DO bit set.
 
 

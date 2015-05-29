@@ -48,7 +48,7 @@ func (s *server) Sign(m *dns.Msg, bufsize uint16) {
 	expir := uint32(now.Add(7 * 24 * time.Hour).Unix()) // sign for a week
 
 	defer func() {
-		promCacheSize.WithLabelValues("sig").Set(float64(s.scache.Size()))
+		promCacheSize.WithLabelValues("signature").Set(float64(s.scache.Size()))
 	}()
 
 	for _, r := range rrSets(m.Answer) {
@@ -110,7 +110,7 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 	log.Printf("skydns: scache miss for %s type %d", r[0].Header().Name, r[0].Header().Rrtype)
 
 	StatsDnssecCacheMiss.Inc(1)
-	promCacheMiss.WithLabelValues("sig").Inc()
+	promCacheMiss.WithLabelValues("signature").Inc()
 
 	sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
 		sig1 := s.NewRRSIG(incep, expir)
