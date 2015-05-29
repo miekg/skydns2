@@ -1159,7 +1159,9 @@ func TestCacheTruncated(t *testing.T) {
 
 	// Now asking for this should result in a non-truncated answer.
 	resp, _ := dns.Exchange(m, "127.0.0.1:"+StrPort)
-	println(resp.String())
+	if resp.Truncated {
+		t.Fatal("truncated bit should be false")
+	}
 }
 
 func BenchmarkDNSSingleCache(b *testing.B) {
