@@ -1150,6 +1150,18 @@ func TestDedup(t *testing.T) {
 	}
 }
 
+func TestCacheTruncated(t *testing.T) {
+	s := newTestServer(t, true)
+	m := &dns.Msg{}
+	m.SetQuestion("skydns.test.", dns.TypeSRV)
+	m.Truncated = true
+	s.rcache.InsertMessage(cache.QuestionKey(m.Question[0], false), m)
+
+	// Now asking for this should result in a non-truncated answer.
+	resp, _ := dns.Exchange(m, "127.0.0.1:"+StrPort)
+	println(resp.String())
+}
+
 func BenchmarkDNSSingleCache(b *testing.B) {
 	b.StopTimer()
 	t := new(testing.T)

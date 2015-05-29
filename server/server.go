@@ -208,7 +208,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if time.Since(exp) < 0 {
 			m1.Id = m.Id
 			m1.Compress = true
-			m1.Truncated = false
+//			m1.Truncated = false
 
 			if dnssec {
 				StatsDnssecOkCount.Inc(1)
@@ -289,9 +289,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 
-		if !m.Truncated {
+		//if !m.Truncated {
 			s.rcache.InsertMessage(cache.QuestionKey(req.Question[0], dnssec), m)
-		}
+		//}
 
 		if dnssec {
 			StatsDnssecOkCount.Inc(1)
