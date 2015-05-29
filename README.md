@@ -142,6 +142,17 @@ are available:
 if `PROMETHEUS_PORT` is set to an integer larger than 0, Prometheus support will
 be enabled.
 
+Current counters are:
+
+*	promForwardCount     prometheus.Counter
+*	promStubForwardCount prometheus.Counter
+*	promLookupCount      prometheus.Counter
+*	promDnssecOkCount    prometheus.Counter
+*	promRequestCount     *prometheus.CounterVec
+*	promErrorCount       *prometheus.CounterVec
+*	promCacheSize        *prometheus.GaugeVec
+*	promCacheMiss        *prometheus.CounterVec
+
 
 ### SSL Usage and Authentication with Client Certificates
 
