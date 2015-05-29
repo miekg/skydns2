@@ -37,7 +37,10 @@ func scrape(t *testing.T, key string) int {
 		t.Fatal("could not get metrics")
 	}
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return -1
+	}
 
 	// Find value for key.
 	n := bytes.Index(body, []byte(key))
@@ -70,5 +73,15 @@ func TestMetricRequests(t *testing.T) {
 	v = scrape(t, "test_dns_request_count{type=\"total\"}")
 	if v != 1 {
 		t.Fatalf("expecting %d, got %d", 1, v)
+	}
+}
+
+func TestMetricsOff(t *testing.T) {
+	s := newTestServer(t, false)
+	defer s.Stop()
+
+	v := scrape(t, "test_dns_request_count{type=\"total\"}")
+	if v != -1 {
+		t.Fatalf("expecting -1, got %d", v)
 	}
 }

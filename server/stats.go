@@ -21,14 +21,12 @@ var (
 )
 
 var (
-	promForwardCount     prometheus.Counter
-	promStubForwardCount prometheus.Counter
-	promLookupCount      prometheus.Counter
-	promDnssecOkCount    prometheus.Counter
-	promRequestCount     *prometheus.CounterVec
-	promErrorCount       *prometheus.CounterVec
-	promCacheSize        *prometheus.GaugeVec
-	promCacheMiss        *prometheus.CounterVec
+	promDnssecOkCount        prometheus.Counter
+	promExternalRequestCount *prometheus.CounterVec
+	promRequestCount         *prometheus.CounterVec
+	promErrorCount           *prometheus.CounterVec
+	promCacheSize            *prometheus.GaugeVec
+	promCacheMiss            *prometheus.CounterVec
 )
 
 func Metrics() {
@@ -43,26 +41,13 @@ func Metrics() {
 		prometheusNamespace = "skydns"
 	}
 
-	promForwardCount = prometheus.NewCounter(prometheus.CounterOpts{
+	promExternalRequestCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
 		Subsystem: prometheusSubsystem,
-		Name:      "dns_forward_count",
-		Help:      "Counter of DNS requests forwarded.",
-	})
-
-	promStubForwardCount = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
-		Name:      "dns_stub_forward_count",
-		Help:      "Counter of DNS requests forwarded to stubs.",
-	})
-
-	promLookupCount = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
-		Name:      "dns_lookup_count",
-		Help:      "Counter of DNS lookups performed.",
-	})
+		Name:      "dns_request_external_count",
+		Help:      "Counter of DNS requests recursive/stub/externl.",
+	}, []string{"type"}) // recursive, stub, lookup
+	prometheus.MustRegister(promExternalRequestCount)
 
 	promRequestCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
@@ -78,6 +63,7 @@ func Metrics() {
 		Name:      "dns_dnssec_ok_count",
 		Help:      "Counter of DNSSEC requests.",
 	})
+	prometheus.MustRegister(promDnssecOkCount) // Maybe more bits here?
 
 	promErrorCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
@@ -103,11 +89,6 @@ func Metrics() {
 		Help:      "Counter of DNS requests that result in a cache miss.",
 	}, []string{"type"}) //rr, sig
 	prometheus.MustRegister(promCacheMiss)
-
-	prometheus.MustRegister(promForwardCount)
-	prometheus.MustRegister(promStubForwardCount)
-	prometheus.MustRegister(promLookupCount)
-	prometheus.MustRegister(promDnssecOkCount)
 
 	_, err := strconv.Atoi(prometheusPort)
 	if err != nil {
