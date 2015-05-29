@@ -24,14 +24,11 @@ var (
 	promForwardCount     prometheus.Counter
 	promStubForwardCount prometheus.Counter
 	promLookupCount      prometheus.Counter
-	promRequestCount     *prometheus.CounterVec
 	promDnssecOkCount    prometheus.Counter
-	promNameErrorCount   prometheus.Counter
-	promNoDataCount      prometheus.Counter
-	promRCacheSize       prometheus.Gauge // Vec with rcache/scache
-	promSCacheSize       prometheus.Gauge
-	promRCacheMiss       prometheus.Counter // idem
-	promSCacheMiss       prometheus.Counter
+	promRequestCount     *prometheus.CounterVec
+	promErrorCount       *prometheus.CounterVec
+	promCacheSize        *prometheus.GaugeVec
+	promCacheMiss        *prometheus.CounterVec
 )
 
 func Metrics() {
@@ -60,7 +57,6 @@ func Metrics() {
 		Help:      "Counter of DNS requests forwarded to stubs.",
 	})
 
-	// convert to VEC and use labels
 	promLookupCount = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
 		Subsystem: prometheusSubsystem,
@@ -73,8 +69,7 @@ func Metrics() {
 		Subsystem: prometheusSubsystem,
 		Name:      "dns_request_count",
 		Help:      "Counter of total DNS requests made.",
-	}, []string{"type"}, // total, udp, tcp
-	)
+	}, []string{"type"}) // total, udp, tcp
 	prometheus.MustRegister(promRequestCount)
 
 	promDnssecOkCount = prometheus.NewCounter(prometheus.CounterOpts{
@@ -84,60 +79,35 @@ func Metrics() {
 		Help:      "Counter of DNSSEC requests.",
 	})
 
-	promNameErrorCount = prometheus.NewCounter(prometheus.CounterOpts{
+	promErrorCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
 		Subsystem: prometheusSubsystem,
-		Name:      "dns_name_error_count",
-		Help:      "Counter of DNS requests resulting in a name error.",
-	})
-
-	promNoDataCount = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
-		Name:      "dns_no_data_count",
-		Help:      "Counter of DNS requests that contained no data.",
-	})
+		Name:      "dns_error_count",
+		Help:      "Counter of DNS requests resulting in an error.",
+	}, []string{"error"}) // nxdomain, nodata, truncated
+	prometheus.MustRegister(promErrorCount)
 
 	// Caches
-	promRCacheSize = prometheus.NewGauge(prometheus.GaugeOpts{
+	promCacheSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: prometheusNamespace,
 		Subsystem: prometheusSubsystem,
-		Name:      "rcache_total_size",
-		Help:      "The total size of all DNS messages in the rcache.",
-	})
+		Name:      "cache_total_size",
+		Help:      "The total size of all elements in the cache.",
+	}, []string{"type"}) // rr, sig
+	prometheus.MustRegister(promCacheSize)
 
-	promSCacheSize = prometheus.NewGauge(prometheus.GaugeOpts{
+	promCacheMiss = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
 		Subsystem: prometheusSubsystem,
-		Name:      "scache_total_size",
-		Help:      "The total size of all RRSIGs in the scache.",
-	})
-
-	promRCacheMiss = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
-		Name:      "dns_rcache_miss_count",
-		Help:      "Counter of DNS requests that result in cache miss.",
-	})
-
-	promSCacheMiss = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
-		Name:      "dns_scache_miss_count",
-		Help:      "Counter of signature requests that result in cache miss.",
-	})
+		Name:      "dns_cache_miss_count",
+		Help:      "Counter of DNS requests that result in a cache miss.",
+	}, []string{"type"}) //rr, sig
+	prometheus.MustRegister(promCacheMiss)
 
 	prometheus.MustRegister(promForwardCount)
 	prometheus.MustRegister(promStubForwardCount)
 	prometheus.MustRegister(promLookupCount)
-
 	prometheus.MustRegister(promDnssecOkCount)
-	prometheus.MustRegister(promNameErrorCount)
-	prometheus.MustRegister(promNoDataCount)
-	prometheus.MustRegister(promRCacheSize)
-	prometheus.MustRegister(promSCacheSize)
-	prometheus.MustRegister(promRCacheMiss)
-	prometheus.MustRegister(promSCacheMiss)
 
 	_, err := strconv.Atoi(prometheusPort)
 	if err != nil {

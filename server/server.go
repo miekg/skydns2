@@ -216,7 +216,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	defer func() {
-		promRCacheSize.Set(float64(s.rcache.Size()))
+		promCacheSize.WithLabelValues("rr").Set(float64(s.rcache.Size()))
 	}()
 
 	// Check cache first.
@@ -236,6 +236,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				//}
 			}
 			if m1.Len() > int(bufsize) && !tcp {
+				promErrorCount.WithLabelValues("truncated").Inc()
 				m1.Truncated = true
 			}
 			// Still round-robin even with hits from the cache.
@@ -253,7 +254,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.rcache.Remove(key)
 	}
 
-	promRCacheMiss.Inc()
+	promCacheMiss.WithLabelValues("rr").Inc()
 
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
@@ -319,6 +320,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if m.Len() > int(bufsize) && !tcp {
 			// TODO(miek): this is a little brain dead, better is to not add
 			// RRs in the message in the first place.
+			promErrorCount.WithLabelValues("truncated").Inc()
 			m.Truncated = true
 		}
 		if err := w.WriteMsg(m); err != nil {
@@ -781,7 +783,7 @@ func (s *server) NameError(m, req *dns.Msg) {
 	m.Ns[0].Header().Ttl = s.config.MinTtl
 
 	StatsNameErrorCount.Inc(1)
-	promNameErrorCount.Inc()
+	promErrorCount.WithLabelValues("nxdomain")
 }
 
 func (s *server) NoDataError(m, req *dns.Msg) {
@@ -790,7 +792,7 @@ func (s *server) NoDataError(m, req *dns.Msg) {
 	m.Ns[0].Header().Ttl = s.config.MinTtl
 
 	StatsNoDataCount.Inc(1)
-	promNoDataCount.Inc()
+	promErrorCount.WithLabelValues("nodata")
 }
 
 func (s *server) logNoConnection(e error) {
