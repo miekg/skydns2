@@ -289,7 +289,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 
-		s.rcache.InsertMessage(cache.QuestionKey(req.Question[0], dnssec), m)
+		if !m.Truncated {
+			s.rcache.InsertMessage(cache.QuestionKey(req.Question[0], dnssec), m)
+		}
 
 		if dnssec {
 			StatsDnssecOkCount.Inc(1)
