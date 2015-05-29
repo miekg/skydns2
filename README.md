@@ -144,14 +144,17 @@ be enabled.
 
 Current counters are:
 
-*	promForwardCount     prometheus.Counter
-*	promStubForwardCount prometheus.Counter
-*	promLookupCount      prometheus.Counter
-*	promDnssecOkCount    prometheus.Counter
-*	promRequestCount     *prometheus.CounterVec
-*	promErrorCount       *prometheus.CounterVec
-*	promCacheSize        *prometheus.GaugeVec
-*	promCacheMiss        *prometheus.CounterVec
+*  promExternalRequestCount, counts requests to external recursive nameservers
+   with the label "recursive", the number of stub lookups (label is "stub"), and
+   "lookup", which are recursive lookups done while resolving data from Etcd.
+*  promRequestCount, number of requests with make with "udp" and "tcp", these
+   are also the labels used.
+*  promErrorCount, counts errors from authoritative answers only! Labels used are
+   "nxomdain", "nodata", "truncated" and "refused"
+*  promCacheSize, current cache size in number of elements. Labels are "rr" and
+   "sig" (DNSSEC cache)
+*  promCacheMiss, counter for cache misses. Labels are "rr" and "sig".
+*  promDnssecOkCount, number of requests that have the DO bit set.
 
 
 ### SSL Usage and Authentication with Client Certificates

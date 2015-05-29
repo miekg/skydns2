@@ -185,6 +185,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.Compress = false
 		// if write fails don't care
 		w.WriteMsg(m)
+
+		promErrorCount.WithLabelValues("refused").Inc()
 		return
 	}
 
@@ -206,7 +208,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	} else {
 		promRequestCount.WithLabelValues("udp").Inc()
 	}
-	promRequestCount.WithLabelValues("total").Inc()
 
 	StatsRequestCount.Inc(1)
 

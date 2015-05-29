@@ -45,7 +45,7 @@ func Metrics() {
 		Namespace: prometheusNamespace,
 		Subsystem: prometheusSubsystem,
 		Name:      "dns_request_external_count",
-		Help:      "Counter of DNS requests recursive/stub/externl.",
+		Help:      "Counter of external DNS requests.",
 	}, []string{"type"}) // recursive, stub, lookup
 	prometheus.MustRegister(promExternalRequestCount)
 
@@ -53,8 +53,8 @@ func Metrics() {
 		Namespace: prometheusNamespace,
 		Subsystem: prometheusSubsystem,
 		Name:      "dns_request_count",
-		Help:      "Counter of total DNS requests made.",
-	}, []string{"type"}) // total, udp, tcp
+		Help:      "Counter of DNS requests made.",
+	}, []string{"type"}) // udp, tcp
 	prometheus.MustRegister(promRequestCount)
 
 	promDnssecOkCount = prometheus.NewCounter(prometheus.CounterOpts{
@@ -70,7 +70,7 @@ func Metrics() {
 		Subsystem: prometheusSubsystem,
 		Name:      "dns_error_count",
 		Help:      "Counter of DNS requests resulting in an error.",
-	}, []string{"error"}) // nxdomain, nodata, truncated
+	}, []string{"error"}) // nxdomain, nodata, truncated, refused
 	prometheus.MustRegister(promErrorCount)
 
 	// Caches
@@ -87,7 +87,7 @@ func Metrics() {
 		Subsystem: prometheusSubsystem,
 		Name:      "dns_cache_miss_count",
 		Help:      "Counter of DNS requests that result in a cache miss.",
-	}, []string{"type"}) //rr, sig
+	}, []string{"type"}) // rr, sig
 	prometheus.MustRegister(promCacheMiss)
 
 	_, err := strconv.Atoi(prometheusPort)
