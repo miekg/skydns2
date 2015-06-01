@@ -114,12 +114,10 @@ func (s *server) Lookup(n string, t, bufsize uint16, dnssec bool) (*dns.Msg, err
 	m.SetQuestion(n, t)
 	m.SetEdns0(bufsize, dnssec)
 
-	c := &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout}
 	nsid := int(m.Id) % len(s.config.Nameservers)
 	try := 0
 Redo:
-	// Move this to use s.udpClient/s.tcpClient code instead of allocating a new client for every query.
-	r, _, err := c.Exchange(m, s.config.Nameservers[nsid])
+	r, _, err := s.dnsUDPclient.Exchange(m, s.config.Nameservers[nsid])
 	if err == nil {
 		if r.Rcode != dns.RcodeSuccess {
 			return nil, fmt.Errorf("rcode is not equal to success")
