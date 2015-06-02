@@ -185,6 +185,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.Compress = false
 		// if write fails don't care
 		w.WriteMsg(m)
+
+		promErrorCount.WithLabelValues("refused").Inc()
 		return
 	}
 
@@ -200,6 +202,24 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		bufsize = dns.MaxMsgSize - 1
 		tcp = true
 	}
+
+	if tcp {
+		promRequestCount.WithLabelValues("tcp").Inc()
+	} else {
+		promRequestCount.WithLabelValues("udp").Inc()
+	}
+
+	StatsRequestCount.Inc(1)
+
+	if dnssec {
+		StatsDnssecOkCount.Inc(1)
+		promDnssecOkCount.Inc()
+	}
+
+	defer func() {
+		promCacheSize.WithLabelValues("response").Set(float64(s.rcache.Size()))
+	}()
+
 	// Check cache first.
 	key := cache.QuestionKey(req.Question[0], dnssec)
 	m1, exp, hit := s.rcache.Search(key)
@@ -211,7 +231,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			m1.Truncated = false
 
 			if dnssec {
-				StatsDnssecOkCount.Inc(1)
 				// The key for DNS/DNSSEC in cache is different, no
 				// need to do Denial/Sign here.
 				//if s.config.PubKey != nil {
@@ -220,6 +239,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				//}
 			}
 			if m1.Len() > int(bufsize) && !tcp {
+				promErrorCount.WithLabelValues("truncated").Inc()
 				m1.Truncated = true
 			}
 			// Still round-robin even with hits from the cache.
@@ -237,9 +257,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.rcache.Remove(key)
 	}
 
+	promCacheMiss.WithLabelValues("response").Inc()
+
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
-	StatsRequestCount.Inc(1)
+
 	if s.config.Verbose {
 		log.Printf("skydns: received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 	}
@@ -294,7 +316,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 
 		if dnssec {
-			StatsDnssecOkCount.Inc(1)
 			if s.config.PubKey != nil {
 				m.AuthenticatedData = true
 				s.Denial(m)
@@ -304,6 +325,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if m.Len() > int(bufsize) && !tcp {
 			// TODO(miek): this is a little brain dead, better is to not add
 			// RRs in the message in the first place.
+			promErrorCount.WithLabelValues("truncated").Inc()
 			m.Truncated = true
 		}
 		if err := w.WriteMsg(m); err != nil {
@@ -764,14 +786,18 @@ func (s *server) NameError(m, req *dns.Msg) {
 	m.SetRcode(req, dns.RcodeNameError)
 	m.Ns = []dns.RR{s.NewSOA()}
 	m.Ns[0].Header().Ttl = s.config.MinTtl
+
 	StatsNameErrorCount.Inc(1)
+	promErrorCount.WithLabelValues("nxdomain")
 }
 
 func (s *server) NoDataError(m, req *dns.Msg) {
 	m.SetRcode(req, dns.RcodeSuccess)
 	m.Ns = []dns.RR{s.NewSOA()}
 	m.Ns[0].Header().Ttl = s.config.MinTtl
-	//	StatsNoDataCount.Inc(1)
+
+	StatsNoDataCount.Inc(1)
+	promErrorCount.WithLabelValues("nodata")
 }
 
 func (s *server) logNoConnection(e error) {

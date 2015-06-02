@@ -15,6 +15,7 @@ import (
 // ServeDNSForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	StatsForwardCount.Inc(1)
+	promExternalRequestCount.WithLabelValues("recursive").Inc()
 
 	if s.config.NoRec {
 		m := new(dns.Msg)
@@ -101,9 +102,11 @@ func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) {
 }
 
 // Lookup looks up name,type using the recursive nameserver defines
-// in the server's config. If none defined it returns an error
+// in the server's config. If none defined it returns an error.
 func (s *server) Lookup(n string, t, bufsize uint16, dnssec bool) (*dns.Msg, error) {
 	StatsLookupCount.Inc(1)
+	promExternalRequestCount.WithLabelValues("lookup").Inc()
+
 	if len(s.config.Nameservers) == 0 {
 		return nil, fmt.Errorf("no nameservers configured can not lookup name")
 	}

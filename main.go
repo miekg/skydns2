@@ -68,7 +68,6 @@ func init() {
 	flag.IntVar(&config.SCache, "scache", server.SCacheCapacity, "capacity of the signature cache")
 	flag.IntVar(&config.RCache, "rcache", 0, "capacity of the response cache") // default to 0 for now
 	flag.IntVar(&config.RCacheTtl, "rcache-ttl", server.RCacheTtl, "TTL of the response cache")
-
 }
 
 func main() {
@@ -157,7 +156,9 @@ func main() {
 		}()
 	}
 
-	stats.Collect()
+	stats.Collect()  // Graphite
+	server.Metrics() // Prometheus
+
 	if err := s.Run(); err != nil {
 		log.Fatalf("skydns: %s", err)
 	}

@@ -131,6 +131,31 @@ And these are used for statistics:
 * `GRAPHITE_PREFIX`
 * `STATHAT_USER`
 
+And for [Prometheus](http://prometheus.io/) the following environment variables
+are available:
+
+* `PROMETHEUS_PORT`: port where the HTTP server for prometheus will run.
+* `PROMETHEUS_PATH`: path for the metrics, defaults to `/metrics`.
+* `PROMETHEUS_NAMESPACE`: namespace used in the metrics, no default.
+* `PROMETHEUS_SUBSYSTEM`: subsystem used in the metric, defaults to `skydns`.
+
+if `PROMETHEUS_PORT` is set to an integer larger than 0, Prometheus support will
+be enabled.
+
+Current counters are:
+
+*  promExternalRequestCount, counts requests to external recursive nameservers
+   with the label "recursive", the number of stub lookups (label is "stub"), and
+   "lookup", which are recursive lookups done while resolving data from Etcd.
+*  promRequestCount, number of requests with make with "udp" and "tcp", these
+   are also the labels used.
+*  promErrorCount, counts errors from authoritative answers only! Labels used are
+   "nxomdain", "nodata", "truncated" and "refused"
+*  promCacheSize, current cache size in number of elements. Labels are "response" and
+   "signature" (DNSSEC cache)
+*  promCacheMiss, counter for cache misses. Labels are "response" and "signature".
+*  promDnssecOkCount, number of requests that have the DO bit set.
+
 
 ### SSL Usage and Authentication with Client Certificates
 
