@@ -30,10 +30,6 @@ var (
 )
 
 func Metrics() {
-	if prometheusPort == "" {
-		return
-	}
-
 	if prometheusPath == "" {
 		prometheusPath = "/metrics"
 	}
@@ -89,6 +85,10 @@ func Metrics() {
 		Help:      "Counter of DNS requests that result in a cache miss.",
 	}, []string{"type"}) // response, signature
 	prometheus.MustRegister(promCacheMiss)
+
+	if prometheusPort == "" {
+		return
+	}
 
 	_, err := strconv.Atoi(prometheusPort)
 	if err != nil {
