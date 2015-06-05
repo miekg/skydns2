@@ -28,10 +28,12 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	if len(s.config.Nameservers) == 0 || dns.CountLabel(req.Question[0].Name) < s.config.Ndots {
-		if len(s.config.Nameservers) == 0 {
-			log.Printf("skydns: can not forward, no nameservers defined")
-		} else {
-			log.Printf("skydns: can not forward, name too short (less than %d labels): `%s'", s.config.Ndots, req.Question[0].Name)
+		if s.config.Verbose {
+			if len(s.config.Nameservers) == 0 {
+				log.Printf("skydns: can not forward, no nameservers defined")
+			} else {
+				log.Printf("skydns: can not forward, name too short (less than %d labels): `%s'", s.config.Ndots, req.Question[0].Name)
+			}
 		}
 		m := new(dns.Msg)
 		m.SetReply(req)
