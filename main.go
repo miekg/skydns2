@@ -204,12 +204,9 @@ func newClient(machines []string, tlsCert, tlsKey, tlsCACert string) (client *et
 			// TODO(miek): would be nice if this wasn't a fatal error
 			log.Fatalf("skydns: failure to connect: %s", err)
 		}
-		client.SyncCluster()
-	} else {
-		client = etcd.NewClient(machines)
-		client.SyncCluster()
+		return client
 	}
-	return client
+	return etcd.NewClient(machines)
 }
 
 // updateClient updates the client with the machines found in v2/_etcd/machines.
