@@ -33,8 +33,8 @@ func Metrics() {
 	if prometheusPath == "" {
 		prometheusPath = "/metrics"
 	}
-	if prometheusNamespace == "" {
-		prometheusNamespace = "skydns"
+	if prometheusSubsystem == "" {
+		prometheusSubsystem = "skydns"
 	}
 
 	promExternalRequestCount = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -92,13 +92,14 @@ func Metrics() {
 
 	_, err := strconv.Atoi(prometheusPort)
 	if err != nil {
-		return
+		log.Fatalf("skydns: bad port for prometheus: %s", prometheusPort)
 	}
 
 	http.Handle(prometheusPath, prometheus.Handler())
 	go func() {
 		log.Fatalf("skydns: %s", http.ListenAndServe(":"+prometheusPort, nil))
 	}()
+	log.Printf("skydns: metrics enabled on :%s%s", prometheusPort, prometheusPath)
 }
 
 // Counter is the metric interface used by this package
