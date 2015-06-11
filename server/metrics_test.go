@@ -22,6 +22,7 @@ func newMetricServer(t *testing.T) *server {
 	// so once this is running. It is running until we shut the
 	// entire test
 	prometheusPort = "12300"
+	prometheusSubsystem = "test"
 	prometheusNamespace = "test"
 
 	Metrics()
