@@ -54,7 +54,6 @@ func newTestServer(t *testing.T, c bool) *server {
 	StrPort = strconv.Itoa(Port)
 	s := new(server)
 	client := etcd.NewClient([]string{"http://127.0.0.1:4001"})
-	client.SyncCluster()
 
 	// TODO(miek): why don't I use NewServer??
 	s.group = new(sync.WaitGroup)
