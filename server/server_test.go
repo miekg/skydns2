@@ -468,6 +468,11 @@ func TestDNS(t *testing.T) {
 			case *dns.CNAME:
 				tt := tc.Answer[i].(*dns.CNAME)
 				if x.Target != tt.Target {
+					// Super super gross hack.
+					if x.Target == "a.ipaddr.skydns.test." && tt.Target == "b.ipaddr.skydns.test." {
+						// These records are randomly choosen, either one is OK.
+						continue
+					}
 					fatal = true
 					t.Fatalf("CNAME target should be %q, but is %q", x.Target, tt.Target)
 				}
