@@ -257,8 +257,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.rcache.Remove(key)
 	}
 
-	promCacheMiss.WithLabelValues("response").Inc()
-
 	q := req.Question[0]
 	name := strings.ToLower(q.Name)
 
@@ -287,6 +285,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		s.ServeDNSForward(w, req)
 		return
 	}
+
+	promCacheMiss.WithLabelValues("response").Inc()
 
 	defer func() {
 		if m.Rcode == dns.RcodeServerFailure {
