@@ -437,27 +437,26 @@ SkyDNS also allows you to query for TXT records. Just register a json with the
 
 #### NS Records
 
-For DNS to work properly SkyDNS needs to tell peers its nameservers. This
-information is stored inside etcd, in the key `local/skydns/dns/`. There
+For DNS to work properly SkyDNS needs to tell its parents its nameservers. This
+information is stored inside etcd, under the key `local/skydns/dns/ns`. There
 multiple services maybe stored. Note these services MUST use IP address, using
 names will not work. For instance:
 
-    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dns/ns \
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dns/ns/ns1 \
         -d value='{"host":"172.16.0.1"}'
 
-Registers `ns.dns.skydns.local` as a nameserver with IP address 172.16.0.1:
+Registers `ns1.ns.dns.skydns.local` as a nameserver with IP address 172.16.0.1:
 
     % dig @localhost NS skydns.local
 
     ;; ANSWER SECTION:
-    skydns.local.       3600    IN  NS  ns.dns.skydns.local.
+    skydns.local.       3600    IN  NS  ns1.ns.dns.skydns.local.
 
     ;; ADDITIONAL SECTION:
-    ns.dns.skydns.local.    3600    IN  A   172.16.0.1
+    n1.ns.dns.skydns.local.    3600    IN  A   172.16.0.1
 
-The first nameserver should have the hostname `ns`  (as this is used in the SOA
-record). Having the nameserver(s) in etcd make sense because usually it is hard
-for SkyDNS to figure this out by itself, especially when running behind NAT or
+Having the nameserver(s) in etcd make sense because usually it is hard for
+SkyDNS to figure this out by itself, especially when running behind NAT or
 running on 127.0.0.1:53 and being forwarded packets IPv6 packets, etc. etc.
 
 
