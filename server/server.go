@@ -329,7 +329,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 
 			if m.Len() > dns.MaxMsgSize {
 				// *Still* too large.
-				log.Printf("skydns: overflowing maximum message size: %d", m.Len())
+				log.Printf("skydns: still overflowing maximum message size: %d", m.Len())
 				promErrorCount.WithLabelValues("overflow").Inc()
 				m1 := new(dns.Msg) // Use smaller msg to signal failure.
 				m1.SetRcode(m, dns.RcodeServerFailure)
@@ -419,10 +419,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					s.NameError(m, req)
 					return
 				}
-				break
 			}
-			s.ServerFailure(m, req)
-			return
 		}
 		m.Answer = append(m.Answer, records...)
 		m.Extra = append(m.Extra, extra...)
@@ -434,10 +431,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					s.NameError(m, req)
 					return
 				}
-				break
 			}
-			s.ServerFailure(m, req)
-			return
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeTXT:
@@ -448,10 +442,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					s.NameError(m, req)
 					return
 				}
-				break
 			}
-			s.ServerFailure(m, req)
-			return
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeCNAME:
@@ -462,10 +453,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					s.NameError(m, req)
 					return
 				}
-				break
 			}
-			s.ServerFailure(m, req)
-			return
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeMX:
@@ -476,10 +464,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					s.NameError(m, req)
 					return
 				}
-				break
 			}
-			s.ServerFailure(m, req)
-			return
 		}
 		m.Answer = append(m.Answer, records...)
 		m.Extra = append(m.Extra, extra...)
@@ -493,7 +478,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					s.NameError(m, req)
 					return
 				}
-				break
 			}
 			if q.Qtype == dns.TypeSRV { // Otherwise NODATA
 				s.ServerFailure(m, req)
