@@ -330,6 +330,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			if m.Len() > dns.MaxMsgSize {
 				// *Still* too large.
 				log.Printf("skydns: overflowing maximum message size: %d", m.Len())
+				promErrorCount.WithLabelValues("overflow").Inc()
 				m1 := new(dns.Msg) // Use smaller msg to signal failure.
 				m1.SetRcode(m, dns.RcodeServerFailure)
 				if err := w.WriteMsg(m1); err != nil {
@@ -340,10 +341,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 
 		if m.Len() > int(bufsize) && !tcp {
-			// TODO(miek): this is a little brain dead, better is to not add
-			// RRs in the message in the first place.
-			promErrorCount.WithLabelValues("truncated").Inc()
-			m.Truncated = true
+			m.Extra = nil // As above, drop entire additional section.
+			if m.Len() > int(bufsize) {
+				promErrorCount.WithLabelValues("truncated").Inc()
+				m.Truncated = true
+			}
 		}
 
 		if err := w.WriteMsg(m); err != nil {
