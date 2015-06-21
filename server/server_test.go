@@ -5,6 +5,8 @@
 package server
 
 // etcd needs to be running on http://127.0.0.1:4001
+// running standalone tests fails, because metrics need to be enabled. TODO(miek)
+// See `if !metricsDone {` in TestMsgOverflow, should be added to more? TODO(miek)
 
 import (
 	"encoding/json"
@@ -1165,6 +1167,42 @@ func TestCacheTruncated(t *testing.T) {
 	resp, _ := dns.Exchange(m, "127.0.0.1:"+StrPort)
 	if resp.Truncated {
 		t.Fatal("truncated bit should be false")
+	}
+}
+
+func TestMsgOverflow(t *testing.T) {
+	if testing.Short() {
+                t.Skip("skipping test in short mode.")
+        }
+
+	s := newTestServer(t, false)
+	defer s.Stop()
+
+	c := new(dns.Client)
+	m := new(dns.Msg)
+
+	// TODO(miek): rethink how to enable metrics in tests.
+	if !metricsDone {
+		Metrics()
+	}
+
+	for i := 0; i < 2000; i++ {
+		is := strconv.Itoa(i)
+		m := &msg.Service{
+			Host: "2001::" + is, Key: "machine" + is + ".machines.skydns.test.",
+		}
+		addService(t, s, m.Key, 0, m)
+		defer delService(t, s, m.Key)
+	}
+	m.SetQuestion("machines.skydns.test.", dns.TypeSRV)
+	resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%s", resp)
+
+	if resp.Rcode != dns.RcodeServerFailure {
+		t.Fatalf("expecting server failure, got %d", resp.Rcode)
 	}
 }
 

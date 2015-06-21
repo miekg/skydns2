@@ -14,6 +14,8 @@ import (
 	"github.com/miekg/dns"
 )
 
+var metricsDone = false
+
 func newMetricServer(t *testing.T) *server {
 	s := newTestServer(t, false)
 
@@ -26,6 +28,7 @@ func newMetricServer(t *testing.T) *server {
 	prometheusNamespace = "test"
 
 	Metrics()
+	metricsDone = true
 
 	return s
 }

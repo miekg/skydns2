@@ -322,14 +322,34 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				s.Sign(m, bufsize)
 			}
 		}
-		if m.Len() > int(bufsize) && !tcp {
-			// TODO(miek): this is a little brain dead, better is to not add
-			// RRs in the message in the first place.
-			promErrorCount.WithLabelValues("truncated").Inc()
-			m.Truncated = true
+
+		if m.Len() > dns.MaxMsgSize {
+			log.Printf("skydns: overflowing maximum message size: %d, dropping additional section", m.Len())
+			m.Extra = nil // Drop entire additional section to see if this helps.
+
+			if m.Len() > dns.MaxMsgSize {
+				// *Still* too large.
+				log.Printf("skydns: still overflowing maximum message size: %d", m.Len())
+				promErrorCount.WithLabelValues("overflow").Inc()
+				m1 := new(dns.Msg) // Use smaller msg to signal failure.
+				m1.SetRcode(m, dns.RcodeServerFailure)
+				if err := w.WriteMsg(m1); err != nil {
+					log.Printf("skydns: failure to return reply %q", err)
+				}
+				return
+			}
 		}
+
+		if m.Len() > int(bufsize) && !tcp {
+			m.Extra = nil // As above, drop entire additional section.
+			if m.Len() > int(bufsize) {
+				promErrorCount.WithLabelValues("truncated").Inc()
+				m.Truncated = true
+			}
+		}
+
 		if err := w.WriteMsg(m); err != nil {
-			log.Printf("skydns: failure to return reply %q", err)
+			log.Printf("skydns: failure to return reply %q %d", err, m.Len())
 		}
 	}()
 
@@ -458,6 +478,10 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					s.NameError(m, req)
 					return
 				}
+			}
+			if q.Qtype == dns.TypeSRV { // Otherwise NODATA
+				s.ServerFailure(m, req)
+				return
 			}
 		}
 		// if we are here again, check the types, because an answer may only
@@ -798,6 +822,11 @@ func (s *server) NoDataError(m, req *dns.Msg) {
 
 	StatsNoDataCount.Inc(1)
 	promErrorCount.WithLabelValues("nodata")
+}
+
+func (s *server) ServerFailure(m, req *dns.Msg) {
+	m.SetRcode(req, dns.RcodeServerFailure)
+	promErrorCount.WithLabelValues("servfail")
 }
 
 func (s *server) logNoConnection(e error) {
