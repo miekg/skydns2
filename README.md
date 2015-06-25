@@ -50,7 +50,7 @@ the flag `-discover`.
 
 Optionally (but recommended) give it a nameserver:
 
-    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dns/ns \
+    curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dns/ns/ns1 \
         -d value='{"host":"192.168.0.1"}'
 
 Also see the section "NS Records".
@@ -139,22 +139,28 @@ are available:
 * `PROMETHEUS_NAMESPACE`: namespace used in the metrics, no default.
 * `PROMETHEUS_SUBSYSTEM`: subsystem used in the metric, defaults to `skydns`.
 
-if `PROMETHEUS_PORT` is set to an integer larger than 0, Prometheus support will
+If `PROMETHEUS_PORT` is set to an integer larger than 0, Prometheus support will
 be enabled.
 
 Current counters are:
 
 *  promExternalRequestCount, counts requests to external recursive nameservers
-   with the label "recursive", the number of stub lookups (label is "stub"), and
-   "lookup", which are recursive lookups done while resolving data from Etcd.
+   with the label value "recursive", the number of stub lookups (label value is
+   "stub"), and "lookup", which are recursive lookups done while resolving data
+   from Etcd.
 *  promRequestCount, number of requests with make with "udp" and "tcp", these
-   are also the labels used.
-*  promErrorCount, counts errors from authoritative answers only! Labels used are
-   "nxomdain", "nodata", "truncated", "refused" and "overflow".
-*  promCacheSize, current cache size in number of elements. Labels are "response" and
-   "signature" (DNSSEC cache)
-*  promCacheMiss, counter for cache misses. Labels are "response" and "signature".
+   are also the label values used.
+*  promErrorCount, counts errors from authoritative answers only! Label values
+   used are "nxomdain", "nodata", "truncated", "refused" and "overflow".
+*  promCacheSize, current cache size in number of elements. Label values are
+   "response" and "signature" (DNSSEC cache)
+*  promCacheMiss, counter for cache misses. Label values are "response" and
+   "signature".
 *  promDnssecOkCount, number of requests that have the DO bit set.
+*  promRequestDuration: time in seconds it took to handle this request. Label
+   values are "tcp" and "udp".
+*  promResponseSize: size in bytes of the response. Label values are "tcp" and
+   "udp".
 
 
 ### SSL Usage and Authentication with Client Certificates
