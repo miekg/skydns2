@@ -176,6 +176,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	bufsize := uint16(512)
 	dnssec := false
 	tcp := false
+	start := time.Now()
 
 	if req.Question[0].Qtype == dns.TypeANY {
 		m.Authoritative = false
@@ -198,12 +199,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		bufsize = 512
 	}
 	// with TCP we can send 64K
-	if _, ok := w.RemoteAddr().(*net.TCPAddr); ok {
+	if tcp = isTCP(w); tcp {
 		bufsize = dns.MaxMsgSize - 1
-		tcp = true
-	}
-
-	if tcp {
 		promRequestCount.WithLabelValues("tcp").Inc()
 	} else {
 		promRequestCount.WithLabelValues("udp").Inc()
@@ -251,6 +248,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			if err := w.WriteMsg(m1); err != nil {
 				log.Printf("skydns: failure to return reply %q", err)
 			}
+			metricSizeAndDuration(m1, start, tcp)
 			return
 		}
 		// Expired! /o\
@@ -266,7 +264,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 
 	for zone, ns := range *s.config.stub {
 		if strings.HasSuffix(name, zone) {
-			s.ServeDNSStubForward(w, req, ns)
+			resp := s.ServeDNSStubForward(w, req, ns)
+			metricSizeAndDuration(resp, start, tcp)
 			return
 		}
 	}
@@ -277,12 +276,14 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	if q.Qtype == dns.TypePTR && strings.HasSuffix(name, ".in-addr.arpa.") || strings.HasSuffix(name, ".ip6.arpa.") {
-		s.ServeDNSReverse(w, req)
+		resp := s.ServeDNSReverse(w, req)
+		metricSizeAndDuration(resp, start, tcp)
 		return
 	}
 
 	if q.Qclass != dns.ClassCHAOS && !strings.HasSuffix(name, s.config.Domain) {
-		s.ServeDNSForward(w, req)
+		resp := s.ServeDNSForward(w, req)
+		metricSizeAndDuration(resp, start, tcp)
 		return
 	}
 
@@ -296,7 +297,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			return
 		}
 		// Set TTL to the minimum of the RRset and dedup the message, i.e.
-		// remove idential RRs.
+		// remove identical RRs.
 		m = s.dedup(m)
 
 		minttl := s.config.Ttl
@@ -336,6 +337,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				if err := w.WriteMsg(m1); err != nil {
 					log.Printf("skydns: failure to return reply %q", err)
 				}
+				metricSizeAndDuration(m1, start, tcp)
 				return
 			}
 		}
@@ -351,6 +353,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if err := w.WriteMsg(m); err != nil {
 			log.Printf("skydns: failure to return reply %q %d", err, m.Len())
 		}
+		metricSizeAndDuration(m, start, tcp)
 	}()
 
 	if name == s.config.Domain {
@@ -943,4 +946,10 @@ func (s *server) dedup(m *dns.Msg) *dns.Msg {
 	}
 
 	return m
+}
+
+// isTCP returns true if the client is connecting over TCP.
+func isTCP(w dns.ResponseWriter) bool {
+	_, ok := w.RemoteAddr().(*net.TCPAddr)
+	return ok
 }

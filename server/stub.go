@@ -68,7 +68,7 @@ func (s *server) UpdateStubZones() {
 }
 
 // ServeDNSStubForward forwards a request to a nameservers and returns the response.
-func (s *server) ServeDNSStubForward(w dns.ResponseWriter, req *dns.Msg, ns []string) {
+func (s *server) ServeDNSStubForward(w dns.ResponseWriter, req *dns.Msg, ns []string) *dns.Msg {
 	StatsStubForwardCount.Inc(1)
 	promExternalRequestCount.WithLabelValues("stub").Inc()
 
@@ -80,15 +80,13 @@ func (s *server) ServeDNSStubForward(w dns.ResponseWriter, req *dns.Msg, ns []st
 				o.(*dns.EDNS0_LOCAL).Data[0] == 1 {
 				// Maybe log source IP here?
 				log.Printf("skydns: not fowarding stub request to another stub")
-				return
+				return nil
 			}
 		}
 	}
 
-	tcp := false
-	if _, ok := w.RemoteAddr().(*net.TCPAddr); ok {
-		tcp = true
-	}
+	tcp := isTCP(w)
+
 	// Add a custom EDNS0 option to the packet, so we can detect loops
 	// when 2 stubs are forwarding to each other.
 	if option != nil {
@@ -116,7 +114,7 @@ Redo:
 		r.Compress = true
 		r.Id = req.Id
 		w.WriteMsg(r)
-		return
+		return r
 	}
 	// Seen an error, this can only mean, "server not reached", try again
 	// but only if we have not exausted our nameservers.
@@ -131,4 +129,5 @@ Redo:
 	m.SetReply(req)
 	m.SetRcode(req, dns.RcodeServerFailure)
 	w.WriteMsg(m)
+	return m
 }
