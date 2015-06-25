@@ -128,11 +128,15 @@ func Metrics() {
 // metricSizeAndDuration sets the size and duration metrics.
 func metricSizeAndDuration(resp *dns.Msg, start time.Time, tcp bool) {
 	net := "udp"
+	rlen := float64(0)
 	if tcp {
 		net = "tcp"
 	}
+	if resp != nil {
+		rlen = float64(resp.Len())
+	}
 	promRequestDuration.WithLabelValues(net).Observe(float64(time.Since(start)) / float64(time.Second))
-	promResponseSize.WithLabelValues(net).Observe(float64(resp.Len()))
+	promResponseSize.WithLabelValues(net).Observe(rlen)
 }
 
 // Counter is the metric interface used by this package
