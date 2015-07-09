@@ -69,7 +69,7 @@ func init() {
 	flag.IntVar(&config.RCache, "rcache", 0, "capacity of the response cache") // default to 0 for now
 	flag.IntVar(&config.RCacheTtl, "rcache-ttl", server.RCacheTtl, "TTL of the response cache")
 
-	flag.StringVar(&msg.PathPrefix, "path-prefix", env("SKYDNS_PATH_PREFIX", msg.PATH_PREFIX), "backend(etcd) path prefix, default: skydns")
+	flag.StringVar(&msg.PathPrefix, "path-prefix", env("SKYDNS_PATH_PREFIX", "skydns"), "backend(etcd) path prefix, default: skydns")
 }
 
 func main() {
@@ -168,7 +168,7 @@ func main() {
 
 func loadConfig(client *etcd.Client, config *server.Config) error {
 	// Override what isn't set yet from the command line.
-	n, err := client.Get(fmt.Sprintf("%s/config", msg.Pathprefix()), false, false)
+	n, err := client.Get("/"+msg.PathPrefix+"/config", false, false)
 	if err != nil {
 		log.Printf("skydns: falling back to default configuration, could not read from etcd: %s", err)
 		return nil
