@@ -80,6 +80,7 @@ SkyDNS' configuration is stored in etcd as a JSON object under the key
 * `rcache`: the capacity of the response cache, defaults to 0 records if not set.
 * `rcache_ttl`: the TTL of the response cache, defaults to 60 if not set.
 * `systemd`: bind to socket(s) activated by systemd (ignores -addr).
+* `path-prefix`: backend(etcd) path prefix, defaults to skydns (i.e. if it is set to `mydns`, the SkyDNS's configuration object should be stored under the key `/mydns/config`).
 
 To set the configuration, use something like:
 
@@ -124,6 +125,7 @@ SkyDNS uses these environment variables:
 * `SKYDNS_DOMAIN` - set a default domain if not specified by etcd config
 * `SKYDNS_NAMESERVERS` - set a list of nameservers to forward DNS requests to
   when not authoritative for a domain, "8.8.8.8:53,8.8.4.4:53".
+* `SKYDNS_PATH_PREFIX` - backend(etcd) path prefix, defaults to skydns (i.e. if it is set to `mydns`, the SkyDNS's configuration object should be stored under the key `/mydns/config`).
 
 And these are used for statistics:
 

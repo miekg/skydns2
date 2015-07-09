@@ -1172,8 +1172,8 @@ func TestCacheTruncated(t *testing.T) {
 
 func TestMsgOverflow(t *testing.T) {
 	if testing.Short() {
-                t.Skip("skipping test in short mode.")
-        }
+		t.Skip("skipping test in short mode.")
+	}
 
 	s := newTestServer(t, false)
 	defer s.Stop()
