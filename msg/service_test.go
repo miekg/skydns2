@@ -8,7 +8,7 @@ import "testing"
 
 func TestPath(t *testing.T) {
 	PathPrefix = "mydns"
-	result = Path("service.staging.skydns.local.")
+	result := Path("service.staging.skydns.local.")
 
 	if result != "/mydns/local/skydns/staging/service" {
 		t.Logf("Failure to get domain's path with prefix: mydns")
@@ -16,7 +16,7 @@ func TestPath(t *testing.T) {
 	}
 
 	PathPrefix = "skydns"
-	result := Path("service.staging.skydns.local.")
+	result = Path("service.staging.skydns.local.")
 
 	if result != "/skydns/local/skydns/staging/service" {
 		t.Logf("Failure to get domain's path with default prefix: skydns")
