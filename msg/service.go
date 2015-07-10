@@ -12,6 +12,11 @@ import (
 	"github.com/miekg/dns"
 )
 
+// Backend(etcd) path prefix, defaults to `skydns`.
+// You can change it by set `path-prefix` configuration or $SKYDNS_PATH_PREFIX env.
+// And then:
+// 	The SkyDNS's configuration object should be stored under the key `/mydns/config`);
+// 	The etcd path of domain `service.staging.skydns.local.` will be `/mydns/local/skydns/staging/service`.
 var PathPrefix string = "skydns"
 
 // This *is* the rdata from a SRV record, but with a twist.
