@@ -12,6 +12,13 @@ import (
 	"github.com/miekg/dns"
 )
 
+// Backend(etcd) path prefix, defaults to `skydns`.
+// You can change it by set `path-prefix` configuration or $SKYDNS_PATH_PREFIX env.
+// And then:
+// 	The SkyDNS's configuration object should be stored under the key `/mydns/config`);
+// 	The etcd path of domain `service.staging.skydns.local.` will be `/mydns/local/skydns/staging/service`.
+var PathPrefix string = "skydns"
+
 // This *is* the rdata from a SRV record, but with a twist.
 // Host (Target in SRV) must be a domain name, but if it looks like an IP
 // address (4/6), we will treat it like an IP address.
@@ -118,10 +125,10 @@ func PathWithWildcard(s string) (string, bool) {
 	}
 	for i, k := range l {
 		if k == "*" || k == "any" {
-			return path.Join(append([]string{"/skydns/"}, l[:i]...)...), true
+			return path.Join(append([]string{"/" + PathPrefix + "/"}, l[:i]...)...), true
 		}
 	}
-	return path.Join(append([]string{"/skydns/"}, l...)...), false
+	return path.Join(append([]string{"/" + PathPrefix + "/"}, l...)...), false
 }
 
 // Path converts a domainname to an etcd path. If s looks like service.staging.skydns.local.,
@@ -131,7 +138,7 @@ func Path(s string) string {
 	for i, j := 0, len(l)-1; i < j; i, j = i+1, j-1 {
 		l[i], l[j] = l[j], l[i]
 	}
-	return path.Join(append([]string{"/skydns/"}, l...)...)
+	return path.Join(append([]string{"/" + PathPrefix + "/"}, l...)...)
 }
 
 // Domain is the opposite of Path.
