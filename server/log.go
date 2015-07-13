@@ -10,3 +10,8 @@ import "log"
 func printf(format string, a ...interface{}) {
 	log.Printf("skydns: "+format, a...)
 }
+
+// fatalf calls log.Fatalf with the parameters given.
+func fatalf(format string, a ...interface{}) {
+	log.Fatalf("skydns: "+format, a...)
+}
