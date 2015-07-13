@@ -7,7 +7,7 @@ package server
 import "log"
 
 // printf calls log.Printf with the parameters given.
-func printf(format string, a ...interface{}) {
+func logf(format string, a ...interface{}) {
 	log.Printf("skydns: "+format, a...)
 }
 

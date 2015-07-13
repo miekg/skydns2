@@ -95,7 +95,7 @@ func TestMetricRequests(t *testing.T) {
 		t.Fatalf("expecting %d, got %d", 1, v)
 	}
 	v = scrape(t, "test_dns_request_count{type=\"tcp\"}")
-	if v != -1 {	// if not hit, is does not show up in the metrics page.
+	if v != -1 { // if not hit, is does not show up in the metrics page.
 		t.Fatalf("expecting %d, got %d for", -1, v)
 	}
 

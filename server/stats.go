@@ -121,7 +121,7 @@ func Metrics() {
 	go func() {
 		fatalf("%s", http.ListenAndServe(":"+prometheusPort, nil))
 	}()
-	printf("metrics enabled on :%s%s", prometheusPort, prometheusPath)
+	logf("metrics enabled on :%s%s", prometheusPort, prometheusPath)
 }
 
 // metricSizeAndDuration sets the size and duration metrics.
