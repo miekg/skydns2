@@ -6,7 +6,6 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"net"
 	"strconv"
@@ -94,9 +93,9 @@ func (s *server) Run() error {
 
 	dnsReadyMsg := func(addr, net string) {
 		if s.config.DNSSEC == "" {
-			log.Printf("skydns: ready for queries on %s for %s://%s [rcache %d]", s.config.Domain, net, addr, s.config.RCache)
+			logf("ready for queries on %s for %s://%s [rcache %d]", s.config.Domain, net, addr, s.config.RCache)
 		} else {
-			log.Printf("skydns: ready for queries on %s for %s://%s [rcache %d], signing with %s [scache %d]", s.config.Domain, net, addr, s.config.RCache, s.config.DNSSEC, s.config.SCache)
+			logf("ready for queries on %s for %s://%s [rcache %d], signing with %s [scache %d]", s.config.Domain, net, addr, s.config.RCache, s.config.DNSSEC, s.config.SCache)
 		}
 	}
 
@@ -118,7 +117,7 @@ func (s *server) Run() error {
 				go func() {
 					defer s.group.Done()
 					if err := dns.ActivateAndServe(nil, u, mux); err != nil {
-						log.Fatalf("skydns: %s", err)
+						fatalf("%s", err)
 					}
 				}()
 				dnsReadyMsg(u.LocalAddr().String(), "udp")
@@ -130,7 +129,7 @@ func (s *server) Run() error {
 				go func() {
 					defer s.group.Done()
 					if err := dns.ActivateAndServe(t, nil, mux); err != nil {
-						log.Fatalf("skydns: %s", err)
+						fatalf("%s", err)
 					}
 				}()
 				dnsReadyMsg(t.Addr().String(), "tcp")
@@ -141,7 +140,7 @@ func (s *server) Run() error {
 		go func() {
 			defer s.group.Done()
 			if err := dns.ListenAndServe(s.config.DnsAddr, "tcp", mux); err != nil {
-				log.Fatalf("skydns: %s", err)
+				fatalf("%s", err)
 			}
 		}()
 		dnsReadyMsg(s.config.DnsAddr, "tcp")
@@ -149,7 +148,7 @@ func (s *server) Run() error {
 		go func() {
 			defer s.group.Done()
 			if err := dns.ListenAndServe(s.config.DnsAddr, "udp", mux); err != nil {
-				log.Fatalf("skydns: %s", err)
+				fatalf("%s", err)
 			}
 		}()
 		dnsReadyMsg(s.config.DnsAddr, "udp")
@@ -246,7 +245,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 
 			if err := w.WriteMsg(m1); err != nil {
-				log.Printf("skydns: failure to return reply %q", err)
+				logf("failure to return reply %q", err)
 			}
 			metricSizeAndDuration(m1, start, tcp)
 			return
@@ -259,7 +258,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	name := strings.ToLower(q.Name)
 
 	if s.config.Verbose {
-		log.Printf("skydns: received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
+		logf("received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 	}
 
 	for zone, ns := range *s.config.stub {
@@ -292,7 +291,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	defer func() {
 		if m.Rcode == dns.RcodeServerFailure {
 			if err := w.WriteMsg(m); err != nil {
-				log.Printf("skydns: failure to return reply %q", err)
+				logf("failure to return reply %q", err)
 			}
 			return
 		}
@@ -325,17 +324,17 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 
 		if m.Len() > dns.MaxMsgSize {
-			log.Printf("skydns: overflowing maximum message size: %d, dropping additional section", m.Len())
+			logf("overflowing maximum message size: %d, dropping additional section", m.Len())
 			m.Extra = nil // Drop entire additional section to see if this helps.
 
 			if m.Len() > dns.MaxMsgSize {
 				// *Still* too large.
-				log.Printf("skydns: still overflowing maximum message size: %d", m.Len())
+				logf("still overflowing maximum message size: %d", m.Len())
 				promErrorCount.WithLabelValues("overflow").Inc()
 				m1 := new(dns.Msg) // Use smaller msg to signal failure.
 				m1.SetRcode(m, dns.RcodeServerFailure)
 				if err := w.WriteMsg(m1); err != nil {
-					log.Printf("skydns: failure to return reply %q", err)
+					logf("failure to return reply %q", err)
 				}
 				metricSizeAndDuration(m1, start, tcp)
 				return
@@ -351,7 +350,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 
 		if err := w.WriteMsg(m); err != nil {
-			log.Printf("skydns: failure to return reply %q %d", err, m.Len())
+			logf("failure to return reply %q %d", err, m.Len())
 		}
 		metricSizeAndDuration(m, start, tcp)
 	}()
@@ -423,6 +422,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
+			logf("go error from backend: %s", err)
 		}
 		m.Answer = append(m.Answer, records...)
 		m.Extra = append(m.Extra, extra...)
@@ -435,6 +435,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
+			logf("go error from backend: %s", err)
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeTXT:
@@ -446,6 +447,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
+			logf("go error from backend: %s", err)
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeCNAME:
@@ -457,6 +459,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
+			logf("go error from backend: %s", err)
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeMX:
@@ -468,6 +471,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
+			logf("go error from backend: %s", err)
 		}
 		m.Answer = append(m.Answer, records...)
 		m.Extra = append(m.Extra, extra...)
@@ -482,6 +486,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
+			logf("go error from backend: %s", err)
 			if q.Qtype == dns.TypeSRV { // Otherwise NODATA
 				s.ServerFailure(m, req)
 				return
@@ -524,12 +529,12 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 
 			newRecord := serv.NewCNAME(q.Name, dns.Fqdn(serv.Host))
 			if len(previousRecords) > 7 {
-				log.Printf("skydns: CNAME lookup limit of 8 exceeded for %s", newRecord)
+				logf("CNAME lookup limit of 8 exceeded for %s", newRecord)
 				// don't add it, and just continue
 				continue
 			}
 			if s.isDuplicateCNAME(newRecord, previousRecords) {
-				log.Printf("skydns: CNAME loop detected for record %s", newRecord)
+				logf("CNAME loop detected for record %s", newRecord)
 				continue
 			}
 
@@ -551,7 +556,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 			}
 			m1, e1 := s.Lookup(target, q.Qtype, bufsize, dnssec)
 			if e1 != nil {
-				log.Printf("skydns: incomplete CNAME chain: %s", e1)
+				logf("incomplete CNAME chain: %s", e1)
 				continue
 			}
 			// Len(m1.Answer) > 0 here is well?
@@ -559,7 +564,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 			records = append(records, m1.Answer...)
 			continue
 
-			log.Printf("skydns: incomplete CNAME chain for %s", name)
+			logf("incomplete CNAME chain for %s", name)
 
 		case ip.To4() != nil && (q.Qtype == dns.TypeA || both):
 			records = append(records, serv.NewA(q.Name, ip.To4()))
@@ -834,7 +839,7 @@ func (s *server) ServerFailure(m, req *dns.Msg) {
 
 func (s *server) logNoConnection(e error) {
 	if e.(*etcd.EtcdError).ErrorCode == etcd.ErrCodeEtcdNotReachable {
-		log.Printf("skydns: failure to connect to etcd: %s", e)
+		logf("failure to connect to etcd: %s", e)
 	}
 }
 

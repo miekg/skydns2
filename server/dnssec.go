@@ -5,7 +5,6 @@
 package server
 
 import (
-	"log"
 	"os"
 	"time"
 
@@ -107,7 +106,7 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 		}
 		s.scache.Remove(key)
 	}
-	log.Printf("skydns: scache miss for %s type %d", r[0].Header().Name, r[0].Header().Rrtype)
+	logf("scache miss for %s type %d", r[0].Header().Name, r[0].Header().Rrtype)
 
 	StatsDnssecCacheMiss.Inc(1)
 	promCacheMiss.WithLabelValues("signature").Inc()
@@ -120,7 +119,7 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 		}
 		e := sig1.Sign(s.config.PrivKey, r)
 		if e != nil {
-			log.Printf("skydns: failed to sign: %s", e.Error())
+			logf("failed to sign: %s", e.Error())
 		}
 		return sig1, e
 	})

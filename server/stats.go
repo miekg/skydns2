@@ -5,7 +5,6 @@
 package server
 
 import (
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -115,14 +114,14 @@ func Metrics() {
 
 	_, err := strconv.Atoi(prometheusPort)
 	if err != nil {
-		log.Fatalf("skydns: bad port for prometheus: %s", prometheusPort)
+		fatalf("bad port for prometheus: %s", prometheusPort)
 	}
 
 	http.Handle(prometheusPath, prometheus.Handler())
 	go func() {
-		log.Fatalf("skydns: %s", http.ListenAndServe(":"+prometheusPort, nil))
+		fatalf("%s", http.ListenAndServe(":"+prometheusPort, nil))
 	}()
-	log.Printf("skydns: metrics enabled on :%s%s", prometheusPort, prometheusPath)
+	logf("metrics enabled on :%s%s", prometheusPort, prometheusPath)
 }
 
 // metricSizeAndDuration sets the size and duration metrics.
