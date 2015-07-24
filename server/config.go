@@ -38,7 +38,7 @@ type Config struct {
 	// List of ip:port, seperated by commas of recursive nameservers to forward queries to.
 	Nameservers []string `json:"nameservers,omitempty"`
 	// Never provide a recursive service.
-	NoRec       bool          `json:norec,omitempty"`
+	NoRec       bool          `json:"no_rec,omitempty"`
 	ReadTimeout time.Duration `json:"read_timeout,omitempty"`
 	// Default priority on SRV records when none is given. Defaults to 10.
 	Priority uint16 `json:"priority"`

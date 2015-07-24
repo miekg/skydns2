@@ -71,8 +71,8 @@ SkyDNS' configuration is stored in etcd as a JSON object under the key
     Note that packets containing more than one CNAME are exempt from this (see issue #128 on Github).
 * `nameservers`: forward DNS requests to these (recursive) nameservers (array of IP:port combination),
     when not authoritative for a domain. This defaults to the servers listed in `/etc/resolv.conf`. Also
-    see `no-rec`.
-* `no-rec`: never (ever) provide a recursive service (i.e. forward to the servers provided in -nameservers).
+    see `no_rec`.
+* `no_rec`: never (ever) provide a recursive service (i.e. forward to the servers provided in -nameservers).
 * `read_timeout`: network read timeout, for DNS and talking with etcd.
 * `ttl`: default TTL in seconds to use on replies when none is set in etcd, defaults to 3600.
 * `min_ttl`: minimum TTL in seconds to use on NXDOMAIN, defaults to 30.
