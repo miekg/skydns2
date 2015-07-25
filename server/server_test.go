@@ -562,7 +562,7 @@ type dnsTestCase struct {
 	Extra  []dns.RR
 }
 
-// Note the key is encoded as dns name, while in "reality" it is a Etcd path.
+// Note the key is encoded as DNS name, while in "reality" it is a etcd path.
 var services = []*msg.Service{
 	{Host: "server1", Port: 8080, Key: "100.server1.development.region1.skydns.test."},
 	{Host: "server2", Port: 80, Key: "101.server2.production.region1.skydns.test."},
@@ -613,7 +613,7 @@ var services = []*msg.Service{
 	{Host: "mx.miek.nl", Priority: 50, Mail: true, Key: "b.mail.skydns.test."},
 	{Host: "a.ipaddr.skydns.test", Priority: 30, Mail: true, Key: "a.mx.skydns.test."},
 
-	// Double CNAME, see issue #168
+	// double CNAME, see issue #168
 	{Host: "mx2.skydns.test", Priority: 50, Mail: true, Key: "a.mail2.skydns.test."},
 	{Host: "a.ipaddr.skydns.test", Mail: true, Key: "a.mx2.skydns.test."},
 	// Sometimes we *do* get back a.ipaddr.skydns.test, making this test flaky.
@@ -1167,6 +1167,54 @@ func TestCacheTruncated(t *testing.T) {
 	resp, _ := dns.Exchange(m, "127.0.0.1:"+StrPort)
 	if resp.Truncated {
 		t.Fatal("truncated bit should be false")
+	}
+}
+
+func TestTargetStripAdditional(t *testing.T) {
+	s := newTestServer(t, false)
+	defer s.Stop()
+
+	// TODO(miek): rethink how to enable metrics in tests.
+	if !metricsDone {
+		Metrics()
+	}
+
+	c := new(dns.Client)
+	m := new(dns.Msg)
+
+	pre := "bliep."
+	expected := "blaat.skydns.test."
+	serv := &msg.Service{
+		Host: "199.43.132.53", Key: pre + expected, TargetStrip: 1, Text: "Text",
+	}
+	addService(t, s, serv.Key, 0, serv)
+	defer delService(t, s, serv.Key)
+
+	m.SetQuestion(pre+expected, dns.TypeSRV)
+	resp, _, err := c.Exchange(m, "127.0.0.1:"+StrPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%s", resp.String())
+	if resp.Extra[0].Header().Name != expected {
+		t.Fatalf("expected %s, got %s for SRV with v4", expected, resp.Extra[0].Header().Name)
+	}
+
+	serv = &msg.Service{
+		Host: "2001::1", Key: pre + expected, TargetStrip: 1, Text: "Text",
+	}
+	delService(t, s, serv.Key)
+	// previous defer still stands
+	addService(t, s, serv.Key, 0, serv)
+
+	m.SetQuestion(pre + expected, dns.TypeSRV)
+	resp, _, err = c.Exchange(m, "127.0.0.1:"+StrPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%s", resp.String())
+	if resp.Extra[0].Header().Name != expected {
+		t.Fatalf("expected %s, got %s for SRV with v6", expected, resp.Extra[0].Header().Name)
 	}
 }
 

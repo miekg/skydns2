@@ -50,17 +50,7 @@ type Service struct {
 
 // NewSRV returns a new SRV record based on the Service.
 func (s *Service) NewSRV(name string, weight uint16) *dns.SRV {
-	host := dns.Fqdn(s.Host)
-
-	offset, end := 0, false
-	for i := 0; i < s.TargetStrip; i++ {
-		offset, end = dns.NextLabel(host, offset)
-	}
-	if end {
-		// We overshot the name, use the orignal one.
-		offset = 0
-	}
-	host = host[offset:]
+	host := targetStrip(dns.Fqdn(s.Host), s.TargetStrip)
 
 	return &dns.SRV{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeSRV, Class: dns.ClassINET, Ttl: s.Ttl},
 		Priority: uint16(s.Priority), Weight: weight, Port: uint16(s.Port), Target: host}
@@ -68,17 +58,7 @@ func (s *Service) NewSRV(name string, weight uint16) *dns.SRV {
 
 // NewMX returns a new MX record based on the Service.
 func (s *Service) NewMX(name string) *dns.MX {
-	host := dns.Fqdn(s.Host)
-
-	offset, end := 0, false
-	for i := 0; i < s.TargetStrip; i++ {
-		offset, end = dns.NextLabel(host, offset)
-	}
-	if end {
-		// We overshot the name, use the orignal one.
-		offset = 0
-	}
-	host = host[offset:]
+	host := targetStrip(dns.Fqdn(s.Host), s.TargetStrip)
 
 	return &dns.MX{Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeMX, Class: dns.ClassINET, Ttl: s.Ttl},
 		Preference: uint16(s.Priority), Mx: host}
@@ -220,4 +200,22 @@ func split255(s string) []string {
 	}
 
 	return sx
+}
+
+// targetStrip strips "targetstrip" labels from the left side of the fully qualified name.
+func targetStrip(name string, targetStrip int) string {
+	if targetStrip == 0 {
+		return name
+	}
+
+	offset, end := 0, false
+	for i := 0; i < targetStrip; i++ {
+		offset, end = dns.NextLabel(name, offset)
+	}
+	if end {
+		// We overshot the name, use the orignal one.
+		offset = 0
+	}
+	name = name[offset:]
+	return name
 }

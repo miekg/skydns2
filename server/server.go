@@ -675,12 +675,16 @@ func (s *server) SRVRecords(q dns.Question, name string, bufsize uint16, dnssec 
 			}
 		case ip.To4() != nil:
 			serv.Host = msg.Domain(serv.Key)
-			records = append(records, serv.NewSRV(q.Name, weight))
-			extra = append(extra, serv.NewA(serv.Host, ip.To4()))
+			srv := serv.NewSRV(q.Name, weight)
+
+			records = append(records, srv)
+			extra = append(extra, serv.NewA(srv.Target, ip.To4()))
 		case ip.To4() == nil:
 			serv.Host = msg.Domain(serv.Key)
-			records = append(records, serv.NewSRV(q.Name, weight))
-			extra = append(extra, serv.NewAAAA(serv.Host, ip.To16()))
+			srv := serv.NewSRV(q.Name, weight)
+
+			records = append(records, srv)
+			extra = append(extra, serv.NewAAAA(srv.Target, ip.To16()))
 		}
 	}
 	return records, extra, nil
