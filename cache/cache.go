@@ -71,7 +71,7 @@ func (c *Cache) EvictRandom() {
 // InsertMessage inserts a message in the Cache. We will cache it for ttl seconds, which
 // should be a small (60...300) integer.
 func (c *Cache) InsertMessage(s string, msg *dns.Msg) {
-	if c.capacity == 0 {
+	if c.capacity <= 0 {
 		return
 	}
 
@@ -86,7 +86,7 @@ func (c *Cache) InsertMessage(s string, msg *dns.Msg) {
 
 // InsertSignature inserts a signature, the expiration time is used as the cache ttl.
 func (c *Cache) InsertSignature(s string, sig *dns.RRSIG) {
-	if c.capacity == 0 {
+	if c.capacity <= 0 {
 		return
 	}
 	c.Lock()
@@ -106,13 +106,14 @@ func (c *Cache) InsertSignature(s string, sig *dns.RRSIG) {
 // Search returns a dns.Msg, the expiration time and a boolean indicating if we found something
 // in the cache.
 func (c *Cache) Search(s string) (*dns.Msg, time.Time, bool) {
-	if c.capacity == 0 {
+	if c.capacity <= 0 {
 		return nil, time.Time{}, false
 	}
 	c.RLock()
 	if e, ok := c.m[s]; ok {
+		e1 := e.msg.Copy()
 		c.RUnlock()
-		return e.msg.Copy(), e.expiration, true
+		return e1, e.expiration, true
 	}
 	c.RUnlock()
 	return nil, time.Time{}, false

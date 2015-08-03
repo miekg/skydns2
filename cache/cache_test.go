@@ -11,6 +11,8 @@ import (
 	"github.com/miekg/dns"
 )
 
+const testTTL = 2
+
 type testcase struct {
 	m           *dns.Msg
 	dnssec, tcp bool
@@ -23,7 +25,7 @@ func newMsg(zone string, typ uint16) *dns.Msg {
 }
 
 func TestInsertMessage(t *testing.T) {
-	c := New(10, 2)
+	c := New(10, testTTL)
 
 	testcases := []testcase{
 		{newMsg("miek.nl.", dns.TypeMX), false, false},
@@ -58,7 +60,7 @@ func TestInsertMessage(t *testing.T) {
 }
 
 func TestExpireMessage(t *testing.T) {
-	c := New(10, 1)
+	c := New(10, testTTL-1)
 
 	tc := testcase{newMsg("miek.nl.", dns.TypeMX), false, false}
 	c.InsertMessage(Key(tc.m.Question[0], tc.dnssec, tc.tcp), tc.m)
@@ -71,7 +73,7 @@ func TestExpireMessage(t *testing.T) {
 		t.Fatalf("bad Qtype, expected %s, got %s:", tc.m.Question[0].Name, m1.Question[0].Name)
 	}
 
-	time.Sleep(2)
+	time.Sleep(testTTL)
 
 	m1 = c.Hit(tc.m.Question[0], tc.dnssec, tc.tcp, tc.m.Id)
 	if m1.Question[0].Qtype != tc.m.Question[0].Qtype {
