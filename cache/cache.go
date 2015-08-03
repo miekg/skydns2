@@ -53,12 +53,17 @@ func (c *Cache) Remove(s string) {
 // EvictRandom removes a random member a the cache.
 // Must be called under a write lock.
 func (c *Cache) EvictRandom() {
-	if len(c.m) < c.capacity {
+	clen := len(c.m)
+	if clen < c.capacity {
 		return
 	}
+	i := c.capacity - clen
 	for k, _ := range c.m {
 		delete(c.m, k)
-		break
+		i--
+		if i == 0 {
+			break
+		}
 	}
 }
 
