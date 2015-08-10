@@ -22,6 +22,7 @@ func TestPath(t *testing.T) {
 		t.Logf("Failure to get domain's path with default prefix: skydns")
 		t.Fail()
 	}
+	t.Fail()
 }
 
 func TestSplit255(t *testing.T) {

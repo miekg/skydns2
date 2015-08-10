@@ -1207,7 +1207,7 @@ func TestTargetStripAdditional(t *testing.T) {
 	// previous defer still stands
 	addService(t, s, serv.Key, 0, serv)
 
-	m.SetQuestion(pre + expected, dns.TypeSRV)
+	m.SetQuestion(pre+expected, dns.TypeSRV)
 	resp, _, err = c.Exchange(m, "127.0.0.1:"+StrPort)
 	if err != nil {
 		t.Fatal(err)
