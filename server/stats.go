@@ -32,6 +32,8 @@ var (
 	promResponseSize         *prometheus.HistogramVec
 )
 
+// Metrics registers the DNS metrics to Prometheus, and starts the internal metrics
+// server if the environment variable PROMETHEUS_PORT is set.
 func Metrics() {
 	if prometheusPath == "" {
 		prometheusPath = "/metrics"
@@ -40,14 +42,27 @@ func Metrics() {
 		prometheusSubsystem = "skydns"
 	}
 
-	promExternalRequestCount = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
-		Name:      "dns_request_external_count",
-		Help:      "Counter of external DNS requests.",
-	}, []string{"type"}) // recursive, stub, lookup
-	prometheus.MustRegister(promExternalRequestCount)
+	RegisterMetrics(prometheusNamespace, prometheusSubsystem)
 
+	if prometheusPort == "" {
+		return
+	}
+
+	_, err := strconv.Atoi(prometheusPort)
+	if err != nil {
+		fatalf("bad port for prometheus: %s", prometheusPort)
+	}
+
+	http.Handle(prometheusPath, prometheus.Handler())
+	go func() {
+		fatalf("%s", http.ListenAndServe(":"+prometheusPort, nil))
+	}()
+	logf("metrics enabled on :%s%s", prometheusPort, prometheusPath)
+}
+
+// RegisterMetrics registers DNS specific Prometheus metrics with the provided namespace
+// and subsystem.
+func RegisterMetrics(prometheusNamespace, prometheusSubsystem string) {
 	promRequestCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,
 		Subsystem: prometheusSubsystem,
@@ -108,20 +123,14 @@ func Metrics() {
 	}, []string{"type"}) // udp, tcp
 	prometheus.MustRegister(promResponseSize)
 
-	if prometheusPort == "" {
-		return
-	}
+	promExternalRequestCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: prometheusNamespace,
+		Subsystem: prometheusSubsystem,
+		Name:      "dns_request_external_count",
+		Help:      "Counter of external DNS requests.",
+	}, []string{"type"}) // recursive, stub, lookup
+	prometheus.MustRegister(promExternalRequestCount)
 
-	_, err := strconv.Atoi(prometheusPort)
-	if err != nil {
-		fatalf("bad port for prometheus: %s", prometheusPort)
-	}
-
-	http.Handle(prometheusPath, prometheus.Handler())
-	go func() {
-		fatalf("%s", http.ListenAndServe(":"+prometheusPort, nil))
-	}()
-	logf("metrics enabled on :%s%s", prometheusPort, prometheusPath)
 }
 
 // metricSizeAndDuration sets the size and duration metrics.
