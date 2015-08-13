@@ -118,8 +118,11 @@ func RegisterMetrics(prometheusNamespace, prometheusSubsystem string) {
 		Subsystem: prometheusSubsystem,
 		Name:      "dns_response_size",
 		Help:      "Size of the returns response in bytes.",
-		// Powers of 2 up to the maximum size.
-		Buckets: []float64{0, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536},
+		// 4k increments after 4096
+		Buckets: []float64{0, 512, 1024, 1500, 2048, 4096,
+			8192, 12288, 16384, 20480, 24576, 28672, 32768, 36864,
+			40960, 45056, 49152, 53248, 57344, 61440, 65536,
+		},
 	}, []string{"type"}) // udp, tcp
 	prometheus.MustRegister(promResponseSize)
 
