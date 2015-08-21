@@ -5,6 +5,7 @@
 package server
 
 import (
+	"crypto"
 	"fmt"
 	"net"
 	"strings"
@@ -56,9 +57,9 @@ type Config struct {
 	Ndots int `json:"ndot,omitempty"`
 
 	// DNSSEC key material
-	PubKey  *dns.DNSKEY    `json:"-"`
-	KeyTag  uint16         `json:"-"`
-	PrivKey dns.PrivateKey `json:"-"`
+	PubKey  *dns.DNSKEY   `json:"-"`
+	KeyTag  uint16        `json:"-"`
+	PrivKey crypto.Signer `json:"-"`
 
 	Verbose bool `json:"-"`
 
