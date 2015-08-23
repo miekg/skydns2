@@ -563,9 +563,6 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 			records = append(records, newRecord)
 			records = append(records, m1.Answer...)
 			continue
-
-			logf("incomplete CNAME chain for %s", name)
-
 		case ip.To4() != nil && (q.Qtype == dns.TypeA || both):
 			records = append(records, serv.NewA(q.Name, ip.To4()))
 		case ip.To4() == nil && (q.Qtype == dns.TypeAAAA || both):

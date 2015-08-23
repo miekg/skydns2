@@ -37,7 +37,7 @@ type Service struct {
 	// the record lives to a DNS name and use this as the srv.Target.  When
 	// TargetStrip > 0 we strip the left most TargetStrip labels from the
 	// DNS name.
-	TargetStrip int `json:"targetstrip",omitempty"`
+	TargetStrip int `json:"targetstrip,omitempty"`
 
 	// Group is used to group (or *not* to group) different services
 	// together. Services with an identical Group are returned in the same
