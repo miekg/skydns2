@@ -8,6 +8,7 @@ import (
 	"crypto"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -112,11 +113,13 @@ func SetDefaults(config *Config) error {
 
 	if len(config.Nameservers) == 0 {
 		c, err := dns.ClientConfigFromFile("/etc/resolv.conf")
-		if err != nil {
-			return err
-		}
-		for _, s := range c.Servers {
-			config.Nameservers = append(config.Nameservers, net.JoinHostPort(s, c.Port))
+		if !os.IsNotExist(err) {
+			if err != nil {
+				return err
+			}
+			for _, s := range c.Servers {
+				config.Nameservers = append(config.Nameservers, net.JoinHostPort(s, c.Port))
+			}
 		}
 	}
 	config.Domain = dns.Fqdn(strings.ToLower(config.Domain))
