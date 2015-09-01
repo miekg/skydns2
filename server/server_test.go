@@ -7,6 +7,7 @@ package server
 // etcd needs to be running on http://127.0.0.1:4001
 
 import (
+	"crypto/rsa"
 	"encoding/json"
 	"sort"
 	"strconv"
@@ -103,7 +104,7 @@ func newTestServerDNSSEC(t *testing.T, cache bool) *server {
 	s := newTestServer(t, cache)
 	s.config.PubKey = newDNSKEY("skydns.test. IN DNSKEY 256 3 5 AwEAAaXfO+DOBMJsQ5H4TfiabwSpqE4cGL0Qlvh5hrQumrjr9eNSdIOjIHJJKCe56qBU5mH+iBlXP29SVf6UiiMjIrAPDVhClLeWFe0PC+XlWseAyRgiLHdQ8r95+AfkhO5aZgnCwYf9FGGSaT0+CRYN+PyDbXBTLK5FN+j5b6bb7z+d")
 	s.config.KeyTag = s.config.PubKey.KeyTag()
-	s.config.PrivKey, err = s.config.PubKey.ReadPrivateKey(strings.NewReader(`Private-key-format: v1.3
+	privKey, err := s.config.PubKey.ReadPrivateKey(strings.NewReader(`Private-key-format: v1.3
 Algorithm: 5 (RSASHA1)
 Modulus: pd874M4EwmxDkfhN+JpvBKmoThwYvRCW+HmGtC6auOv141J0g6MgckkoJ7nqoFTmYf6IGVc/b1JV/pSKIyMisA8NWEKUt5YV7Q8L5eVax4DJGCIsd1Dyv3n4B+SE7lpmCcLBh/0UYZJpPT4JFg34/INtcFMsrkU36PlvptvvP50=
 PublicExponent: AQAB
@@ -114,6 +115,7 @@ Exponent1: wkdTngUcIiau67YMmSFBoFOq9Lldy9HvpVzK/R0e5vDsnS8ZKTb4QJJ7BaG2ADpno7pIS
 Exponent2: YrC8OglEXIGkV3tm2494vf9ozPL6+cBkFsPPg9dXbvVCyyuW0pGHDeplvfUqs4nZp87z8PsoUL+LAUqdldnwcQ==
 Coefficient: mMFr4+rDY5V24HZU3Oa5NEb55iQ56ZNa182GnNhWqX7UqWjcUUGjnkCy40BqeFAQ7lp52xKHvP5Zon56mwuQRw==
 `), "stdin")
+	s.config.PrivKey = privKey.(*rsa.PrivateKey)
 	if err != nil {
 		t.Fatal(err)
 	}

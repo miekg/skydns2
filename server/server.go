@@ -20,7 +20,7 @@ import (
 	"github.com/skynetservices/skydns/msg"
 )
 
-const Version = "2.5.2a"
+const Version = "2.5.2b"
 
 type server struct {
 	backend Backend
@@ -429,6 +429,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 				s.NameError(m, req)
 				return
 			}
+			logf("got error from backend: %s", err)
 			if q.Qtype == dns.TypeSRV { // Otherwise NODATA
 				s.ServerFailure(m, req)
 				return
@@ -505,9 +506,6 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 			records = append(records, newRecord)
 			records = append(records, m1.Answer...)
 			continue
-
-			logf("incomplete CNAME chain for %s", name)
-
 		case ip.To4() != nil && (q.Qtype == dns.TypeA || both):
 			records = append(records, serv.NewA(q.Name, ip.To4()))
 		case ip.To4() == nil && (q.Qtype == dns.TypeAAAA || both):
