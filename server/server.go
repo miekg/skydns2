@@ -422,7 +422,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
-			logf("go error from backend: %s", err)
+			logf("got error from backend: %s", err)
 		}
 		m.Answer = append(m.Answer, records...)
 		m.Extra = append(m.Extra, extra...)
@@ -435,7 +435,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
-			logf("go error from backend: %s", err)
+			logf("got error from backend: %s", err)
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeTXT:
@@ -447,7 +447,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
-			logf("go error from backend: %s", err)
+			logf("got error from backend: %s", err)
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeCNAME:
@@ -459,7 +459,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
-			logf("go error from backend: %s", err)
+			logf("got error from backend: %s", err)
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeMX:
@@ -471,7 +471,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
-			logf("go error from backend: %s", err)
+			logf("got error from backend: %s", err)
 		}
 		m.Answer = append(m.Answer, records...)
 		m.Extra = append(m.Extra, extra...)
@@ -486,7 +486,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 					return
 				}
 			}
-			logf("go error from backend: %s", err)
+			logf("got error from backend: %s", err)
 			if q.Qtype == dns.TypeSRV { // Otherwise NODATA
 				s.ServerFailure(m, req)
 				return
