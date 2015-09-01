@@ -26,7 +26,6 @@ var (
 	promExternalRequestCount *prometheus.CounterVec
 	promRequestCount         *prometheus.CounterVec
 	promErrorCount           *prometheus.CounterVec
-	promCacheSize            *prometheus.GaugeVec
 	promCacheMiss            *prometheus.CounterVec
 	promRequestDuration      *prometheus.HistogramVec
 	promResponseSize         *prometheus.HistogramVec
@@ -86,15 +85,6 @@ func RegisterMetrics(prometheusNamespace, prometheusSubsystem string) {
 		Help:      "Counter of DNS requests resulting in an error.",
 	}, []string{"error"}) // nxdomain, nodata, truncated, refused, overflow
 	prometheus.MustRegister(promErrorCount)
-
-	// Caches
-	promCacheSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: prometheusNamespace,
-		Subsystem: prometheusSubsystem,
-		Name:      "cache_total_size",
-		Help:      "The total size of all elements in the cache.",
-	}, []string{"type"}) // response, signature
-	prometheus.MustRegister(promCacheSize)
 
 	promCacheMiss = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: prometheusNamespace,

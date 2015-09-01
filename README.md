@@ -76,8 +76,8 @@ SkyDNS' configuration is stored in etcd as a JSON object under the key
 * `read_timeout`: network read timeout, for DNS and talking with etcd.
 * `ttl`: default TTL in seconds to use on replies when none is set in etcd, defaults to 3600.
 * `min_ttl`: minimum TTL in seconds to use on NXDOMAIN, defaults to 30.
-* `scache`: the capacity of the DNSSEC signature cache, defaults to 10000 records if not set.
-* `rcache`: the capacity of the response cache, defaults to 0 records if not set.
+* `scache`: the capacity of the DNSSEC signature cache, defaults to 10000 signatures if not set.
+* `rcache`: the capacity of the response cache, defaults to 0 messages if not set.
 * `rcache_ttl`: the TTL of the response cache, defaults to 60 if not set.
 * `systemd`: bind to socket(s) activated by systemd (ignores -addr).
 * `path-prefix`: backend(etcd) path prefix, defaults to skydns (i.e. if it is set to `mydns`, the SkyDNS's configuration object should be stored under the key `/mydns/config`).

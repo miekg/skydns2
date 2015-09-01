@@ -56,10 +56,6 @@ func (s *server) Sign(m *dns.Msg, bufsize uint16) {
 	incep := uint32(now.Add(-3 * time.Hour).Unix())     // 2+1 hours, be sure to catch daylight saving time and such
 	expir := uint32(now.Add(7 * 24 * time.Hour).Unix()) // sign for a week
 
-	defer func() {
-		promCacheSize.WithLabelValues("signature").Set(float64(s.scache.Size()))
-	}()
-
 	for _, r := range rrSets(m.Answer) {
 		if r[0].Header().Rrtype == dns.TypeRRSIG {
 			continue
@@ -93,11 +89,7 @@ func (s *server) Sign(m *dns.Msg, bufsize uint16) {
 			m.Extra = append(m.Extra, sig)
 		}
 	}
-	if bufsize >= 512 || bufsize <= 4096 {
-		// TCP here?
-		promErrorCount.WithLabelValues("truncated").Inc()
-		m.Truncated = m.Len() > int(bufsize)
-	}
+
 	o := new(dns.OPT)
 	o.Hdr.Name = "."
 	o.Hdr.Rrtype = dns.TypeOPT
@@ -108,7 +100,7 @@ func (s *server) Sign(m *dns.Msg, bufsize uint16) {
 }
 
 func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.RRSIG, error) {
-	key := cache.Key(r)
+	key := cache.KeyRRset(r)
 	if m, exp, hit := s.scache.Search(key); hit { // There can only be one sig in this cache.
 		// Is it still valid 24 hours from now?
 		if now.Add(+24*time.Hour).Sub(exp) < -24*time.Hour {
@@ -116,7 +108,9 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 		}
 		s.scache.Remove(key)
 	}
-	logf("scache miss for %s type %d", r[0].Header().Name, r[0].Header().Rrtype)
+	if s.config.Verbose {
+		logf("scache miss for %s type %d", r[0].Header().Name, r[0].Header().Rrtype)
+	}
 
 	StatsDnssecCacheMiss.Inc(1)
 	promCacheMiss.WithLabelValues("signature").Inc()

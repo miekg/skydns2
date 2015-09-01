@@ -5,8 +5,6 @@
 package server
 
 // etcd needs to be running on http://127.0.0.1:4001
-// running standalone tests fails, because metrics need to be enabled. TODO(miek)
-// See `if !metricsDone {` in TestMsgOverflow, should be added to more? TODO(miek)
 
 import (
 	"crypto/rsa"
@@ -27,8 +25,11 @@ import (
 
 // Keep global port counter that increments with 10 for each
 // new call to newTestServer. The dns server is started on port 'Port'.
-var Port = 9400
-var StrPort = "9400" // string equivalent of Port
+var (
+	Port        = 9400
+	StrPort     = "9400" // string equivalent of Port
+	metricsDone = false
+)
 
 func addService(t *testing.T, s *server, k string, ttl uint64, m *msg.Service) {
 	b, err := json.Marshal(m)
@@ -75,6 +76,14 @@ func newTestServer(t *testing.T, c bool) *server {
 	s.config.RCacheTtl = RCacheTtl
 	s.config.Ttl = 3600
 	s.config.Ndots = 2
+
+	prometheusPort = "12300"
+	prometheusSubsystem = "test"
+	prometheusNamespace = "test"
+	if !metricsDone {
+		metricsDone = true
+		Metrics()
+	}
 
 	s.dnsUDPclient = &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
 	s.dnsTCPclient = &dns.Client{Net: "tcp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
@@ -1158,28 +1167,9 @@ func TestDedup(t *testing.T) {
 	}
 }
 
-func TestCacheTruncated(t *testing.T) {
-	s := newTestServer(t, true)
-	m := &dns.Msg{}
-	m.SetQuestion("skydns.test.", dns.TypeSRV)
-	m.Truncated = true
-	s.rcache.InsertMessage(cache.QuestionKey(m.Question[0], false), m)
-
-	// Now asking for this should result in a non-truncated answer.
-	resp, _ := dns.Exchange(m, "127.0.0.1:"+StrPort)
-	if resp.Truncated {
-		t.Fatal("truncated bit should be false")
-	}
-}
-
 func TestTargetStripAdditional(t *testing.T) {
 	s := newTestServer(t, false)
 	defer s.Stop()
-
-	// TODO(miek): rethink how to enable metrics in tests.
-	if !metricsDone {
-		Metrics()
-	}
 
 	c := new(dns.Client)
 	m := new(dns.Msg)
@@ -1231,11 +1221,6 @@ func TestMsgOverflow(t *testing.T) {
 	c := new(dns.Client)
 	m := new(dns.Msg)
 
-	// TODO(miek): rethink how to enable metrics in tests.
-	if !metricsDone {
-		Metrics()
-	}
-
 	for i := 0; i < 2000; i++ {
 		is := strconv.Itoa(i)
 		m := &msg.Service{
@@ -1251,7 +1236,7 @@ func TestMsgOverflow(t *testing.T) {
 	}
 	t.Logf("%s", resp)
 
-	if resp.Rcode != dns.RcodeServerFailure {
+	if resp.Rcode != dns.RcodeSuccess {
 		t.Fatalf("expecting server failure, got %d", resp.Rcode)
 	}
 }
