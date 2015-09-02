@@ -23,6 +23,7 @@ func Fit(m *dns.Msg, size int, tcp bool) (*dns.Msg, bool) {
 	// With TCP setting TC does not mean anything.
 	if !tcp {
 		m.Truncated = true
+		return m, false
 	}
 
 	// Additional section is gone, binary search until we have length that fits.

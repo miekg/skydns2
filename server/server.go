@@ -225,6 +225,10 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if tcp {
 			if _, overflow := Fit(m1, dns.MaxMsgSize, tcp); overflow {
 				promErrorCount.WithLabelValues("overflow").Inc()
+				msgFail := new(dns.Msg)
+				s.ServerFailure(msgFail, req)
+				w.WriteMsg(msgFail)
+				return
 			}
 		} else {
 			// Overflow with udp always results in TC.
@@ -313,7 +317,12 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		}
 
 		if tcp {
-			Fit(m, dns.MaxMsgSize, tcp)
+			if _, overflow := Fit(m, dns.MaxMsgSize, tcp); overflow {
+				msgFail := new(dns.Msg)
+				s.ServerFailure(msgFail, req)
+				w.WriteMsg(msgFail)
+				return
+			}
 		} else {
 			Fit(m, int(bufsize), tcp)
 		}
