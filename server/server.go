@@ -325,6 +325,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		} else {
 			Fit(m, int(bufsize), tcp)
+			if m.Truncated {
+				promErrorCount.WithLabelValues("truncated").Inc()
+			}
 		}
 		s.rcache.InsertMessage(cache.Key(q, dnssec, tcp), m)
 
