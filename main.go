@@ -92,7 +92,9 @@ func main() {
 	if err := loadConfig(client, config); err != nil {
 		log.Fatalf("skydns: %s", err)
 	}
-	server.SetDefaults(config)
+	if err := server.SetDefaults(config); err != nil {
+		log.Fatalf("skydns defaults could not be set from /etc/resolv.conf: %v", err)
+	}
 
 	if config.Local != "" {
 		config.Local = dns.Fqdn(config.Local)
