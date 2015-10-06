@@ -44,6 +44,15 @@ func env(key, def string) string {
 	return def
 }
 
+func boolEnv(key string, def bool) bool {
+	if x := os.Getenv(key); x != "" {
+		if v, err := strconv.ParseBool(x); err == nil {
+			return v
+		}
+	}
+	return def
+}
+
 func init() {
 	flag.StringVar(&config.Domain, "domain", env("SKYDNS_DOMAIN", "skydns.local."), "domain to anchor requests to (SKYDNS_DOMAIN)")
 	flag.StringVar(&config.DnsAddr, "addr", env("SKYDNS_ADDR", "127.0.0.1:53"), "ip:port to bind to (SKYDNS_ADDR)")
@@ -60,7 +69,7 @@ func init() {
 	flag.BoolVar(&discover, "discover", false, "discover new machines by watching /v2/_etcd/machines")
 	flag.BoolVar(&stub, "stubzones", false, "support stub zones")
 	flag.BoolVar(&config.Verbose, "verbose", false, "log queries")
-	flag.BoolVar(&config.Systemd, "systemd", false, "bind to socket(s) activated by systemd (ignore -addr)")
+	flag.BoolVar(&config.Systemd, "systemd", boolEnv("SKYDNS_SYSTEMD", false), "bind to socket(s) activated by systemd (ignore -addr)")
 
 	// TTl
 	// Minttl
