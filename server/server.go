@@ -20,7 +20,7 @@ import (
 	"github.com/skynetservices/skydns/msg"
 )
 
-const Version = "2.5.2c"
+const Version = "2.5.3a"
 
 type server struct {
 	backend Backend
