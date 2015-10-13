@@ -94,7 +94,7 @@ func main() {
 		log.Fatalf("skydns: %s", err)
 	}
 	if err := server.SetDefaults(config); err != nil {
-		log.Fatalf("skydns defaults could not be set from /etc/resolv.conf: %v", err)
+		log.Fatalf("skydns: defaults could not be set from /etc/resolv.conf: %v", err)
 	}
 
 	if config.Local != "" {
