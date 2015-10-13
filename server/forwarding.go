@@ -49,8 +49,12 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) *dns.Msg {
 		err error
 		try int
 	)
-	// Use request Id for "random" nameserver selection.
-	nsid := int(req.Id) % len(s.config.Nameservers)
+
+	nsid := 0
+	if s.config.NSRotate {
+		// Use request Id for "random" nameserver selection.
+		nsid = int(req.Id) % len(s.config.Nameservers)
+	}
 Redo:
 	switch tcp {
 	case false:
