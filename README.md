@@ -102,7 +102,7 @@ precedence.
     SkyDNS receives a query for the name `local.dns.skydns.local` it will fetch this service and return it.
     For instance: `-local e2016c14-fbba-11e3-ae08-10604b7efbe2.dockerhosts.skydns.local` and then
 
-        curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dockerhosts/2016c14-fbba-11e3-ae08-10604b7efbe2 \
+        curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dockerhosts/e2016c14-fbba-11e3-ae08-10604b7efbe2 \
             -d value='{"host":"10.1.1.16"}'
 
     To register the local IP address. Now when SkyDNS receives a query for local.dns.skydns.local it will fetch the above
