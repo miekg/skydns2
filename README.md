@@ -126,6 +126,7 @@ SkyDNS uses these environment variables:
 * `SKYDNS_NAMESERVERS` - set a list of nameservers to forward DNS requests to
   when not authoritative for a domain, "8.8.8.8:53,8.8.4.4:53".
 * `SKYDNS_PATH_PREFIX` - backend(etcd) path prefix, defaults to skydns (i.e. if it is set to `mydns`, the SkyDNS's configuration object should be stored under the key `/mydns/config`).
+* `SKYDNS_SYSTEMD`: set to `true` to bind to socket(s) activated by systemd (ignores SKYDNS_ADDR).
 
 And these are used for statistics:
 
