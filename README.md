@@ -102,7 +102,7 @@ precedence.
     SkyDNS receives a query for the name `local.dns.skydns.local` it will fetch this service and return it.
     For instance: `-local e2016c14-fbba-11e3-ae08-10604b7efbe2.dockerhosts.skydns.local` and then
 
-        curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dockerhosts/2016c14-fbba-11e3-ae08-10604b7efbe2 \
+        curl -XPUT http://127.0.0.1:4001/v2/keys/skydns/local/skydns/dockerhosts/e2016c14-fbba-11e3-ae08-10604b7efbe2 \
             -d value='{"host":"10.1.1.16"}'
 
     To register the local IP address. Now when SkyDNS receives a query for local.dns.skydns.local it will fetch the above
@@ -126,6 +126,7 @@ SkyDNS uses these environment variables:
 * `SKYDNS_NAMESERVERS` - set a list of nameservers to forward DNS requests to
   when not authoritative for a domain, "8.8.8.8:53,8.8.4.4:53".
 * `SKYDNS_PATH_PREFIX` - backend(etcd) path prefix, defaults to skydns (i.e. if it is set to `mydns`, the SkyDNS's configuration object should be stored under the key `/mydns/config`).
+* `SKYDNS_SYSTEMD`: set to `true` to bind to socket(s) activated by systemd (ignores SKYDNS_ADDR).
 
 And these are used for statistics:
 
