@@ -117,16 +117,16 @@ precedence.
 
 SkyDNS uses these environment variables:
 
-* `ETCD_MACHINES` - list of etcd machines, "http://localhost:4001,http://etcd.example.com:4001".
-* `ETCD_TLSKEY` - path of TLS client certificate - private key.
-* `ETCD_TLSPEM` - path of TLS client certificate - public key.
-* `ETCD_CACERT` - path of TLS certificate authority public key
-* `SKYDNS_ADDR` - specify address to bind to
-* `SKYDNS_DOMAIN` - set a default domain if not specified by etcd config
+* `ETCD_MACHINES` - list of etcd machines, "http://localhost:4001,http://etcd.example.com:4001". Overwrite with `-machines` string flag.
+* `ETCD_TLSKEY` - path of TLS client certificate - private key. Overwrite with `-tls-key` string flag.
+* `ETCD_TLSPEM` - path of TLS client certificate - public key. Overwrite with `-tls-pem` string flag.
+* `ETCD_CACERT` - path of TLS certificate authority public key. Overwrite with `-ca-cert` string flag.
+* `SKYDNS_ADDR` - specify address to bind to Overwrite with `-addr` string flag.
+* `SKYDNS_DOMAIN` - set a default domain if not specified by etcd config. Overwrite with `-domain` string flag.
 * `SKYDNS_NAMESERVERS` - set a list of nameservers to forward DNS requests to
-  when not authoritative for a domain, "8.8.8.8:53,8.8.4.4:53".
-* `SKYDNS_PATH_PREFIX` - backend(etcd) path prefix, defaults to skydns (i.e. if it is set to `mydns`, the SkyDNS's configuration object should be stored under the key `/mydns/config`).
-* `SKYDNS_SYSTEMD`: set to `true` to bind to socket(s) activated by systemd (ignores SKYDNS_ADDR).
+  when not authoritative for a domain, "8.8.8.8:53,8.8.4.4:53". Overwrite with `-nameservers` string flag.
+* `SKYDNS_PATH_PREFIX` - backend(etcd) path prefix, defaults to skydns (i.e. if it is set to `mydns`, the SkyDNS's configuration object should be stored under the key `/mydns/config`). Overwrite with `-path-prefix` string flag.
+* `SKYDNS_SYSTEMD`: set to `true` to bind to socket(s) activated by systemd (ignores SKYDNS_ADDR). Overwrite with `-systemd` bool flag.
 
 And these are used for statistics:
 
