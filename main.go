@@ -5,25 +5,29 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
-	"net/url"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/miekg/dns"
 
 	backendetcd "github.com/skynetservices/skydns/backends/etcd"
 	"github.com/skynetservices/skydns/msg"
 	"github.com/skynetservices/skydns/server"
 	"github.com/skynetservices/skydns/stats"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -33,8 +37,8 @@ var (
 	config     = &server.Config{ReadTimeout: 0, Domain: "", DnsAddr: "", DNSSEC: ""}
 	nameserver = ""
 	machine    = ""
-	discover   = false
 	stub       = false
+	ctx        = context.Background()
 )
 
 func env(key, def string) string {
@@ -58,7 +62,7 @@ func init() {
 	flag.StringVar(&config.DnsAddr, "addr", env("SKYDNS_ADDR", "127.0.0.1:53"), "ip:port to bind to (SKYDNS_ADDR)")
 	flag.StringVar(&nameserver, "nameservers", env("SKYDNS_NAMESERVERS", ""), "nameserver address(es) to forward (non-local) queries to e.g. 8.8.8.8:53,8.8.4.4:53")
 	flag.BoolVar(&config.NoRec, "no-rec", false, "do not provide a recursive service")
-	flag.StringVar(&machine, "machines", env("ETCD_MACHINES", ""), "machine address(es) running etcd")
+	flag.StringVar(&machine, "machines", env("ETCD_MACHINES", "http://127.0.0.1:2379"), "machine address(es) running etcd")
 	flag.StringVar(&config.DNSSEC, "dnssec", "", "basename of DNSSEC key file e.q. Kskydns.local.+005+38250")
 	flag.StringVar(&config.Local, "local", "", "optional unique value for this skydns instance")
 	flag.StringVar(&tlskey, "tls-key", env("ETCD_TLSKEY", ""), "TLS Private Key path")
@@ -67,7 +71,6 @@ func init() {
 	flag.DurationVar(&config.ReadTimeout, "rtimeout", 2*time.Second, "read timeout")
 	flag.BoolVar(&config.RoundRobin, "round-robin", true, "round robin A/AAAA replies")
 	flag.BoolVar(&config.NSRotate, "ns-rotate", true, "round robin selection of nameservers from among those listed")
-	flag.BoolVar(&discover, "discover", false, "discover new machines by watching /v2/_etcd/machines")
 	flag.BoolVar(&stub, "stubzones", false, "support stub zones")
 	flag.BoolVar(&config.Verbose, "verbose", false, "log queries")
 	flag.BoolVar(&config.Systemd, "systemd", boolEnv("SKYDNS_SYSTEMD", false), "bind to socket(s) activated by systemd (ignore -addr)")
@@ -85,7 +88,10 @@ func init() {
 func main() {
 	flag.Parse()
 	machines := strings.Split(machine, ",")
-	client := newClient(machines, tlspem, tlskey, cacert)
+	client, err := newEtcdClient(machines, tlspem, tlskey, cacert)
+	if err != nil {
+		panic(err)
+	}
 
 	if nameserver != "" {
 		for _, hostPort := range strings.Split(nameserver, ",") {
@@ -110,61 +116,35 @@ func main() {
 		config.Local = dns.Fqdn(config.Local)
 	}
 
-	backend := backendetcd.NewBackend(client, &backendetcd.Config{
+	backend := backendetcd.NewBackend(client, ctx, &backendetcd.Config{
 		Ttl:      config.Ttl,
 		Priority: config.Priority,
 	})
 	s := server.New(backend, config)
 
-	if discover {
-		go func() {
-			recv := make(chan *etcd.Response)
-			go client.Watch("/_etcd/machines/", 0, true, recv, nil)
-			duration := 1 * time.Second
-			for {
-				select {
-				case n := <-recv:
-					if n != nil {
-						if client := updateClient(n, tlskey, tlspem, cacert); client != nil {
-							backend.UpdateClient(client)
-						}
-						duration = 1 * time.Second // reset
-					} else {
-						// we can see an n == nil, probably when we can't connect to etcd.
-						log.Printf("skydns: etcd machine cluster update failed, sleeping %s + ~3s", duration)
-						time.Sleep(duration + (time.Duration(rand.Float32() * 3e9))) // Add some random.
-						duration *= 2
-						if duration > 32*time.Second {
-							duration = 32 * time.Second
-						}
-					}
-				}
-			}
-		}()
-	}
-
 	if stub {
 		s.UpdateStubZones()
 		go func() {
-			recv := make(chan *etcd.Response)
-			go client.Watch(msg.Path(config.Domain)+"/dns/stub/", 0, true, recv, nil)
 			duration := 1 * time.Second
+			var watcher etcd.Watcher
+
+			watcher = client.Watcher(msg.Path(config.Domain)+"/dns/stub/", &etcd.WatcherOptions{AfterIndex: 0, Recursive: true})
+
 			for {
-				select {
-				case n := <-recv:
-					if n != nil {
-						s.UpdateStubZones()
-						log.Printf("skydns: stubzone update")
-						duration = 1 * time.Second // reset
-					} else {
-						// we can see an n == nil, probably when we can't connect to etcd.
-						log.Printf("skydns: stubzone update failed, sleeping %s + ~3s", duration)
-						time.Sleep(duration + (time.Duration(rand.Float32() * 3e9))) // Add some random.
-						duration *= 2
-						if duration > 32*time.Second {
-							duration = 32 * time.Second
-						}
+				_, err := watcher.Next(ctx)
+
+				if err != nil {
+					//
+					log.Printf("skydns: stubzone update failed, sleeping %s + ~3s", duration)
+					time.Sleep(duration + (time.Duration(rand.Float32() * 3e9))) // Add some random.
+					duration *= 2
+					if duration > 32*time.Second {
+						duration = 32 * time.Second
 					}
+				} else {
+					s.UpdateStubZones()
+					log.Printf("skydns: stubzone update")
+					duration = 1 * time.Second // reset
 				}
 			}
 		}()
@@ -178,14 +158,15 @@ func main() {
 	}
 }
 
-func loadConfig(client *etcd.Client, config *server.Config) error {
+func loadConfig(client etcd.KeysAPI, config *server.Config) error {
 	// Override what isn't set yet from the command line.
-	n, err := client.Get("/"+msg.PathPrefix+"/config", false, false)
+	configPath := "/" + msg.PathPrefix + "/config"
+	resp, err := client.Get(ctx, configPath, nil)
 	if err != nil {
 		log.Printf("skydns: falling back to default configuration, could not read from etcd: %s", err)
 		return nil
 	}
-	if err := json.Unmarshal([]byte(n.Node.Value), config); err != nil {
+	if err := json.Unmarshal([]byte(resp.Node.Value), config); err != nil {
 		return fmt.Errorf("failed to unmarshal config: %s", err.Error())
 	}
 	return nil
@@ -206,50 +187,52 @@ func validateHostPort(hostPort string) error {
 	return nil
 }
 
-func newClient(machines []string, tlsCert, tlsKey, tlsCACert string) (client *etcd.Client) {
-	// set default if not specified in env
-	if len(machines) == 1 && machines[0] == "" {
-		machines[0] = "http://127.0.0.1:4001"
+func newEtcdClient(machines []string, tlsCert, tlsKey, tlsCACert string) (etcd.KeysAPI, error) {
+	etcdCfg := etcd.Config{
+		Endpoints: machines,
+		Transport: newHttpTransport(tlsCert, tlsKey, tlsCACert),
 	}
-	if strings.HasPrefix(machines[0], "https://") {
-		var err error
-		// TODO(miek): machines is local, the rest is global, ugly.
-		if client, err = etcd.NewTLSClient(machines, tlsCert, tlsKey, tlsCACert); err != nil {
-			// TODO(miek): would be nice if this wasn't a fatal error
-			log.Fatalf("skydns: failure to connect: %s", err)
-		}
-		return client
+	cli, err := etcd.New(etcdCfg)
+	if err != nil {
+		return nil, err
 	}
-	return etcd.NewClient(machines)
+
+	// Periodically sync etcd
+	go cli.AutoSync(ctx, 15*time.Second)
+
+	return etcd.NewKeysAPI(cli), nil
 }
 
-// updateClient updates the client with the machines found in v2/_etcd/machines.
-func updateClient(resp *etcd.Response, tlsCert, tlsKey, tlsCACert string) (client *etcd.Client) {
-	machines := make([]string, 0, 3)
-	for _, m := range resp.Node.Nodes {
-		u, e := url.Parse(m.Value)
-		if e != nil {
-			continue
+func newHttpTransport(tlsCertFile, tlsKeyFile, tlsCACertFile string) etcd.CancelableTransport {
+	var cc *tls.Config = nil
+
+	if tlsCertFile != "" && tlsKeyFile != "" {
+		var rpool *x509.CertPool
+		if tlsCACertFile != "" {
+			if pemBytes, err := ioutil.ReadFile(tlsCACertFile); err == nil {
+				rpool = x509.NewCertPool()
+				rpool.AppendCertsFromPEM(pemBytes)
+			}
 		}
-		// etcd=bla&raft=bliep
-		// TODO(miek): surely there is a better way to do this
-		ms := strings.Split(u.String(), "&")
-		if len(ms) == 0 {
-			continue
+
+		if tlsCert, err := tls.LoadX509KeyPair(tlsCertFile, tlsKeyFile); err == nil {
+			cc = &tls.Config{
+				RootCAs:            rpool,
+				Certificates:       []tls.Certificate{tlsCert},
+				InsecureSkipVerify: true,
+			}
 		}
-		if len(ms[0]) < 5 {
-			continue
-		}
-		machines = append(machines, ms[0][5:])
 	}
-	// When CoreOS (and thus etcd) crash this call back seems to also trigger, but we
-	// don't have any machines. Don't trigger this update then, as a) it
-	// crashes SkyDNS and b) potentially leaves with no machines to connect to.
-	// Keep the old ones and hope they still work and wait for another update
-	// in the future.
-	if len(machines) > 0 {
-		log.Printf("skydns: setting new etcd cluster to %v", machines)
-		return newClient(machines, tlsCert, tlsKey, tlsCACert)
+
+	tr := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		Dial: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: 10 * time.Second,
+		TLSClientConfig:     cc,
 	}
-	return nil
+
+	return tr
 }

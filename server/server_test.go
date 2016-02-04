@@ -16,11 +16,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/miekg/dns"
 	backendetcd "github.com/skynetservices/skydns/backends/etcd"
 	"github.com/skynetservices/skydns/cache"
 	"github.com/skynetservices/skydns/msg"
+	"golang.org/x/net/context"
 )
 
 // Keep global port counter that increments with 10 for each
@@ -29,16 +30,17 @@ var (
 	Port        = 9400
 	StrPort     = "9400" // string equivalent of Port
 	metricsDone = false
+	ctx         = context.Background()
 )
 
-func addService(t *testing.T, s *server, k string, ttl uint64, m *msg.Service) {
+func addService(t *testing.T, s *server, k string, ttl time.Duration, m *msg.Service) {
 	b, err := json.Marshal(m)
 	if err != nil {
 		t.Fatal(err)
 	}
 	path, _ := msg.PathWithWildcard(k)
 
-	_, err = s.backend.(*backendetcd.Backend).Client().Create(path, string(b), ttl)
+	_, err = s.backend.(*backendetcd.Backend).Client().Set(ctx, path, string(b), &etcd.SetOptions{TTL: ttl})
 	if err != nil {
 		// TODO(miek): allow for existing keys...
 		t.Fatal(err)
@@ -47,7 +49,7 @@ func addService(t *testing.T, s *server, k string, ttl uint64, m *msg.Service) {
 
 func delService(t *testing.T, s *server, k string) {
 	path, _ := msg.PathWithWildcard(k)
-	_, err := s.backend.(*backendetcd.Backend).Client().Delete(path, false)
+	_, err := s.backend.(*backendetcd.Backend).Client().Delete(ctx, path, &etcd.DeleteOptions{Recursive: false})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +59,11 @@ func newTestServer(t *testing.T, c bool) *server {
 	Port += 10
 	StrPort = strconv.Itoa(Port)
 	s := new(server)
-	client := etcd.NewClient([]string{"http://127.0.0.1:4001"})
+	client, _ := etcd.New(etcd.Config{
+		Endpoints: []string{"http://127.0.0.1:4001/"},
+		Transport: etcd.DefaultTransport,
+	})
+	kapi := etcd.NewKeysAPI(client)
 
 	// TODO(miek): why don't I use NewServer??
 	s.group = new(sync.WaitGroup)
@@ -88,7 +94,7 @@ func newTestServer(t *testing.T, c bool) *server {
 	s.dnsUDPclient = &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
 	s.dnsTCPclient = &dns.Client{Net: "tcp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
 
-	s.backend = backendetcd.NewBackend(client, &backendetcd.Config{
+	s.backend = backendetcd.NewBackend(kapi, ctx, &backendetcd.Config{
 		Ttl:      s.config.Ttl,
 		Priority: s.config.Priority,
 	})
@@ -302,7 +308,7 @@ func TestDNSTtlRRset(t *testing.T) {
 
 	ttl := uint32(60)
 	for _, serv := range services {
-		addService(t, s, serv.Key, uint64(ttl), serv)
+		addService(t, s, serv.Key, 60, serv)
 		defer delService(t, s, serv.Key)
 		ttl += 60
 	}
