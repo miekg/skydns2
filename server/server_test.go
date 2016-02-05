@@ -31,7 +31,6 @@ import (
 var (
 	Port        = 9400
 	StrPort     = "9400" // string equivalent of Port
-	metricsDone = false
 	ctx         = context.Background()
 )
 
@@ -88,10 +87,7 @@ func newTestServer(t *testing.T, c bool) *server {
 	metrics.Port = "12300"
 	metrics.Subsystem = "test"
 	metrics.Namespace = "test"
-	if !metricsDone {
-		metricsDone = true
-		metrics.Metrics()
-	}
+	metrics.Metrics()
 
 	s.dnsUDPclient = &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
 	s.dnsTCPclient = &dns.Client{Net: "tcp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
@@ -104,6 +100,7 @@ func newTestServer(t *testing.T, c bool) *server {
 	go s.Run()
 	// Yeah, yeah, should do a proper fix.
 	time.Sleep(500 * time.Millisecond)
+	time.Sleep(1 * time.Second)
 	return s
 }
 

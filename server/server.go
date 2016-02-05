@@ -173,6 +173,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	m.Authoritative = true
 	m.RecursionAvailable = true
 	m.Compress = true
+
 	bufsize := uint16(512)
 	dnssec := false
 	tcp := false
@@ -188,7 +189,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.RecursionDesired = false
 		m.Compress = false
 		w.WriteMsg(m)
-		metrics.ErrorCount("refused")
+		metrics.ErrorCount(metrics.Auth, metrics.Refused)
 		return
 	}
 
@@ -204,8 +205,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		bufsize = dns.MaxMsgSize - 1
 	}
 
-	metrics.RequestCount(w, req)
-
 	if s.config.Verbose {
 		logf("received DNS Request for %q from %q with type %d", q.Name, w.RemoteAddr(), q.Qtype)
 	}
@@ -213,7 +212,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	// Check cache first.
 	m1 := s.rcache.Hit(q, dnssec, tcp, m.Id)
 	if m1 != nil {
-		if send := s.overflowOrTruncated(w, m1, int(bufsize)); send {
+		metrics.RequestCount(w, req, metrics.Cache)
+		if send := s.overflowOrTruncated(w, m1, int(bufsize), metrics.Cache); send {
 			return
 		}
 
@@ -226,16 +226,17 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if err := w.WriteMsg(m1); err != nil {
 			logf("failure to return reply %q", err)
 		}
-		metrics.SizeAndDuration(w, m1, start)
+		metrics.Duration(w, m1, start, metrics.Cache)
 		return
 	}
+
 
 	for zone, ns := range *s.config.stub {
 		if strings.HasSuffix(name, zone) {
 			resp := s.ServeDNSStubForward(w, req, ns)
 			if resp != nil {
 				s.rcache.InsertMessage(cache.Key(q, dnssec, tcp), resp)
-				metrics.SizeAndDuration(w, resp, start)
+				metrics.Duration(w, resp, start, metrics.Stub)
 			}
 			return
 		}
@@ -250,7 +251,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		resp := s.ServeDNSReverse(w, req)
 		if resp != nil {
 			s.rcache.InsertMessage(cache.Key(q, dnssec, tcp), resp)
-			metrics.SizeAndDuration(w, resp, start)
+			metrics.Duration(w, resp, start, metrics.Reverse)
 		}
 		return
 	}
@@ -259,19 +260,25 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		resp := s.ServeDNSForward(w, req)
 		if resp != nil {
 			s.rcache.InsertMessage(cache.Key(q, dnssec, tcp), resp)
-			metrics.SizeAndDuration(w, resp, start)
+			println(metrics.Done)
+				println("ACTUALLY AS THIS POINT")
+			metrics.Duration(w, resp, start, metrics.Rec)
 		}
 		return
 	}
 
-	metrics.CacheMiss("response")
+	metrics.CacheMiss(metrics.Response)
 
 	defer func() {
 		if m.Rcode == dns.RcodeServerFailure {
+			metrics.ErrorCount(metrics.Auth, metrics.Fail)
 			if err := w.WriteMsg(m); err != nil {
 				logf("failure to return reply %q", err)
 			}
 			return
+		}
+		if m.Rcode == dns.RcodeNameError {
+			metrics.ErrorCount(metrics.Auth, metrics.Nxdomain)
 		}
 		// Set TTL to the minimum of the RRset and dedup the message, i.e. remove identical RRs.
 		m = s.dedup(m)
@@ -296,7 +303,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			}
 		}
 
-		if send := s.overflowOrTruncated(w, m, int(bufsize)); send {
+		if send := s.overflowOrTruncated(w, m, int(bufsize), metrics.Auth); send {
 			return
 		}
 
@@ -305,7 +312,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if err := w.WriteMsg(m); err != nil {
 			logf("failure to return reply %q", err)
 		}
-		metrics.SizeAndDuration(w, m, start)
+		metrics.Duration(w, m, start, metrics.Auth)
 	}()
 
 	if name == s.config.Domain {
@@ -369,7 +376,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		// Lookup s.config.DnsDomain
 		records, extra, err := s.NSRecords(q, s.config.dnsDomain)
 		if isEtcdNameError(err, s) {
-			s.NameError(m, req)
+			m = s.NameError(req)
 			return
 		}
 		m.Answer = append(m.Answer, records...)
@@ -377,28 +384,28 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	case dns.TypeA, dns.TypeAAAA:
 		records, err := s.AddressRecords(q, name, nil, bufsize, dnssec, false)
 		if isEtcdNameError(err, s) {
-			s.NameError(m, req)
+			m = s.NameError(req)
 			return
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeTXT:
 		records, err := s.TXTRecords(q, name)
 		if isEtcdNameError(err, s) {
-			s.NameError(m, req)
+			m = s.NameError(req)
 			return
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeCNAME:
 		records, err := s.CNAMERecords(q, name)
 		if isEtcdNameError(err, s) {
-			s.NameError(m, req)
+			m = s.NameError(req)
 			return
 		}
 		m.Answer = append(m.Answer, records...)
 	case dns.TypeMX:
 		records, extra, err := s.MXRecords(q, name, bufsize, dnssec)
 		if isEtcdNameError(err, s) {
-			s.NameError(m, req)
+			m = s.NameError(req)
 			return
 		}
 		m.Answer = append(m.Answer, records...)
@@ -409,12 +416,12 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		records, extra, err := s.SRVRecords(q, name, bufsize, dnssec)
 		if err != nil {
 			if isEtcdNameError(err, s) {
-				s.NameError(m, req)
+				m = s.NameError(req)
 				return
 			}
 			logf("got error from backend: %s", err)
 			if q.Qtype == dns.TypeSRV { // Otherwise NODATA
-				s.ServerFailure(m, req)
+				m = s.ServerFailure(req)
 				return
 			}
 		}
@@ -738,23 +745,18 @@ func (s *server) isDuplicateCNAME(r *dns.CNAME, records []dns.RR) bool {
 	return false
 }
 
-func (s *server) NameError(m, req *dns.Msg) {
+func (s *server) NameError(req *dns.Msg) *dns.Msg {
+	m := new(dns.Msg)
 	m.SetRcode(req, dns.RcodeNameError)
 	m.Ns = []dns.RR{s.NewSOA()}
 	m.Ns[0].Header().Ttl = s.config.MinTtl
-	metrics.ErrorCount("nxdomain")
+	return m
 }
 
-func (s *server) NoDataError(m, req *dns.Msg) {
-	m.SetRcode(req, dns.RcodeSuccess)
-	m.Ns = []dns.RR{s.NewSOA()}
-	m.Ns[0].Header().Ttl = s.config.MinTtl
-	metrics.ErrorCount("nodata")
-}
-
-func (s *server) ServerFailure(m, req *dns.Msg) {
+func (s *server) ServerFailure(req *dns.Msg) *dns.Msg {
+	m := new(dns.Msg)
 	m.SetRcode(req, dns.RcodeServerFailure)
-	metrics.ErrorCount("servfail")
+	return m
 }
 
 func (s *server) RoundRobin(rrs []dns.RR) {
@@ -869,13 +871,12 @@ func (s *server) dedup(m *dns.Msg) *dns.Msg {
 // overflowOrTruncated writes back an error to the client if the message does not fit.
 // It updates prometheus metrics. If something has been written to the client, true
 // will be returned.
-func (s *server) overflowOrTruncated(w dns.ResponseWriter, m *dns.Msg, bufsize int) bool {
+func (s *server) overflowOrTruncated(w dns.ResponseWriter, m *dns.Msg, bufsize int, sy metrics.System) bool {
 	switch isTCP(w) {
 	case true:
 		if _, overflow := Fit(m, dns.MaxMsgSize, true); overflow {
-			metrics.ErrorCount("overflow")
-			msgFail := new(dns.Msg)
-			s.ServerFailure(msgFail, m)
+			metrics.ErrorCount(sy, metrics.Overflow)
+			msgFail := s.ServerFailure(m)
 			w.WriteMsg(msgFail)
 			return true
 		}
@@ -883,7 +884,7 @@ func (s *server) overflowOrTruncated(w dns.ResponseWriter, m *dns.Msg, bufsize i
 		// Overflow with udp always results in TC.
 		Fit(m, bufsize, false)
 		if m.Truncated {
-			metrics.ErrorCount("truncated")
+			metrics.ErrorCount(sy, metrics.Truncated)
 			w.WriteMsg(m)
 			return true
 		}
@@ -908,4 +909,3 @@ func isEtcdNameError(err error, s *server) bool {
 	}
 	return false
 }
-

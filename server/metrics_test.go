@@ -34,7 +34,6 @@ func scrape(t *testing.T, key string) int {
 	println(string(body))
 
 	// Find value for key.
-	println(string(key))
 	n := bytes.Index(body, []byte(key))
 	if n == -1 {
 		return -1
@@ -62,9 +61,9 @@ func TestMetrics(t *testing.T) {
 	defer s.Stop()
 
 	query("miek.nl.", dns.TypeMX)
-	v0 := scrape(t, "test_test_dns_request_external_count{type=\"recursive\"}")
+	v0 := scrape(t, "test_test_dns_request_count{system=\"recursive\"}")
 	query("miek.nl.", dns.TypeMX)
-	v1 := scrape(t, "test_test_dns_request_external_count{type=\"recursive\"}")
+	v1 := scrape(t, "test_test_dns_request_count{system=\"recursive\"}")
 	println(v1)
 	if v1 != v0+1 {
 		t.Fatalf("expecting %d, got %d", v0+1, v1)
