@@ -190,20 +190,16 @@ func validateHostPort(hostPort string) error {
 func newEtcdClient(machines []string, tlsCert, tlsKey, tlsCACert string) (etcd.KeysAPI, error) {
 	etcdCfg := etcd.Config{
 		Endpoints: machines,
-		Transport: newHttpTransport(tlsCert, tlsKey, tlsCACert),
+		Transport: newHTTPSTransport(tlsCert, tlsKey, tlsCACert),
 	}
 	cli, err := etcd.New(etcdCfg)
 	if err != nil {
 		return nil, err
 	}
-
-	// Periodically sync etcd
-	go cli.AutoSync(ctx, 15*time.Second)
-
 	return etcd.NewKeysAPI(cli), nil
 }
 
-func newHttpTransport(tlsCertFile, tlsKeyFile, tlsCACertFile string) etcd.CancelableTransport {
+func newHTTPSTransport(tlsCertFile, tlsKeyFile, tlsCACertFile string) etcd.CancelableTransport {
 	var cc *tls.Config = nil
 
 	if tlsCertFile != "" && tlsKeyFile != "" {
