@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
+	etcd "github.com/coreos/etcd/client"
 	"github.com/coreos/go-systemd/activation"
 	"github.com/miekg/dns"
 	"github.com/skynetservices/skydns/cache"
@@ -910,10 +910,8 @@ func isTCP(w dns.ResponseWriter) bool {
 // etcNameError return a NameError to the client if the error
 // returned from etcd has ErrorCode == 100.
 func isEtcdNameError(err error, s *server) bool {
-	if e, ok := err.(*etcd.EtcdError); ok {
-		if e.ErrorCode == 100 {
-			return true
-		}
+	if e, ok := err.(etcd.Error); ok && e.Code == etcd.ErrorCodeKeyNotFound {
+		return true
 	}
 	if err != nil {
 		logf("error from backend: %s", err)
