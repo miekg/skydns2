@@ -128,13 +128,7 @@ SkyDNS uses these environment variables:
 * `SKYDNS_PATH_PREFIX` - backend(etcd) path prefix, defaults to skydns (i.e. if it is set to `mydns`, the SkyDNS's configuration object should be stored under the key `/mydns/config`). Overwrite with `-path-prefix` string flag.
 * `SKYDNS_SYSTEMD`: set to `true` to bind to socket(s) activated by systemd (ignores SKYDNS_ADDR). Overwrite with `-systemd` bool flag.
 
-And these are used for statistics:
-
-* `GRAPHITE_SERVER`
-* `GRAPHITE_PREFIX`
-* `STATHAT_USER`
-
-And for [Prometheus](http://prometheus.io/) the following environment variables
+For [Prometheus](http://prometheus.io/) the following environment variables
 are available:
 
 * `PROMETHEUS_PORT`: port where the HTTP server for prometheus will run.

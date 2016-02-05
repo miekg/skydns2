@@ -16,11 +16,13 @@ import (
 	"testing"
 	"time"
 
-	etcd "github.com/coreos/etcd/client"
-	"github.com/miekg/dns"
+	"github.com/miekg/skydns/metrics"
 	backendetcd "github.com/skynetservices/skydns/backends/etcd"
 	"github.com/skynetservices/skydns/cache"
 	"github.com/skynetservices/skydns/msg"
+
+	etcd "github.com/coreos/etcd/client"
+	"github.com/miekg/dns"
 	"golang.org/x/net/context"
 )
 
@@ -83,12 +85,12 @@ func newTestServer(t *testing.T, c bool) *server {
 	s.config.Ttl = 3600
 	s.config.Ndots = 2
 
-	prometheusPort = "12300"
-	prometheusSubsystem = "test"
-	prometheusNamespace = "test"
+	metrics.Port = "12300"
+	metrics.Subsystem = "test"
+	metrics.Namespace = "test"
 	if !metricsDone {
 		metricsDone = true
-		Metrics()
+		metrics.Metrics()
 	}
 
 	s.dnsUDPclient = &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
@@ -307,7 +309,7 @@ func TestDNSTtlRR(t *testing.T) {
 	defer s.Stop()
 
 	serv := &msg.Service{Host: "10.0.0.2", Key: "ttl.skydns.test.", Ttl: 360}
-	addService(t, s, serv.Key, time.Duration(serv.Ttl) * time.Second, serv)
+	addService(t, s, serv.Key, time.Duration(serv.Ttl)*time.Second, serv)
 	defer delService(t, s, serv.Key)
 
 	c := new(dns.Client)

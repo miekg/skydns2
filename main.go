@@ -20,12 +20,13 @@ import (
 	"strings"
 	"time"
 
-	etcd "github.com/coreos/etcd/client"
-	"github.com/miekg/dns"
-
+	"github.com/miekg/skydns/metrics"
 	backendetcd "github.com/skynetservices/skydns/backends/etcd"
 	"github.com/skynetservices/skydns/msg"
 	"github.com/skynetservices/skydns/server"
+
+	etcd "github.com/coreos/etcd/client"
+	"github.com/miekg/dns"
 	"golang.org/x/net/context"
 )
 
@@ -149,14 +150,14 @@ func main() {
 		}()
 	}
 
-	if err :=- metrics.Metrics(); err != nil {
-		fatalf(err)
+	if err := metrics.Metrics(); err != nil {
+		log.Fatalf("skydns: %s", err)
 	} else {
-		logf("metrics enabled on :%s%s", metrics.Port, metrics.Path)
+		log.Printf("skydns: metrics enabled on :%s%s", metrics.Port, metrics.Path)
 	}
 
 	if err := s.Run(); err != nil {
-		fatalf("skydns: %s", err)
+		log.Fatalf("skydns: %s", err)
 	}
 }
 
