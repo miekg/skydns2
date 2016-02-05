@@ -11,6 +11,7 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/skynetservices/skydns/msg"
+	"github.com/skynetservices/skydns/metrics"
 )
 
 const ednsStubCode = dns.EDNS0LOCALSTART + 10
@@ -68,8 +69,7 @@ func (s *server) UpdateStubZones() {
 
 // ServeDNSStubForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSStubForward(w dns.ResponseWriter, req *dns.Msg, ns []string) *dns.Msg {
-	StatsStubForwardCount.Inc(1)
-	promExternalRequestCount.WithLabelValues("stub").Inc()
+	metrics.ExternalRequest("stub")
 
 	// Check EDNS0 Stub option, if set drop the packet.
 	option := req.IsEdns0()

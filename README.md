@@ -147,22 +147,20 @@ be enabled.
 
 Current counters are:
 
-*  promExternalRequestCount, counts requests to external recursive nameservers
+*  `dns_request_external_count`, counts requests to external recursive nameservers
    with the label value "recursive", the number of stub lookups (label value is
    "stub"), and "lookup", which are recursive lookups done while resolving data
    from Etcd.
-*  promRequestCount, number of requests with make with "udp" and "tcp", these
+*  `dns_request_count`, number of requests with make with "udp" and "tcp", these
    are also the label values used.
-*  promErrorCount, counts errors from authoritative answers only! Label values
+*  `dns_error_count`, counts errors from authoritative answers only! Label values
    used are "nxomdain", "nodata", "truncated", "refused" and "overflow".
-*  promCacheSize, current cache size in number of elements. Label values are
-   "response" and "signature" (DNSSEC cache)
-*  promCacheMiss, counter for cache misses. Label values are "response" and
+*  `dns_cache_miss_count`, counter for cache misses. Label values are "response" and
    "signature".
-*  promDnssecOkCount, number of requests that have the DO bit set.
-*  promRequestDuration: time in seconds it took to handle this request. Label
+*  `dns_dnssec_ok_count`, number of requests that have the DO bit set.
+*  `dns_request_duration`: time in seconds it took to handle this request. Label
    values are "tcp" and "udp".
-*  promResponseSize: size in bytes of the response. Label values are "tcp" and
+*  `dns_request_size`: size in bytes of the response. Label values are "tcp" and
    "udp".
 
 
@@ -748,27 +746,3 @@ If you run it, SkyDNS needs to access Etcd (or whatever backend), which usually
 runs on the host server (i.e. when using CoreOS), to make that work, just run:
 
     docker run --net host <image>
-
-
-# License
-
-The MIT License (MIT)
-
-Copyright © 2014 The SkyDNS Authors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

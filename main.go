@@ -26,7 +26,6 @@ import (
 	backendetcd "github.com/skynetservices/skydns/backends/etcd"
 	"github.com/skynetservices/skydns/msg"
 	"github.com/skynetservices/skydns/server"
-	"github.com/skynetservices/skydns/stats"
 	"golang.org/x/net/context"
 )
 
@@ -150,11 +149,14 @@ func main() {
 		}()
 	}
 
-	stats.Collect()  // Graphite
-	server.Metrics() // Prometheus
+	if err :=- metrics.Metrics(); err != nil {
+		fatalf(err)
+	} else {
+		logf("metrics enabled on :%s%s", metrics.Port, metrics.Path)
+	}
 
 	if err := s.Run(); err != nil {
-		log.Fatalf("skydns: %s", err)
+		fatalf("skydns: %s", err)
 	}
 }
 

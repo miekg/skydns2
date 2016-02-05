@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/miekg/skydns/metrics"
 	"github.com/skynetservices/skydns/cache"
 )
 
@@ -112,8 +113,7 @@ func (s *server) signSet(r []dns.RR, now time.Time, incep, expir uint32) (*dns.R
 		logf("scache miss for %s type %d", r[0].Header().Name, r[0].Header().Rrtype)
 	}
 
-	StatsDnssecCacheMiss.Inc(1)
-	promCacheMiss.WithLabelValues("signature").Inc()
+	metrics.CacheMiss("signature")
 
 	sig, err, shared := inflight.Do(key, func() (*dns.RRSIG, error) {
 		sig1 := s.NewRRSIG(incep, expir)
