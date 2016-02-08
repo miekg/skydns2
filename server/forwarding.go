@@ -8,17 +8,14 @@ import (
 	"fmt"
 
 	"github.com/miekg/dns"
-	"github.com/miekg/skydns/metrics"
 )
 
 // ServeDNSForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) *dns.Msg {
-	metrics.RequestCount(w, req, metrics.Rec)
 
 	if s.config.NoRec {
 		m := s.ServerFailure(req)
 		w.WriteMsg(m)
-		metrics.ErrorCount(metrics.Rec, metrics.Fail)
 		return m
 	}
 
@@ -33,7 +30,6 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) *dns.Msg {
 		m := s.ServerFailure(req)
 		m.RecursionAvailable = true // this is still true
 		w.WriteMsg(m)
-		metrics.ErrorCount(metrics.Rec, metrics.Fail)
 		return m
 	}
 
@@ -73,15 +69,12 @@ Redo:
 
 	logf("failure to forward request %q", err)
 	m := s.ServerFailure(req)
-	metrics.ErrorCount(metrics.Rec, metrics.Fail)
 	return m
 }
 
 // ServeDNSReverse is the handler for DNS requests for the reverse zone. If nothing is found
 // locally the request is forwarded to the forwarder for resolution.
 func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) *dns.Msg {
-	metrics.RequestCount(w, req, metrics.Reverse)
-
 	m := new(dns.Msg)
 	m.SetReply(req)
 	m.Compress = true

@@ -29,9 +29,9 @@ import (
 // Keep global port counter that increments with 10 for each
 // new call to newTestServer. The dns server is started on port 'Port'.
 var (
-	Port        = 9400
-	StrPort     = "9400" // string equivalent of Port
-	ctx         = context.Background()
+	Port    = 9400
+	StrPort = "9400" // string equivalent of Port
+	ctx     = context.Background()
 )
 
 func addService(t *testing.T, s *server, k string, ttl time.Duration, m *msg.Service) {
@@ -98,9 +98,7 @@ func newTestServer(t *testing.T, c bool) *server {
 	})
 
 	go s.Run()
-	// Yeah, yeah, should do a proper fix.
-	time.Sleep(500 * time.Millisecond)
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond) // Yeah, yeah, should do a proper fix
 	return s
 }
 

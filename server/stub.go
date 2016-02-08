@@ -69,8 +69,6 @@ func (s *server) UpdateStubZones() {
 
 // ServeDNSStubForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSStubForward(w dns.ResponseWriter, req *dns.Msg, ns []string) *dns.Msg {
-	metrics.RequestCount(w, req, metrics.Stub)
-
 	// Check EDNS0 Stub option, if set drop the packet.
 	option := req.IsEdns0()
 	if option != nil {
@@ -127,6 +125,5 @@ Redo:
 	logf("failure to forward stub request %q", err)
 	m := s.ServerFailure(req)
 	w.WriteMsg(m)
-	metrics.ErrorCount(metrics.Stub, metrics.Fail)
 	return m
 }

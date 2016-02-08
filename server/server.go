@@ -189,7 +189,11 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.RecursionDesired = false
 		m.Compress = false
 		w.WriteMsg(m)
-		metrics.ErrorCount(metrics.Auth, metrics.Refused)
+
+		metrics.RequestCount(m, metrics.Auth)
+		metrics.Duration(m, start, metrics.Auth)
+		metrics.ErrorCount(m, metrics.Auth)
+
 		return
 	}
 
@@ -212,7 +216,8 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	// Check cache first.
 	m1 := s.rcache.Hit(q, dnssec, tcp, m.Id)
 	if m1 != nil {
-		metrics.RequestCount(w, req, metrics.Cache)
+		metrics.RequestCount(req, metrics.Cache)
+
 		if send := s.overflowOrTruncated(w, m1, int(bufsize), metrics.Cache); send {
 			return
 		}
@@ -226,18 +231,24 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if err := w.WriteMsg(m1); err != nil {
 			logf("failure to return reply %q", err)
 		}
-		metrics.Duration(w, m1, start, metrics.Cache)
+
+		metrics.Duration(m1, start, metrics.Cache)
+		metrics.ErrorCount(m1, metrics.Cache)
 		return
 	}
 
 
 	for zone, ns := range *s.config.stub {
 		if strings.HasSuffix(name, zone) {
+			metrics.RequestCount(req, metrics.Stub)
+
 			resp := s.ServeDNSStubForward(w, req, ns)
 			if resp != nil {
 				s.rcache.InsertMessage(cache.Key(q, dnssec, tcp), resp)
-				metrics.Duration(w, resp, start, metrics.Stub)
 			}
+
+			metrics.Duration(resp, start, metrics.Stub)
+			metrics.ErrorCount(resp, metrics.Stub)
 			return
 		}
 	}
@@ -248,37 +259,42 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	if q.Qtype == dns.TypePTR && strings.HasSuffix(name, ".in-addr.arpa.") || strings.HasSuffix(name, ".ip6.arpa.") {
+		metrics.RequestCount(req, metrics.Reverse)
+
 		resp := s.ServeDNSReverse(w, req)
 		if resp != nil {
 			s.rcache.InsertMessage(cache.Key(q, dnssec, tcp), resp)
-			metrics.Duration(w, resp, start, metrics.Reverse)
 		}
+
+		metrics.Duration(resp, start, metrics.Reverse)
+		metrics.ErrorCount(resp, metrics.Reverse)
 		return
 	}
 
 	if q.Qclass != dns.ClassCHAOS && !strings.HasSuffix(name, s.config.Domain) {
+		metrics.RequestCount(req, metrics.Rec)
+
 		resp := s.ServeDNSForward(w, req)
 		if resp != nil {
 			s.rcache.InsertMessage(cache.Key(q, dnssec, tcp), resp)
-			println(metrics.Done)
-				println("ACTUALLY AS THIS POINT")
-			metrics.Duration(w, resp, start, metrics.Rec)
 		}
+
+		metrics.Duration(resp, start, metrics.Rec)
+		metrics.ErrorCount(resp, metrics.Rec)
 		return
 	}
 
 	metrics.CacheMiss(metrics.Response)
 
 	defer func() {
+		metrics.Duration(m, start, metrics.Auth)
+		metrics.ErrorCount(m, metrics.Auth)
+
 		if m.Rcode == dns.RcodeServerFailure {
-			metrics.ErrorCount(metrics.Auth, metrics.Fail)
 			if err := w.WriteMsg(m); err != nil {
 				logf("failure to return reply %q", err)
 			}
 			return
-		}
-		if m.Rcode == dns.RcodeNameError {
-			metrics.ErrorCount(metrics.Auth, metrics.Nxdomain)
 		}
 		// Set TTL to the minimum of the RRset and dedup the message, i.e. remove identical RRs.
 		m = s.dedup(m)
@@ -312,7 +328,6 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		if err := w.WriteMsg(m); err != nil {
 			logf("failure to return reply %q", err)
 		}
-		metrics.Duration(w, m, start, metrics.Auth)
 	}()
 
 	if name == s.config.Domain {

@@ -26,8 +26,6 @@ var (
 	responseSize    *prometheus.HistogramVec
 	errorCount      *prometheus.CounterVec
 	cacheMiss       *prometheus.CounterVec
-
-	Done = false
 )
 
 type (
@@ -96,16 +94,21 @@ func define() {
 		Name:      "dns_cache_miss_count",
 		Help:      "Counter of DNS requests that result in a cache miss.",
 	}, []string{"cache"})
+
+	println("define")
+	println(requestDuration)
+	println(responseSize)
+	println("define, done")
 }
 
 // Metrics registers the DNS metrics to Prometheus, and starts the internal metrics
 // server if the environment variable PROMETHEUS_PORT is set.
 func Metrics() error {
-	if Done {
-		return nil
-	}
 	// We do this in a function instead of using var + init(), because we want to
 	// able to set Namespace and/or Subsystem.
+	println(requestDuration)
+	println(responseSize)
+	println(requestCount)
 	define()
 
 	prometheus.MustRegister(requestCount)
@@ -113,8 +116,13 @@ func Metrics() error {
 	prometheus.MustRegister(responseSize)
 	prometheus.MustRegister(errorCount)
 	prometheus.MustRegister(cacheMiss)
+	println(requestDuration)
+	println(responseSize)
+	println(requestCount)
+	println("after registger")
 
 	if Port == "" {
+		println("NO PORT")
 		return nil
 	}
 
@@ -127,48 +135,45 @@ func Metrics() error {
 	go func() {
 		fmt.Errorf("%s", http.ListenAndServe(":"+Port, nil))
 	}()
-	println("INITIALIZED")
-	Done = true
 	return nil
 }
 
-func Duration(w dns.ResponseWriter, resp *dns.Msg, start time.Time, sys System) {
-	println("DODING DURATION", string(sys))
-	if !Done {
-		println("WHWHAWA")
-		return
-	}
+func Duration(resp *dns.Msg, start time.Time, sys System) {
 	rlen := float64(0)
 	if resp != nil {
 		rlen = float64(resp.Len())
 	}
+	println(string(sys), start.String())
+	println(requestCount)
+	println(requestDuration)
+	println(responseSize)
 	requestDuration.WithLabelValues(string(sys)).Observe(float64(time.Since(start)) / float64(time.Second))
 	responseSize.WithLabelValues(string(sys)).Observe(rlen)
 }
 
-func RequestCount(w dns.ResponseWriter, req *dns.Msg, sys System) {
-	println(Done)
-	println("DOING REQUEST COUNT", string(sys))
-	if !Done {
-		println("WHWHAWA NOA ASHA ")
-		return
-	}
+func RequestCount(req *dns.Msg, sys System) {
 	requestCount.WithLabelValues(string(sys)).Inc()
+	println(requestCount)
 }
 
-func ErrorCount(sys System, ca Cause) {
-	if !Done {
+func ErrorCount(resp *dns.Msg, sys System) {
+	if resp == nil {
 		return
 	}
-	errorCount.WithLabelValues(string(sys), string(ca)).Inc()
+
+	switch resp.Rcode {
+	case dns.RcodeServerFailure:
+		errorCount.WithLabelValues(string(sys), string(Fail)).Inc()
+	case dns.RcodeRefused:
+		errorCount.WithLabelValues(string(sys), string(Refused)).Inc()
+	case dns.RcodeNameError:
+		errorCount.WithLabelValues(string(sys), string(Nxdomain)).Inc()
+	// nodata ??
+	}
+
 }
 
-func CacheMiss(ca CacheType) {
-	if !Done {
-		return
-	}
-	cacheMiss.WithLabelValues(string(ca)).Inc()
-}
+func CacheMiss(ca CacheType) { cacheMiss.WithLabelValues(string(ca)).Inc() }
 
 func envOrDefault(env, def string) string {
 	e := os.Getenv(env)
