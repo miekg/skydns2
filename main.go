@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miekg/skydns/metrics"
 	backendetcd "github.com/skynetservices/skydns/backends/etcd"
+	"github.com/skynetservices/skydns/metrics"
 	"github.com/skynetservices/skydns/msg"
 	"github.com/skynetservices/skydns/server"
 

@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miekg/skydns/metrics"
 	backendetcd "github.com/skynetservices/skydns/backends/etcd"
 	"github.com/skynetservices/skydns/cache"
 	"github.com/skynetservices/skydns/msg"
@@ -83,11 +82,6 @@ func newTestServer(t *testing.T, c bool) *server {
 	s.config.RCacheTtl = RCacheTtl
 	s.config.Ttl = 3600
 	s.config.Ndots = 2
-
-	metrics.Port = "12300"
-	metrics.Subsystem = "test"
-	metrics.Namespace = "test"
-	metrics.Metrics()
 
 	s.dnsUDPclient = &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
 	s.dnsTCPclient = &dns.Client{Net: "tcp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}

@@ -18,7 +18,7 @@ import (
 var (
 	Port      = os.Getenv("PROMETHEUS_PORT")
 	Path      = envOrDefault("PROMETHEUS_PATH", "/metrics")
-	Namespace = os.Getenv("PROMETHEUS_NAMESPACE")
+	Namespace = envOrDefault("PROMETHEUS_NAMESPACE", "skydns")
 	Subsystem = envOrDefault("PROMETHEUS_SUBSYSTEM", "skydns")
 
 	requestCount    *prometheus.CounterVec
@@ -52,7 +52,7 @@ var (
 	Signature CacheType = "signature"
 )
 
-func define() {
+func defineMetrics() {
 	requestCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: Namespace,
 		Subsystem: Subsystem,
@@ -73,7 +73,6 @@ func define() {
 		Subsystem: Subsystem,
 		Name:      "dns_response_size",
 		Help:      "Size of the returns response in bytes.",
-		// 4k increments after 4096
 		Buckets: []float64{0, 512, 1024, 1500, 2048, 4096,
 			8192, 12288, 16384, 20480, 24576, 28672, 32768, 36864,
 			40960, 45056, 49152, 53248, 57344, 61440, 65536,
@@ -100,14 +99,6 @@ func define() {
 func Metrics() error {
 	// We do this in a function instead of using var + init(), because we want to
 	// able to set Namespace and/or Subsystem.
-	define()
-
-	prometheus.MustRegister(requestCount)
-	prometheus.MustRegister(requestDuration)
-	prometheus.MustRegister(responseSize)
-	prometheus.MustRegister(errorCount)
-	prometheus.MustRegister(cacheMiss)
-
 	if Port == "" {
 		return nil
 	}
@@ -117,6 +108,14 @@ func Metrics() error {
 		fmt.Errorf("bad port for prometheus: %s", Port)
 	}
 
+	defineMetrics()
+
+	prometheus.MustRegister(requestCount)
+	prometheus.MustRegister(requestDuration)
+	prometheus.MustRegister(responseSize)
+	prometheus.MustRegister(errorCount)
+	prometheus.MustRegister(cacheMiss)
+
 	http.Handle(Path, prometheus.Handler())
 	go func() {
 		fmt.Errorf("%s", http.ListenAndServe(":"+Port, nil))
@@ -124,7 +123,7 @@ func Metrics() error {
 	return nil
 }
 
-func Duration(resp *dns.Msg, start time.Time, sys System) {
+func ReportDuration(resp *dns.Msg, start time.Time, sys System) {
 	if requestDuration == nil || responseSize == nil {
 		return
 	}
@@ -137,15 +136,16 @@ func Duration(resp *dns.Msg, start time.Time, sys System) {
 	responseSize.WithLabelValues(string(sys)).Observe(rlen)
 }
 
-func RequestCount(req *dns.Msg, sys System) {
+func ReportRequestCount(req *dns.Msg, sys System) {
 	if requestCount == nil {
+		println("NIL")
 		return
 	}
 
 	requestCount.WithLabelValues(string(sys)).Inc()
 }
 
-func ErrorCount(resp *dns.Msg, sys System) {
+func ReportErrorCount(resp *dns.Msg, sys System) {
 	if resp == nil || errorCount == nil {
 		return
 	}
@@ -171,7 +171,7 @@ func ErrorCount(resp *dns.Msg, sys System) {
 
 }
 
-func CacheMiss(ca CacheType) {
+func ReportCacheMiss(ca CacheType) {
 	if cacheMiss == nil {
 		return
 	}

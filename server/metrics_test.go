@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/skynetservices/skydns/metrics"
+
 	"github.com/miekg/dns"
 )
 
@@ -58,6 +60,11 @@ func scrape(t *testing.T, key string) int {
 func TestMetrics(t *testing.T) {
 	s := newTestServer(t, false)
 	defer s.Stop()
+
+	metrics.Port = "12300"
+	metrics.Subsystem = "test"
+	metrics.Namespace = "test"
+	metrics.Metrics()
 
 	query("miek.nl.", dns.TypeMX)
 	v0 := scrape(t, "test_test_dns_request_count{system=\"recursive\"}")

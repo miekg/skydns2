@@ -13,12 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/skynetservices/skydns/cache"
+	"github.com/skynetservices/skydns/metrics"
+	"github.com/skynetservices/skydns/msg"
+
 	etcd "github.com/coreos/etcd/client"
 	"github.com/coreos/go-systemd/activation"
 	"github.com/miekg/dns"
-	"github.com/skynetservices/skydns/cache"
-	"github.com/skynetservices/skydns/msg"
-	"github.com/skynetservices/skydns/metrics"
 )
 
 const Version = "2.5.3a"
@@ -190,9 +191,9 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		m.Compress = false
 		w.WriteMsg(m)
 
-		metrics.RequestCount(m, metrics.Auth)
-		metrics.Duration(m, start, metrics.Auth)
-		metrics.ErrorCount(m, metrics.Auth)
+		metrics.ReportRequestCount(m, metrics.Auth)
+		metrics.ReportDuration(m, start, metrics.Auth)
+		metrics.ReportErrorCount(m, metrics.Auth)
 
 		return
 	}
@@ -216,7 +217,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	// Check cache first.
 	m1 := s.rcache.Hit(q, dnssec, tcp, m.Id)
 	if m1 != nil {
-		metrics.RequestCount(req, metrics.Cache)
+		metrics.ReportRequestCount(req, metrics.Cache)
 
 		if send := s.overflowOrTruncated(w, m1, int(bufsize), metrics.Cache); send {
 			return
@@ -232,23 +233,22 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			logf("failure to return reply %q", err)
 		}
 
-		metrics.Duration(m1, start, metrics.Cache)
-		metrics.ErrorCount(m1, metrics.Cache)
+		metrics.ReportDuration(m1, start, metrics.Cache)
+		metrics.ReportErrorCount(m1, metrics.Cache)
 		return
 	}
 
-
 	for zone, ns := range *s.config.stub {
 		if strings.HasSuffix(name, zone) {
-			metrics.RequestCount(req, metrics.Stub)
+			metrics.ReportRequestCount(req, metrics.Stub)
 
 			resp := s.ServeDNSStubForward(w, req, ns)
 			if resp != nil {
 				s.rcache.InsertMessage(cache.Key(q, dnssec, tcp), resp)
 			}
 
-			metrics.Duration(resp, start, metrics.Stub)
-			metrics.ErrorCount(resp, metrics.Stub)
+			metrics.ReportDuration(resp, start, metrics.Stub)
+			metrics.ReportErrorCount(resp, metrics.Stub)
 			return
 		}
 	}
@@ -259,36 +259,36 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	if q.Qtype == dns.TypePTR && strings.HasSuffix(name, ".in-addr.arpa.") || strings.HasSuffix(name, ".ip6.arpa.") {
-		metrics.RequestCount(req, metrics.Reverse)
+		metrics.ReportRequestCount(req, metrics.Reverse)
 
 		resp := s.ServeDNSReverse(w, req)
 		if resp != nil {
 			s.rcache.InsertMessage(cache.Key(q, dnssec, tcp), resp)
 		}
 
-		metrics.Duration(resp, start, metrics.Reverse)
-		metrics.ErrorCount(resp, metrics.Reverse)
+		metrics.ReportDuration(resp, start, metrics.Reverse)
+		metrics.ReportErrorCount(resp, metrics.Reverse)
 		return
 	}
 
 	if q.Qclass != dns.ClassCHAOS && !strings.HasSuffix(name, s.config.Domain) {
-		metrics.RequestCount(req, metrics.Rec)
+		metrics.ReportRequestCount(req, metrics.Rec)
 
 		resp := s.ServeDNSForward(w, req)
 		if resp != nil {
 			s.rcache.InsertMessage(cache.Key(q, dnssec, tcp), resp)
 		}
 
-		metrics.Duration(resp, start, metrics.Rec)
-		metrics.ErrorCount(resp, metrics.Rec)
+		metrics.ReportDuration(resp, start, metrics.Rec)
+		metrics.ReportErrorCount(resp, metrics.Rec)
 		return
 	}
 
-	metrics.CacheMiss(metrics.Response)
+	metrics.ReportCacheMiss(metrics.Response)
 
 	defer func() {
-		metrics.Duration(m, start, metrics.Auth)
-		metrics.ErrorCount(m, metrics.Auth)
+		metrics.ReportDuration(m, start, metrics.Auth)
+		metrics.ReportErrorCount(m, metrics.Auth)
 
 		if m.Rcode == dns.RcodeServerFailure {
 			if err := w.WriteMsg(m); err != nil {
@@ -883,6 +883,7 @@ func (s *server) dedup(m *dns.Msg) *dns.Msg {
 
 	return m
 }
+
 // overflowOrTruncated writes back an error to the client if the message does not fit.
 // It updates prometheus metrics. If something has been written to the client, true
 // will be returned.
@@ -890,7 +891,7 @@ func (s *server) overflowOrTruncated(w dns.ResponseWriter, m *dns.Msg, bufsize i
 	switch isTCP(w) {
 	case true:
 		if _, overflow := Fit(m, dns.MaxMsgSize, true); overflow {
-			metrics.ErrorCount(m, sy)
+			metrics.ReportErrorCount(m, sy)
 			msgFail := s.ServerFailure(m)
 			w.WriteMsg(msgFail)
 			return true
@@ -898,7 +899,7 @@ func (s *server) overflowOrTruncated(w dns.ResponseWriter, m *dns.Msg, bufsize i
 	case false:
 		// Overflow with udp always results in TC.
 		Fit(m, bufsize, false)
-		metrics.ErrorCount(m, sy)
+		metrics.ReportErrorCount(m, sy)
 		if m.Truncated {
 			w.WriteMsg(m)
 			return true
