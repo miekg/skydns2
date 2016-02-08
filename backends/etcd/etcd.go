@@ -10,10 +10,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
+
+	"github.com/skynetservices/skydns/msg"
+	"github.com/skynetservices/skydns/singleflight"
 
 	etcd "github.com/coreos/etcd/client"
-	"github.com/skynetservices/skydns/msg"
 	"golang.org/x/net/context"
 )
 
@@ -28,7 +29,7 @@ type Backend struct {
 	client   etcd.KeysAPI
 	ctx      context.Context
 	config   *Config
-	inflight *etcdSingle
+	inflight *singleflight.Group
 }
 
 // NewBackend returns a new Backend for SkyDNS, backed by etcd.
@@ -37,7 +38,7 @@ func NewBackend(client etcd.KeysAPI, ctx context.Context, config *Config) *Backe
 		client:   client,
 		ctx:      ctx,
 		config:   config,
-		inflight: new(etcdSingle),
+		inflight: &singleflight.Group{},
 	}
 }
 
@@ -84,7 +85,7 @@ func (g *Backend) ReverseRecord(name string) (*msg.Service, error) {
 // get is a wrapper for client.Get that uses SingleInflight to suppress multiple
 // outstanding queries.
 func (g *Backend) get(path string, recursive bool) (*etcd.Response, error) {
-	resp, err, _ := g.inflight.Do(path, func() (*etcd.Response, error) {
+	resp, err := g.inflight.Do(path, func() (interface{}, error) {
 		r, e := g.client.Get(g.ctx, path, &etcd.GetOptions{Sort: false, Recursive: recursive})
 		if e != nil {
 			return nil, e
@@ -92,10 +93,9 @@ func (g *Backend) get(path string, recursive bool) (*etcd.Response, error) {
 		return r, e
 	})
 	if err != nil {
-		return resp, err
+		return nil, err
 	}
-	// shared?
-	return resp, err
+	return resp.(*etcd.Response), err
 }
 
 type bareService struct {
@@ -184,45 +184,7 @@ func (g *Backend) calculateTtl(node *etcd.Node, serv *msg.Service) uint32 {
 	return serv.Ttl
 }
 
-// Client exposes the underlying Etcd client.
+// Client exposes the underlying Etcd client (used in tests).
 func (g *Backend) Client() etcd.KeysAPI {
-	return g.client
-}
-
-type etcdCall struct {
-	wg   sync.WaitGroup
-	val  *etcd.Response
-	err  error
-	dups int
-}
-
-type etcdSingle struct {
-	sync.Mutex
-	m map[string]*etcdCall
-}
-
-func (g *etcdSingle) Do(key string, fn func() (*etcd.Response, error)) (*etcd.Response, error, bool) {
-	g.Lock()
-	if g.m == nil {
-		g.m = make(map[string]*etcdCall)
-	}
-	if c, ok := g.m[key]; ok {
-		c.dups++
-		g.Unlock()
-		c.wg.Wait()
-		return c.val, c.err, true
-	}
-	c := new(etcdCall)
-	c.wg.Add(1)
-	g.m[key] = c
-	g.Unlock()
-
-	c.val, c.err = fn()
-	c.wg.Done()
-
-	g.Lock()
-	delete(g.m, key)
-	g.Unlock()
-
-	return c.val, c.err, c.dups > 0
+       return g.client
 }
