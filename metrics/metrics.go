@@ -46,7 +46,6 @@ var (
 	Truncated Cause = "truncated"
 	Refused   Cause = "refused"
 	Overflow  Cause = "overflow"
-	Loop      Cause = "loop"
 	Fail      Cause = "servfail"
 
 	Response  CacheType = "response"
@@ -94,11 +93,6 @@ func define() {
 		Name:      "dns_cache_miss_count",
 		Help:      "Counter of DNS requests that result in a cache miss.",
 	}, []string{"cache"})
-
-	println("define")
-	println(requestDuration)
-	println(responseSize)
-	println("define, done")
 }
 
 // Metrics registers the DNS metrics to Prometheus, and starts the internal metrics
@@ -106,9 +100,6 @@ func define() {
 func Metrics() error {
 	// We do this in a function instead of using var + init(), because we want to
 	// able to set Namespace and/or Subsystem.
-	println(requestDuration)
-	println(responseSize)
-	println(requestCount)
 	define()
 
 	prometheus.MustRegister(requestCount)
@@ -116,13 +107,8 @@ func Metrics() error {
 	prometheus.MustRegister(responseSize)
 	prometheus.MustRegister(errorCount)
 	prometheus.MustRegister(cacheMiss)
-	println(requestDuration)
-	println(responseSize)
-	println(requestCount)
-	println("after registger")
 
 	if Port == "" {
-		println("NO PORT")
 		return nil
 	}
 
@@ -139,25 +125,37 @@ func Metrics() error {
 }
 
 func Duration(resp *dns.Msg, start time.Time, sys System) {
+	if requestDuration == nil || responseSize == nil {
+		return
+	}
+
 	rlen := float64(0)
 	if resp != nil {
 		rlen = float64(resp.Len())
 	}
-	println(string(sys), start.String())
-	println(requestCount)
-	println(requestDuration)
-	println(responseSize)
 	requestDuration.WithLabelValues(string(sys)).Observe(float64(time.Since(start)) / float64(time.Second))
 	responseSize.WithLabelValues(string(sys)).Observe(rlen)
 }
 
 func RequestCount(req *dns.Msg, sys System) {
+	if requestCount == nil {
+		return
+	}
+
 	requestCount.WithLabelValues(string(sys)).Inc()
-	println(requestCount)
 }
 
 func ErrorCount(resp *dns.Msg, sys System) {
-	if resp == nil {
+	if resp == nil || errorCount == nil {
+		return
+	}
+
+	if resp.Truncated {
+		errorCount.WithLabelValues(string(sys), string(Truncated)).Inc()
+		return
+	}
+	if resp.Len() > dns.MaxMsgSize {
+		errorCount.WithLabelValues(string(sys), string(Overflow)).Inc()
 		return
 	}
 
@@ -168,12 +166,17 @@ func ErrorCount(resp *dns.Msg, sys System) {
 		errorCount.WithLabelValues(string(sys), string(Refused)).Inc()
 	case dns.RcodeNameError:
 		errorCount.WithLabelValues(string(sys), string(Nxdomain)).Inc()
-	// nodata ??
+		// nodata ??
 	}
 
 }
 
-func CacheMiss(ca CacheType) { cacheMiss.WithLabelValues(string(ca)).Inc() }
+func CacheMiss(ca CacheType) {
+	if cacheMiss == nil {
+		return
+	}
+	cacheMiss.WithLabelValues(string(ca)).Inc()
+}
 
 func envOrDefault(env, def string) string {
 	e := os.Getenv(env)

@@ -890,7 +890,7 @@ func (s *server) overflowOrTruncated(w dns.ResponseWriter, m *dns.Msg, bufsize i
 	switch isTCP(w) {
 	case true:
 		if _, overflow := Fit(m, dns.MaxMsgSize, true); overflow {
-			metrics.ErrorCount(sy, metrics.Overflow)
+			metrics.ErrorCount(m, sy)
 			msgFail := s.ServerFailure(m)
 			w.WriteMsg(msgFail)
 			return true
@@ -898,8 +898,8 @@ func (s *server) overflowOrTruncated(w dns.ResponseWriter, m *dns.Msg, bufsize i
 	case false:
 		// Overflow with udp always results in TC.
 		Fit(m, bufsize, false)
+		metrics.ErrorCount(m, sy)
 		if m.Truncated {
-			metrics.ErrorCount(sy, metrics.Truncated)
 			w.WriteMsg(m)
 			return true
 		}

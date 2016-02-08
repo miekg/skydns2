@@ -11,7 +11,6 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/skynetservices/skydns/msg"
-	"github.com/skynetservices/skydns/metrics"
 )
 
 const ednsStubCode = dns.EDNS0LOCALSTART + 10
@@ -77,7 +76,6 @@ func (s *server) ServeDNSStubForward(w dns.ResponseWriter, req *dns.Msg, ns []st
 				o.(*dns.EDNS0_LOCAL).Data[0] == 1 {
 				// Maybe log source IP here?
 				logf("not fowarding stub request to another stub")
-				metrics.ErrorCount(metrics.Stub, metrics.Loop)
 				return nil
 			}
 		}

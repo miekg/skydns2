@@ -61,9 +61,9 @@ func TestMetrics(t *testing.T) {
 
 	query("miek.nl.", dns.TypeMX)
 	v0 := scrape(t, "test_test_dns_request_count{system=\"recursive\"}")
-//	query("miek.nl.", dns.TypeMX)
+	query("miek.nl.", dns.TypeMX)
 	v1 := scrape(t, "test_test_dns_request_count{system=\"recursive\"}")
-	println(v1)
+
 	if v1 != v0+1 {
 		t.Fatalf("expecting %d, got %d", v0+1, v1)
 	}
