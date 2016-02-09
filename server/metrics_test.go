@@ -40,8 +40,6 @@ func scrape(t *testing.T, key string) int {
 		return -1
 	}
 
-	println(string(body))
-
 	i := n
 	for i < len(body) {
 		if body[i] == '\n' {
