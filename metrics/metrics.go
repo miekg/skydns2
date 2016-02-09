@@ -138,7 +138,6 @@ func ReportDuration(resp *dns.Msg, start time.Time, sys System) {
 
 func ReportRequestCount(req *dns.Msg, sys System) {
 	if requestCount == nil {
-		println("NIL")
 		return
 	}
 
