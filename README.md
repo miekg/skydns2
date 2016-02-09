@@ -141,22 +141,11 @@ be enabled.
 
 Current counters are:
 
-*  `dns_request_external_count`, counts requests to external recursive nameservers
-   with the label value "recursive", the number of stub lookups (label value is
-   "stub"), and "lookup", which are recursive lookups done while resolving data
-   from Etcd.
-*  `dns_request_count`, number of requests with make with "udp" and "tcp", these
-   are also the label values used.
-*  `dns_error_count`, counts errors from authoritative answers only! Label values
-   used are "nxomdain", "nodata", "truncated", "refused" and "overflow".
-*  `dns_cache_miss_count`, counter for cache misses. Label values are "response" and
-   "signature".
-*  `dns_dnssec_ok_count`, number of requests that have the DO bit set.
-*  `dns_request_duration`: time in seconds it took to handle this request. Label
-   values are "tcp" and "udp".
-*  `dns_request_size`: size in bytes of the response. Label values are "tcp" and
-   "udp".
-
+*  `dns_request_count_total`, total count of request made against SkyDNS.
+*  `dns_request_duration_seconds`, duration of the request handling in seconds.
+*  `dns_response_size_bytes`, size of the repsonses in bytes.
+*  `dns_error_count_total`, total count of responses containing errors.
+*  `dns_cachemiss_count_total`, total count of cache misses.
 
 ### SSL Usage and Authentication with Client Certificates
 

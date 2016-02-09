@@ -40,6 +40,8 @@ func scrape(t *testing.T, key string) int {
 		return -1
 	}
 
+	println(string(body))
+
 	i := n
 	for i < len(body) {
 		if body[i] == '\n' {
@@ -67,9 +69,9 @@ func TestMetrics(t *testing.T) {
 	metrics.Metrics()
 
 	query("miek.nl.", dns.TypeMX)
-	v0 := scrape(t, "test_test_dns_request_count{system=\"recursive\"}")
+	v0 := scrape(t, "test_test_dns_request_count_total{system=\"recursive\"}")
 	query("miek.nl.", dns.TypeMX)
-	v1 := scrape(t, "test_test_dns_request_count{system=\"recursive\"}")
+	v1 := scrape(t, "test_test_dns_request_count_total{system=\"recursive\"}")
 
 	if v1 != v0+1 {
 		t.Fatalf("expecting %d, got %d", v0+1, v1)

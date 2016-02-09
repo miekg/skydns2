@@ -56,14 +56,14 @@ func defineMetrics() {
 	requestCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: Namespace,
 		Subsystem: Subsystem,
-		Name:      "dns_request_count",
+		Name:      "dns_request_count_total",
 		Help:      "Counter of DNS requests made.",
 	}, []string{"system"})
 
 	requestDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: Namespace,
 		Subsystem: Subsystem,
-		Name:      "dns_request_duration",
+		Name:      "dns_request_duration_seconds",
 		Help:      "Histogram of the time (in seconds) each request took to resolve.",
 		Buckets:   append([]float64{0.001, 0.003}, prometheus.DefBuckets...),
 	}, []string{"system"})
@@ -71,7 +71,7 @@ func defineMetrics() {
 	responseSize = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Namespace: Namespace,
 		Subsystem: Subsystem,
-		Name:      "dns_response_size",
+		Name:      "dns_response_size_bytes",
 		Help:      "Size of the returns response in bytes.",
 		Buckets: []float64{0, 512, 1024, 1500, 2048, 4096,
 			8192, 12288, 16384, 20480, 24576, 28672, 32768, 36864,
@@ -82,14 +82,14 @@ func defineMetrics() {
 	errorCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: Namespace,
 		Subsystem: Subsystem,
-		Name:      "dns_error_count",
+		Name:      "dns_error_count_total",
 		Help:      "Counter of DNS requests resulting in an error.",
 	}, []string{"system", "cause"})
 
 	cacheMiss = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: Namespace,
 		Subsystem: Subsystem,
-		Name:      "dns_cache_miss_count",
+		Name:      "dns_cachemiss_count_total",
 		Help:      "Counter of DNS requests that result in a cache miss.",
 	}, []string{"cache"})
 }
