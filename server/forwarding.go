@@ -12,15 +12,9 @@ import (
 
 // ServeDNSForward forwards a request to a nameservers and returns the response.
 func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) *dns.Msg {
-	StatsForwardCount.Inc(1)
-	promExternalRequestCount.WithLabelValues("recursive").Inc()
 
 	if s.config.NoRec {
-		m := new(dns.Msg)
-		m.SetReply(req)
-		m.SetRcode(req, dns.RcodeServerFailure)
-		m.Authoritative = false
-		m.RecursionAvailable = false
+		m := s.ServerFailure(req)
 		w.WriteMsg(m)
 		return m
 	}
@@ -33,11 +27,8 @@ func (s *server) ServeDNSForward(w dns.ResponseWriter, req *dns.Msg) *dns.Msg {
 				logf("can not forward, name too short (less than %d labels): `%s'", s.config.Ndots, req.Question[0].Name)
 			}
 		}
-		m := new(dns.Msg)
-		m.SetReply(req)
-		m.SetRcode(req, dns.RcodeServerFailure)
-		m.Authoritative = false     // no matter what set to false
-		m.RecursionAvailable = true // and this is still true
+		m := s.ServerFailure(req)
+		m.RecursionAvailable = true // this is still true
 		w.WriteMsg(m)
 		return m
 	}
@@ -77,10 +68,7 @@ Redo:
 	}
 
 	logf("failure to forward request %q", err)
-	m := new(dns.Msg)
-	m.SetReply(req)
-	m.SetRcode(req, dns.RcodeServerFailure)
-	w.WriteMsg(m)
+	m := s.ServerFailure(req)
 	return m
 }
 
@@ -108,9 +96,6 @@ func (s *server) ServeDNSReverse(w dns.ResponseWriter, req *dns.Msg) *dns.Msg {
 // Lookup looks up name,type using the recursive nameserver defines
 // in the server's config. If none defined it returns an error.
 func (s *server) Lookup(n string, t, bufsize uint16, dnssec bool) (*dns.Msg, error) {
-	StatsLookupCount.Inc(1)
-	promExternalRequestCount.WithLabelValues("lookup").Inc()
-
 	if len(s.config.Nameservers) == 0 {
 		return nil, fmt.Errorf("no nameservers configured can not lookup name")
 	}

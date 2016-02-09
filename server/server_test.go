@@ -16,21 +16,21 @@ import (
 	"testing"
 	"time"
 
-	etcd "github.com/coreos/etcd/client"
-	"github.com/miekg/dns"
 	backendetcd "github.com/skynetservices/skydns/backends/etcd"
 	"github.com/skynetservices/skydns/cache"
 	"github.com/skynetservices/skydns/msg"
+
+	etcd "github.com/coreos/etcd/client"
+	"github.com/miekg/dns"
 	"golang.org/x/net/context"
 )
 
 // Keep global port counter that increments with 10 for each
 // new call to newTestServer. The dns server is started on port 'Port'.
 var (
-	Port        = 9400
-	StrPort     = "9400" // string equivalent of Port
-	metricsDone = false
-	ctx         = context.Background()
+	Port    = 9400
+	StrPort = "9400" // string equivalent of Port
+	ctx     = context.Background()
 )
 
 func addService(t *testing.T, s *server, k string, ttl time.Duration, m *msg.Service) {
@@ -83,14 +83,6 @@ func newTestServer(t *testing.T, c bool) *server {
 	s.config.Ttl = 3600
 	s.config.Ndots = 2
 
-	prometheusPort = "12300"
-	prometheusSubsystem = "test"
-	prometheusNamespace = "test"
-	if !metricsDone {
-		metricsDone = true
-		Metrics()
-	}
-
 	s.dnsUDPclient = &dns.Client{Net: "udp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
 	s.dnsTCPclient = &dns.Client{Net: "tcp", ReadTimeout: 2 * s.config.ReadTimeout, WriteTimeout: 2 * s.config.ReadTimeout, SingleInflight: true}
 
@@ -100,8 +92,7 @@ func newTestServer(t *testing.T, c bool) *server {
 	})
 
 	go s.Run()
-	// Yeah, yeah, should do a proper fix.
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond) // Yeah, yeah, should do a proper fix
 	return s
 }
 
@@ -307,7 +298,7 @@ func TestDNSTtlRR(t *testing.T) {
 	defer s.Stop()
 
 	serv := &msg.Service{Host: "10.0.0.2", Key: "ttl.skydns.test.", Ttl: 360}
-	addService(t, s, serv.Key, time.Duration(serv.Ttl) * time.Second, serv)
+	addService(t, s, serv.Key, time.Duration(serv.Ttl)*time.Second, serv)
 	defer delService(t, s, serv.Key)
 
 	c := new(dns.Client)

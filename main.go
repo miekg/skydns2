@@ -20,13 +20,13 @@ import (
 	"strings"
 	"time"
 
-	etcd "github.com/coreos/etcd/client"
-	"github.com/miekg/dns"
-
 	backendetcd "github.com/skynetservices/skydns/backends/etcd"
+	"github.com/skynetservices/skydns/metrics"
 	"github.com/skynetservices/skydns/msg"
 	"github.com/skynetservices/skydns/server"
-	"github.com/skynetservices/skydns/stats"
+
+	etcd "github.com/coreos/etcd/client"
+	"github.com/miekg/dns"
 	"golang.org/x/net/context"
 )
 
@@ -150,8 +150,11 @@ func main() {
 		}()
 	}
 
-	stats.Collect()  // Graphite
-	server.Metrics() // Prometheus
+	if err := metrics.Metrics(); err != nil {
+		log.Fatalf("skydns: %s", err)
+	} else {
+		log.Printf("skydns: metrics enabled on :%s%s", metrics.Port, metrics.Path)
+	}
 
 	if err := s.Run(); err != nil {
 		log.Fatalf("skydns: %s", err)
