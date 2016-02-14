@@ -66,6 +66,8 @@ type Config struct {
 
 	Verbose bool `json:"-"`
 
+	Version bool
+
 	// some predefined string "constants"
 	localDomain string // "local.dns." + config.Domain
 	dnsDomain   string // "ns.dns". + config.Domain
