@@ -75,6 +75,9 @@ func init() {
 	flag.BoolVar(&config.Verbose, "verbose", false, "log queries")
 	flag.BoolVar(&config.Systemd, "systemd", boolEnv("SKYDNS_SYSTEMD", false), "bind to socket(s) activated by systemd (ignore -addr)")
 
+	// Version
+	flag.BoolVar(&config.Version, "version", false, "Print the version and exit.")
+
 	// TTl
 	// Minttl
 	flag.StringVar(&config.Hostmaster, "hostmaster", "hostmaster@skydns.local.", "hostmaster email address to use")
@@ -87,6 +90,12 @@ func init() {
 
 func main() {
 	flag.Parse()
+
+	if config.Version {
+		fmt.Printf("skydns server version: %s\n", server.Version)
+		os.Exit(0)
+	}
+
 	machines := strings.Split(machine, ",")
 	client, err := newEtcdClient(machines, tlspem, tlskey, cacert)
 	if err != nil {
