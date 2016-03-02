@@ -111,7 +111,13 @@ func (s *server) Lookup(n string, t, bufsize uint16, dnssec bool) (*dns.Msg, err
 Redo:
 	r, _, err := s.dnsUDPclient.Exchange(m, s.config.Nameservers[nsid])
 	if err == nil {
-		if r.Rcode != dns.RcodeSuccess {
+		switch r.Rcode {
+		case dns.RcodeServerFailure:
+			// On server failure try the next nameserver in the list.
+			try++
+			nsid = (nsid + 1) % len(s.config.Nameservers)
+			goto Redo
+		default:
 			return nil, fmt.Errorf("rcode is not equal to success")
 		}
 		// Reset TTLs to rcache TTL to make some of the other code
