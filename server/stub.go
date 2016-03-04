@@ -81,8 +81,6 @@ func (s *server) ServeDNSStubForward(w dns.ResponseWriter, req *dns.Msg, ns []st
 		}
 	}
 
-	tcp := isTCP(w)
-
 	// Add a custom EDNS0 option to the packet, so we can detect loops
 	// when 2 stubs are forwarding to each other.
 	if option != nil {
@@ -94,17 +92,16 @@ func (s *server) ServeDNSStubForward(w dns.ResponseWriter, req *dns.Msg, ns []st
 	var (
 		r   *dns.Msg
 		err error
-		try int
 	)
 
 	// Use request Id for "random" nameserver selection.
 	nsid := int(req.Id) % len(ns)
+	try := 0
 Redo:
-	switch tcp {
-	case false:
-		r, _, err = s.dnsUDPclient.Exchange(req, ns[nsid])
-	case true:
-		r, _, err = s.dnsTCPclient.Exchange(req, ns[nsid])
+	if isTCP(w) {
+		r, err = exchangeWithRetry(s.dnsTCPclient, req, ns[nsid])
+	} else {
+		r, err = exchangeWithRetry(s.dnsUDPclient, req, ns[nsid])
 	}
 	if err == nil {
 		r.Compress = true
