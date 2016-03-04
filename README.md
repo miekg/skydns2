@@ -719,7 +719,7 @@ SkyDNS you must make sure if does not need glibc when run:
 
 Build SkyDNS with:
 
-    % go build -a -tags netgo -installsuffix netgo
+    % GOOS=linux go build -a -tags netgo -installsuffix netgo
 
 And then build the docker image:
 
