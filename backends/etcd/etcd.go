@@ -7,6 +7,7 @@
 package etcd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -15,7 +16,6 @@ import (
 	"github.com/skynetservices/skydns/singleflight"
 
 	etcd "github.com/coreos/etcd/client"
-	"golang.org/x/net/context"
 )
 
 // Config represents configuration for the Etcd backend - these values
@@ -40,6 +40,10 @@ func NewBackend(client etcd.KeysAPI, ctx context.Context, config *Config) *Backe
 		config:   config,
 		inflight: &singleflight.Group{},
 	}
+}
+
+func (g *Backend) HasSynced() bool {
+	return true
 }
 
 func (g *Backend) Records(name string, exact bool) ([]msg.Service, error) {
